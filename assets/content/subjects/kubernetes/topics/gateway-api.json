@@ -1,0 +1,666 @@
+{
+  "id": "gateway-api",
+  "title": "Gateway API",
+  "summary": "Role-oriented successor to Ingress: GatewayClass, Gateway and HTTPRoute, how they link, and how a request flows.",
+  "order": 5,
+  "domainIds": [
+    "services-networking"
+  ],
+  "competencyIds": [
+    "sn-gateway"
+  ],
+  "prerequisites": [
+    "ingress"
+  ],
+  "estMinutes": 14,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "gateway-api-what",
+      "heading": "What Gateway API is",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "sourceTitle": "Gateway API",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Gateway API is a family of API kinds for **dynamic infrastructure provisioning** and **advanced traffic routing**. It is an **add-on**: Kubernetes doesn't implement it natively."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Its kinds are defined as **Custom Resources**. You install the Gateway API CRDs, or follow your chosen implementation's install steps.",
+            "Many implementations support it, so the same specs work in many places.",
+            "Read your implementation's docs for its caveats.",
+            "API group and version in the examples: `gateway.networking.k8s.io/v1`."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-design",
+      "heading": "Design principles and roles",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "sourceTitle": "Gateway API",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Role",
+            "Typically cares about"
+          ],
+          "rows": [
+            [
+              "Infrastructure Provider",
+              "Infrastructure that lets many isolated clusters serve many tenants (e.g. a cloud provider)"
+            ],
+            [
+              "Cluster Operator",
+              "Policies, network access and application permissions for clusters"
+            ],
+            [
+              "Application Developer",
+              "App-level configuration and Service composition"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Role-oriented:** the API kinds mirror these organisational roles.",
+            "**Portable:** specs are custom resources supported by many implementations.",
+            "**Expressive:** header-based matching, traffic weighting and more are built in. With Ingress these needed custom annotations.",
+            "**Extensible:** custom resources can be linked at various layers of the API."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-model",
+      "heading": "Resource model",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "sourceTitle": "Gateway API",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Kind",
+            "What it defines"
+          ],
+          "rows": [
+            [
+              "GatewayClass",
+              "A set of Gateways with common config, managed by the controller that implements the class"
+            ],
+            [
+              "Gateway",
+              "An instance of traffic handling infrastructure, e.g. a cloud load balancer or in-cluster proxy"
+            ],
+            [
+              "HTTPRoute",
+              "HTTP rules mapping traffic from a Gateway listener to backends (often Services)"
+            ],
+            [
+              "GRPCRoute",
+              "The same idea for gRPC traffic"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "These four kinds are **stable**.",
+            "Each Gateway is linked to **exactly one** GatewayClass, which names the controller that manages it.",
+            "One or more Routes (such as HTTPRoute) attach to a Gateway.",
+            "A Gateway can filter which Routes may attach to its listeners. Together this forms a **bidirectional trust model** between Gateways and Routes."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-class-gw",
+      "heading": "GatewayClass and Gateway",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "sourceTitle": "Gateway API",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: gateway.networking.k8s.io/v1\nkind: GatewayClass\nmetadata:\n  name: <class-name>\nspec:\n  controllerName: <controller-name>\n---\napiVersion: gateway.networking.k8s.io/v1\nkind: Gateway\nmetadata:\n  name: <gateway-name>\n  namespace: <namespace>\nspec:\n  gatewayClassName: <class-name>\n  listeners:\n  - name: http\n    protocol: HTTP\n    port: 80\n    hostname: \"<host>\"\n    allowedRoutes:\n      namespaces:\n        from: Same"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A GatewayClass's `controllerName` tells an implementation which classes it manages.",
+            "A Gateway must reference a GatewayClass through `gatewayClassName`.",
+            "Each **listener** sets a protocol, port and optional hostname.",
+            "If `addresses` is left unset, the implementation's controller assigns an address or hostname to the Gateway."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "By default a Gateway only accepts Routes **from its own namespace**. To attach Routes from other namespaces, configure `allowedRoutes` on the listener."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-routes",
+      "heading": "HTTPRoute (and GRPCRoute)",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "sourceTitle": "Gateway API",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: gateway.networking.k8s.io/v1\nkind: HTTPRoute\nmetadata:\n  name: <route-name>\nspec:\n  parentRefs:\n  - name: <gateway-name>\n  hostnames:\n  - \"<host>\"\n  rules:\n  - matches:\n    - path:\n        type: PathPrefix\n        value: /<path>\n    backendRefs:\n    - name: <service-name>\n      port: <port>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`parentRefs` attaches the Route to a Gateway.",
+            "`hostnames` and `matches` choose which requests the rule handles; `backendRefs` says where they go.",
+            "For a Service backend, an implementation may target the Service IP or the Service's EndpointSlices.",
+            "Creating an HTTPRoute configures the underlying Gateway, e.g. extra routes in a cloud load balancer or proxy.",
+            "**GRPCRoute** works the same way for gRPC and can match on a gRPC `service` and `method`. Gateways that support it must support HTTP/2 without an initial upgrade from HTTP/1."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Exam check: a Route only takes effect once it points at the right Gateway via `parentRefs`, that Gateway names an existing class via `gatewayClassName`, and the listener's `allowedRoutes` admits the Route's namespace (same namespace by default)."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-flow",
+      "heading": "Request flow and migrating from Ingress",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "sourceTitle": "Gateway API",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "For a Gateway implemented as a reverse proxy, an HTTP request goes like this:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "1. The client's DNS lookup for the host returns IP(s) belonging to the Gateway.",
+            "2. The client sends the request to that IP. The proxy uses the **Host header** to find config built from the Gateway and its attached HTTPRoute.",
+            "3. Optionally, the proxy matches on headers and/or path using the HTTPRoute's match rules.",
+            "4. Optionally, it modifies the request (e.g. adds or removes headers) using the HTTPRoute's filter rules.",
+            "5. It forwards the request to one or more backends."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Gateway API is the **successor to Ingress**, but it does not include an Ingress kind. Moving existing Ingress objects over needs a **one-time conversion** to Gateway API resources."
+        },
+        {
+          "type": "p",
+          "text": "Because the API is broad and widely implemented, it has conformance definitions and tests (release channels, support levels) to keep behaviour consistent across implementations."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "gateway-api-fc-01",
+      "front": "Is Gateway API built into Kubernetes?",
+      "back": "No. It's an add-on defined as Custom Resources; install the CRDs or an implementation.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-02",
+      "front": "The four stable Gateway API kinds?",
+      "back": "GatewayClass, Gateway, HTTPRoute, GRPCRoute.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-03",
+      "front": "The three roles Gateway API is modelled on?",
+      "back": "Infrastructure Provider, Cluster Operator, Application Developer.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-04",
+      "front": "How many GatewayClasses can one Gateway be associated with?",
+      "back": "Exactly one.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-05",
+      "front": "Which GatewayClass field names the controller that implements it?",
+      "back": "spec.controllerName",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-06",
+      "front": "Which Gateway field references its class?",
+      "back": "spec.gatewayClassName",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-07",
+      "front": "Which HTTPRoute field attaches it to a Gateway?",
+      "back": "spec.parentRefs",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-08",
+      "front": "By default, Routes from which namespaces can attach to a Gateway?",
+      "back": "Only the Gateway's own namespace. Cross-namespace needs allowedRoutes.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-09",
+      "front": "A Gateway leaves `addresses` unset. Where does its address come from?",
+      "back": "The implementation's controller assigns an address or hostname.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-10",
+      "front": "Does Gateway API include an Ingress kind?",
+      "back": "No. Migrating needs a one-time conversion of Ingress objects to Gateway API resources.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-11",
+      "front": "What does a reverse-proxy Gateway use first to pick the right HTTPRoute config?",
+      "back": "The request's Host header.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    },
+    {
+      "id": "gateway-api-fc-12",
+      "front": "Which features does the docs page say Ingress could only do with custom annotations?",
+      "back": "Things like header-based matching and traffic weighting, which Gateway API supports natively.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "gateway-api-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-gateway",
+      "stem": "Which Gateway API kind represents an instance of traffic handling infrastructure, such as a cloud load balancer?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Gateway",
+          "correct": true,
+          "explanation": "A Gateway defines an instance of traffic handling infrastructure."
+        },
+        {
+          "id": "b",
+          "text": "GatewayClass",
+          "correct": false,
+          "explanation": "GatewayClass defines a set of Gateways sharing config and a controller."
+        },
+        {
+          "id": "c",
+          "text": "HTTPRoute",
+          "correct": false,
+          "explanation": "HTTPRoute holds HTTP routing rules from a listener to backends."
+        },
+        {
+          "id": "d",
+          "text": "GRPCRoute",
+          "correct": false,
+          "explanation": "GRPCRoute holds gRPC routing rules."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-02",
+      "type": "multi",
+      "difficulty": 1,
+      "competencyId": "sn-gateway",
+      "stem": "Which are roles that Gateway API's role-oriented design is modelled on? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Infrastructure Provider",
+          "correct": true,
+          "explanation": "Manages infrastructure serving multiple isolated clusters and tenants."
+        },
+        {
+          "id": "b",
+          "text": "Cluster Operator",
+          "correct": true,
+          "explanation": "Manages clusters: policies, network access, app permissions."
+        },
+        {
+          "id": "c",
+          "text": "Application Developer",
+          "correct": true,
+          "explanation": "Manages an application and its Service composition."
+        },
+        {
+          "id": "d",
+          "text": "Ingress Controller",
+          "correct": false,
+          "explanation": "An ingress controller is software that fulfils Ingress objects, not one of the three Gateway API roles."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-gateway",
+      "stem": "An HTTPRoute in namespace `team-a` references a Gateway in namespace `infra` whose listener has no allowedRoutes configured. What happens by default?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The Gateway does not accept the Route, because by default it only accepts Routes from its own namespace",
+          "correct": true,
+          "explanation": "Cross-namespace Routes require allowedRoutes on the listener."
+        },
+        {
+          "id": "b",
+          "text": "The Route is accepted because parentRefs names the Gateway",
+          "correct": false,
+          "explanation": "Trust is bidirectional; the Gateway also filters which Routes may attach."
+        },
+        {
+          "id": "c",
+          "text": "The Route is moved into the infra namespace automatically",
+          "correct": false,
+          "explanation": "Nothing moves objects between namespaces."
+        },
+        {
+          "id": "d",
+          "text": "The GatewayClass decides per request",
+          "correct": false,
+          "explanation": "Route attachment is controlled on the Gateway listener via allowedRoutes."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-04",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "sn-gateway",
+      "stem": "Gateway API kinds are defined as Custom Resources, so you install the CRDs or an implementation before using them.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": true,
+          "explanation": "The page says the specs are Custom Resources, not natively implemented by Kubernetes."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": false,
+          "explanation": "Gateway API is an add-on; it is not built in."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-05",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-gateway",
+      "stem": "Which field in an HTTPRoute links it to a Gateway?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "parentRefs",
+          "correct": true,
+          "explanation": "parentRefs lists the Gateway(s) the Route attaches to."
+        },
+        {
+          "id": "b",
+          "text": "backendRefs",
+          "correct": false,
+          "explanation": "backendRefs lists where matched traffic is sent, e.g. a Service."
+        },
+        {
+          "id": "c",
+          "text": "gatewayClassName",
+          "correct": false,
+          "explanation": "That field is on a Gateway, pointing at its GatewayClass."
+        },
+        {
+          "id": "d",
+          "text": "hostnames",
+          "correct": false,
+          "explanation": "hostnames filters requests by host; it doesn't link to a Gateway."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-gateway",
+      "stem": "Given an HTTPRoute with hostnames `www.example.com`, a PathPrefix match on `/login` and backendRef `example-svc` port 8080, which request reaches example-svc?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A request with Host www.example.com and path /login",
+          "correct": true,
+          "explanation": "Both the hostname and the path match, so it is routed to example-svc on 8080."
+        },
+        {
+          "id": "b",
+          "text": "Any request on port 8080",
+          "correct": false,
+          "explanation": "8080 is the backend port; matching uses host and path."
+        },
+        {
+          "id": "c",
+          "text": "Any request for www.example.com, whatever the path",
+          "correct": false,
+          "explanation": "The rule also requires the /login path prefix."
+        },
+        {
+          "id": "d",
+          "text": "Only gRPC requests for www.example.com",
+          "correct": false,
+          "explanation": "HTTPRoute handles HTTP; GRPCRoute is for gRPC."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-gateway",
+      "stem": "You're migrating to Gateway API. What happens to your existing Ingress objects?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "You do a one-time conversion of them into Gateway API resources",
+          "correct": true,
+          "explanation": "Gateway API has no Ingress kind, so a one-time conversion is needed."
+        },
+        {
+          "id": "b",
+          "text": "Gateway API serves them unchanged through its Ingress kind",
+          "correct": false,
+          "explanation": "Gateway API does not include the Ingress kind."
+        },
+        {
+          "id": "c",
+          "text": "GatewayClass converts them automatically",
+          "correct": false,
+          "explanation": "GatewayClass names a controller; it doesn't convert Ingress objects."
+        },
+        {
+          "id": "d",
+          "text": "They must be deleted because Ingress is being removed",
+          "correct": false,
+          "explanation": "Gateway API is the successor, but the page only calls for converting them, not forced deletion."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-gateway",
+      "stem": "In the documented request flow for a reverse-proxy Gateway, which steps are optional? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Header and/or path matching based on HTTPRoute match rules",
+          "correct": true,
+          "explanation": "The flow lists matching as optional."
+        },
+        {
+          "id": "b",
+          "text": "Modifying the request, e.g. adding or removing headers, using HTTPRoute filters",
+          "correct": true,
+          "explanation": "Request modification via filters is listed as optional."
+        },
+        {
+          "id": "c",
+          "text": "Forwarding the request to one or more backends",
+          "correct": false,
+          "explanation": "Forwarding is the final step, not optional."
+        },
+        {
+          "id": "d",
+          "text": "Using the Host header to find the matching configuration",
+          "correct": false,
+          "explanation": "The proxy always uses the Host header to pick config from the Gateway and HTTPRoute."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-09",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "sn-gateway",
+      "stem": "A single Gateway can be associated with several GatewayClasses at once.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "A Gateway is associated with exactly one GatewayClass."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: exactly one GatewayClass per Gateway."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-gateway",
+      "stem": "Which design principle covers features like header-based matching and traffic weighting that Ingress only offered through custom annotations?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Expressive",
+          "correct": true,
+          "explanation": "Expressive is about built-in support for common routing use cases."
+        },
+        {
+          "id": "b",
+          "text": "Portable",
+          "correct": false,
+          "explanation": "Portable means the specs are custom resources supported by many implementations."
+        },
+        {
+          "id": "c",
+          "text": "Extensible",
+          "correct": false,
+          "explanation": "Extensible means custom resources can be linked at various API layers."
+        },
+        {
+          "id": "d",
+          "text": "Role-oriented",
+          "correct": false,
+          "explanation": "Role-oriented means the kinds mirror organisational roles."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-11",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-gateway",
+      "stem": "A Gateway manifest has no `addresses` field. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The implementation's controller assigns an address or hostname",
+          "correct": true,
+          "explanation": "That's what the page describes for the example Gateway."
+        },
+        {
+          "id": "b",
+          "text": "The Gateway is rejected as invalid",
+          "correct": false,
+          "explanation": "The documented example omits addresses and is valid."
+        },
+        {
+          "id": "c",
+          "text": "It reuses the address of the cluster's Ingress controller",
+          "correct": false,
+          "explanation": "Gateway addresses come from the Gateway API implementation, not an Ingress controller."
+        },
+        {
+          "id": "d",
+          "text": "The listener's hostname becomes the IP address",
+          "correct": false,
+          "explanation": "hostname filters traffic; the address is assigned by the controller."
+        }
+      ]
+    },
+    {
+      "id": "gateway-api-q-12",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-gateway",
+      "stem": "What extra requirement applies to Gateways that support GRPCRoute?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
+      "options": [
+        {
+          "id": "a",
+          "text": "They must support HTTP/2 without an initial upgrade from HTTP/1",
+          "correct": true,
+          "explanation": "This guarantees gRPC traffic flows properly."
+        },
+        {
+          "id": "b",
+          "text": "They must be in the same namespace as every backend Service",
+          "correct": false,
+          "explanation": "The page sets no such namespace rule for GRPCRoute support."
+        },
+        {
+          "id": "c",
+          "text": "They must not have any HTTPRoutes attached",
+          "correct": false,
+          "explanation": "Nothing on the page forbids mixing route kinds."
+        },
+        {
+          "id": "d",
+          "text": "They must leave allowedRoutes unset",
+          "correct": false,
+          "explanation": "allowedRoutes controls which namespaces' Routes attach, not gRPC support."
+        }
+      ]
+    }
+  ]
+}

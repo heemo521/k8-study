@@ -1,5 +1,0 @@
-{
-  "contentVersion": 1,
-  "reviewedAt": "2026-10-11",
-  "topics": ["what-is-k8s", "namespaces", "minikube", "architecture", "managed-k8s", "kubeadm"]
-}

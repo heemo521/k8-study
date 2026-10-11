@@ -1,0 +1,712 @@
+{
+  "id": "cluster-networking",
+  "title": "Pod Networking Model",
+  "summary": "Every Pod gets its own IP, Pods talk without NAT, CNI plugins build the Pod network and kube-proxy programs Service traffic.",
+  "order": 1,
+  "domainIds": [
+    "services-networking"
+  ],
+  "competencyIds": [
+    "sn-pod-connectivity"
+  ],
+  "prerequisites": [
+    "pods"
+  ],
+  "estMinutes": 14,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "cluster-networking-model",
+      "heading": "The Kubernetes network model",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/",
+      "sourceTitle": "Services, Load Balancing, and Networking",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Every Pod gets its **own IP address**, unique across the whole cluster.",
+            "All containers in a Pod share **one network namespace**, so they reach each other over `localhost`.",
+            "Any Pod can reach any other Pod, on the same node or a different one, **directly: no proxies and no NAT** (unless the network is deliberately segmented).",
+            "Node agents such as the kubelet and system daemons can reach every Pod on their own node.",
+            "Pods behave much like VMs or hosts: no need to link containers or map container ports to host ports."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "The **Service** API adds a stable IP or hostname in front of Pods that come and go. **EndpointSlices** track which Pods currently back a Service. **NetworkPolicy** controls traffic between Pods."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-problems",
+      "heading": "Four networking problems",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/networking/",
+      "sourceTitle": "Cluster Networking",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Problem",
+            "Solved by"
+          ],
+          "rows": [
+            [
+              "Container-to-container (tightly coupled)",
+              "Pods and localhost"
+            ],
+            [
+              "Pod-to-Pod",
+              "The Pod network (network plugin)"
+            ],
+            [
+              "Pod-to-Service",
+              "Services"
+            ],
+            [
+              "External-to-Service",
+              "Services"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Giving each Pod its own IP avoids the pain of coordinating host ports between many apps sharing the same machines."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-who",
+      "heading": "Who implements what",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/",
+      "sourceTitle": "Services, Load Balancing, and Networking",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Kubernetes defines the APIs, but most of the networking is done by external components."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Piece",
+            "Implemented by"
+          ],
+          "rows": [
+            [
+              "Pod network namespace setup",
+              "The container runtime (CRI)"
+            ],
+            [
+              "The Pod network itself",
+              "A Pod network implementation, usually a **CNI plugin**"
+            ],
+            [
+              "Service proxying",
+              "**kube-proxy** by default, or the network plugin's own proxy"
+            ],
+            [
+              "NetworkPolicy",
+              "Usually the Pod network implementation"
+            ],
+            [
+              "External access",
+              "Gateway API or Ingress implementations, or `type: LoadBalancer` on a supported cloud"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "If your network plugin doesn't support NetworkPolicy, you can still create NetworkPolicy objects, but they **have no effect**."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-ranges",
+      "heading": "IP address ranges",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/networking/",
+      "sourceTitle": "Cluster Networking",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Pods, Services and Nodes need **non-overlapping** IP ranges, each handed out by a different component:"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Addresses for",
+            "Assigned by"
+          ],
+          "rows": [
+            [
+              "Pods",
+              "The network plugin"
+            ],
+            [
+              "Services",
+              "kube-apiserver"
+            ],
+            [
+              "Nodes",
+              "The kubelet or the cloud-controller-manager"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Clusters are IPv4 only, IPv6 only, or dual-stack (IPv4/IPv6 or IPv6/IPv4).",
+            "In dual-stack, all three components assign both families and must agree on the **primary** IP family.",
+            "Kubernetes only counts the IPs listed in `node.status.addresses` and `pod.status.ips`, even if an interface has more."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-cni",
+      "heading": "CNI plugins",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "sourceTitle": "Network Plugins",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "A **CNI plugin is required** to implement the network model. Pick one compatible with your cluster.",
+            "It must support CNI spec **v0.4.0 or later**; v1.0.0 compatibility is recommended.",
+            "The **container runtime** (for example containerd or CRI-O) is configured to load the CNI plugins, not the kubelet.",
+            "The kubelet flags `cni-bin-dir` and `network-plugin` were **removed in v1.24**.",
+            "Runtimes must also give every sandbox a loopback interface `lo` (the CNI loopback plugin can do this).",
+            "`hostPort` support comes from the `portmap` plugin with the `portMappings` capability."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Default location",
+            "Holds"
+          ],
+          "rows": [
+            [
+              "/etc/cni/net.d",
+              "CNI configuration files"
+            ],
+            [
+              "/opt/cni/bin",
+              "CNI plugin binaries"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Pods stuck without networking on a node? Check that a CNI config exists in `/etc/cni/net.d` and the binaries in `/opt/cni/bin`. Since v1.24 the runtime, not the kubelet, loads CNI."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-kube-proxy",
+      "heading": "kube-proxy and Service IPs",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/virtual-ips/",
+      "sourceTitle": "Virtual IPs and Service Proxies",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "**kube-proxy** runs on every node (unless replaced by another component). It watches **Service and EndpointSlice** objects and programs node rules that catch traffic sent to a Service's `clusterIP` and port and send it on to a backend. It handles every Service type **except ExternalName**."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Mode (Linux)",
+            "Notes"
+          ],
+          "rows": [
+            [
+              "iptables",
+              "Default in v1.37 when no mode is set. Picks a backend at random by default."
+            ],
+            [
+              "nftables",
+              "Successor to iptables; needs kernel 5.13+. Planned future default."
+            ],
+            [
+              "ipvs",
+              "Deprecated since v1.35."
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Choose a mode with `--proxy-mode` or the `mode` field in the kube-proxy config file. Windows only has `kernelspace`.",
+            "Service ClusterIPs come from the `--service-cluster-ip-range` set on kube-apiserver.",
+            "That flag seeds a default **ServiceCIDR** object named `kubernetes`. List ranges with `kubectl get servicecidrs`, and allocated IPs with `kubectl get ipaddresses`."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "cluster-networking-fc-01",
+      "front": "What IP does a Pod get?",
+      "back": "Its own IP address, unique across the whole cluster.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/"
+    },
+    {
+      "id": "cluster-networking-fc-02",
+      "front": "How do two containers in the same Pod talk to each other?",
+      "back": "Over localhost. They share the Pod's network namespace.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/"
+    },
+    {
+      "id": "cluster-networking-fc-03",
+      "front": "Is NAT used for Pod-to-Pod traffic across nodes?",
+      "back": "No. Pods reach each other directly, without proxies or address translation.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/"
+    },
+    {
+      "id": "cluster-networking-fc-04",
+      "front": "The four networking problems Kubernetes addresses?",
+      "back": "Container-to-container, Pod-to-Pod, Pod-to-Service, External-to-Service.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/networking/"
+    },
+    {
+      "id": "cluster-networking-fc-05",
+      "front": "Which components assign IPs to Pods, Services and Nodes?",
+      "back": "Pods: network plugin. Services: kube-apiserver. Nodes: kubelet or cloud-controller-manager.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/networking/"
+    },
+    {
+      "id": "cluster-networking-fc-06",
+      "front": "What is a CNI plugin for?",
+      "back": "It implements the Pod network (the Kubernetes network model). One is required.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/"
+    },
+    {
+      "id": "cluster-networking-fc-07",
+      "front": "Default directories for CNI config and CNI binaries?",
+      "back": "Config: /etc/cni/net.d. Binaries: /opt/cni/bin.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/"
+    },
+    {
+      "id": "cluster-networking-fc-08",
+      "front": "Since v1.24, who loads CNI plugins: the kubelet or the container runtime?",
+      "back": "The container runtime. The kubelet's cni-bin-dir and network-plugin flags were removed.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/"
+    },
+    {
+      "id": "cluster-networking-fc-09",
+      "front": "What does kube-proxy watch?",
+      "back": "Service and EndpointSlice objects. It programs node rules so traffic to a ClusterIP reaches a backend.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/virtual-ips/"
+    },
+    {
+      "id": "cluster-networking-fc-10",
+      "front": "kube-proxy's default mode on Linux in v1.37?",
+      "back": "iptables (nftables is planned as a future default; ipvs is deprecated).",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/virtual-ips/"
+    },
+    {
+      "id": "cluster-networking-fc-11",
+      "front": "Which kube-apiserver flag sets the range for Service ClusterIPs?",
+      "back": "--service-cluster-ip-range",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/virtual-ips/"
+    },
+    {
+      "id": "cluster-networking-fc-12",
+      "front": "What happens to NetworkPolicy objects if the network plugin doesn't support them?",
+      "back": "The API still exists, but the policies have no effect.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cluster-networking-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "A Pod has an app container and a sidecar. How can the sidecar reach the app's port 8080?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/",
+      "options": [
+        {
+          "id": "a",
+          "text": "localhost:8080",
+          "correct": true,
+          "explanation": "Containers in a Pod share one network namespace, so they talk over localhost."
+        },
+        {
+          "id": "b",
+          "text": "Only through a Service",
+          "correct": false,
+          "explanation": "A Service isn't needed inside a Pod; localhost works."
+        },
+        {
+          "id": "c",
+          "text": "Through the node's IP and a hostPort",
+          "correct": false,
+          "explanation": "Host port mapping is not needed in the Kubernetes model."
+        },
+        {
+          "id": "d",
+          "text": "They can't communicate over the network",
+          "correct": false,
+          "explanation": "They share the Pod's network namespace."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-02",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "In the Kubernetes network model, traffic between Pods on different nodes must pass through NAT.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "Pods talk to each other directly, without proxies or NAT."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. Any Pod reaches any other Pod directly, on any node."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-03",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "Which statements match the Kubernetes network model? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Each Pod has a cluster-wide unique IP",
+          "correct": true,
+          "explanation": "Part of the model."
+        },
+        {
+          "id": "b",
+          "text": "Node agents such as the kubelet can reach all Pods on their node",
+          "correct": true,
+          "explanation": "Part of the model."
+        },
+        {
+          "id": "c",
+          "text": "Pods on different nodes can talk directly",
+          "correct": true,
+          "explanation": "The Pod network connects Pods on any node."
+        },
+        {
+          "id": "d",
+          "text": "Every container gets its own Pod-level IP",
+          "correct": false,
+          "explanation": "The IP belongs to the Pod; its containers share it."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "Which component is responsible for assigning IP addresses to Services?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/networking/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kube-apiserver",
+          "correct": true,
+          "explanation": "The API server is configured with the Service IP range."
+        },
+        {
+          "id": "b",
+          "text": "The network plugin",
+          "correct": false,
+          "explanation": "The network plugin assigns Pod IPs."
+        },
+        {
+          "id": "c",
+          "text": "The kubelet",
+          "correct": false,
+          "explanation": "The kubelet (or cloud-controller-manager) assigns Node IPs."
+        },
+        {
+          "id": "d",
+          "text": "kube-proxy",
+          "correct": false,
+          "explanation": "kube-proxy routes Service traffic; it doesn't allocate Service IPs."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-05",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "The Pod, Service and Node IP ranges in a cluster may overlap.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/networking/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "The ranges must be non-overlapping."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. Kubernetes needs non-overlapping ranges for Pods, Services and Nodes."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "In a dual-stack cluster, what must the network plugin, kube-apiserver and kubelet agree on?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/networking/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The primary IP family",
+          "correct": true,
+          "explanation": "All components must agree on which family is primary."
+        },
+        {
+          "id": "b",
+          "text": "Using one shared CIDR for Pods and Services",
+          "correct": false,
+          "explanation": "Ranges must not overlap."
+        },
+        {
+          "id": "c",
+          "text": "Using only IPv6 for Services",
+          "correct": false,
+          "explanation": "Dual-stack means both IPv4 and IPv6 are assigned."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-07",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "On Linux, what usually implements the Pod network itself?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A CNI plugin",
+          "correct": true,
+          "explanation": "Most runtimes use CNI to talk to the Pod network implementation."
+        },
+        {
+          "id": "b",
+          "text": "kube-proxy",
+          "correct": false,
+          "explanation": "kube-proxy handles Service proxying, not the Pod network."
+        },
+        {
+          "id": "c",
+          "text": "CoreDNS",
+          "correct": false,
+          "explanation": "CoreDNS provides name resolution, not Pod connectivity."
+        },
+        {
+          "id": "d",
+          "text": "The kube-scheduler",
+          "correct": false,
+          "explanation": "The scheduler places Pods on nodes."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "New Pods on one node get no network. Where would you check, by default, that a CNI configuration file exists?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "options": [
+        {
+          "id": "a",
+          "text": "/etc/cni/net.d",
+          "correct": true,
+          "explanation": "That is the default CNI configuration directory."
+        },
+        {
+          "id": "b",
+          "text": "/etc/kubernetes/manifests",
+          "correct": false,
+          "explanation": "That holds static Pod manifests, not CNI config."
+        },
+        {
+          "id": "c",
+          "text": "/opt/cni/bin",
+          "correct": false,
+          "explanation": "That's the default directory for CNI binaries, not config."
+        },
+        {
+          "id": "d",
+          "text": "The kubelet's --network-plugin flag",
+          "correct": false,
+          "explanation": "That flag was removed in v1.24."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-09",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "Since Kubernetes v1.24, the container runtime, not the kubelet, is responsible for loading CNI plugins.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": true,
+          "explanation": "The kubelet's cni-bin-dir and network-plugin flags were removed in v1.24."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": false,
+          "explanation": "CNI management is no longer in scope for the kubelet."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "Which CNI plugin provides hostPort support?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "options": [
+        {
+          "id": "a",
+          "text": "portmap",
+          "correct": true,
+          "explanation": "portmap, with the portMappings capability, supports hostPort."
+        },
+        {
+          "id": "b",
+          "text": "bandwidth",
+          "correct": false,
+          "explanation": "bandwidth provides traffic shaping."
+        },
+        {
+          "id": "c",
+          "text": "loopback",
+          "correct": false,
+          "explanation": "loopback provides the lo interface for each sandbox."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-11",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "Which objects does kube-proxy watch to program Service routing? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/virtual-ips/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Service",
+          "correct": true,
+          "explanation": "kube-proxy watches Services."
+        },
+        {
+          "id": "b",
+          "text": "EndpointSlice",
+          "correct": true,
+          "explanation": "kube-proxy watches EndpointSlices to know the backends."
+        },
+        {
+          "id": "c",
+          "text": "Ingress",
+          "correct": false,
+          "explanation": "Ingress is handled by an Ingress controller."
+        },
+        {
+          "id": "d",
+          "text": "NetworkPolicy",
+          "correct": false,
+          "explanation": "NetworkPolicy is usually enforced by the network plugin."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-12",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "kube-proxy runs with no mode set on a Linux v1.37 node. Which mode does it use?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/virtual-ips/",
+      "options": [
+        {
+          "id": "a",
+          "text": "iptables",
+          "correct": true,
+          "explanation": "iptables is the default in v1.37."
+        },
+        {
+          "id": "b",
+          "text": "nftables",
+          "correct": false,
+          "explanation": "nftables is planned to become the default in a future release."
+        },
+        {
+          "id": "c",
+          "text": "ipvs",
+          "correct": false,
+          "explanation": "ipvs is deprecated since v1.35 and isn't the default."
+        },
+        {
+          "id": "d",
+          "text": "kernelspace",
+          "correct": false,
+          "explanation": "kernelspace is the only mode on Windows."
+        }
+      ]
+    },
+    {
+      "id": "cluster-networking-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-pod-connectivity",
+      "stem": "Which Service type does kube-proxy NOT implement a virtual IP for?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/virtual-ips/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ExternalName",
+          "correct": true,
+          "explanation": "kube-proxy handles every Service type other than ExternalName."
+        },
+        {
+          "id": "b",
+          "text": "ClusterIP",
+          "correct": false,
+          "explanation": "ClusterIP is the core virtual IP that kube-proxy implements."
+        },
+        {
+          "id": "c",
+          "text": "NodePort",
+          "correct": false,
+          "explanation": "kube-proxy handles NodePort traffic too."
+        }
+      ]
+    }
+  ]
+}

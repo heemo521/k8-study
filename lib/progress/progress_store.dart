@@ -2,6 +2,7 @@
 /// Corrupt data in a key resets that key; it never stops the app starting.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -25,6 +26,37 @@ abstract final class StorageKeys {
   static const practice = 'k8s.practice';
   static const ads = 'k8s.ads';
   static const settings = 'k8s.settings';
+  static const answers = 'k8s.answers';
+  static const recent = 'k8s.recent';
+}
+
+/// Answer history for one question across quizzes, reviews and tests.
+class AnswerStats {
+  const AnswerStats({
+    required this.seen,
+    required this.correct,
+    required this.lastCorrect,
+    required this.lastAt,
+  });
+
+  final int seen;
+  final int correct;
+  final bool lastCorrect;
+  final DateTime lastAt;
+
+  Map<String, dynamic> toJson() => {
+        'n': seen,
+        'c': correct,
+        'last': lastCorrect,
+        'at': lastAt.toIso8601String(),
+      };
+
+  static AnswerStats fromJson(Map<String, dynamic> j) => AnswerStats(
+        seen: j['n'] as int,
+        correct: j['c'] as int,
+        lastCorrect: j['last'] as bool,
+        lastAt: DateTime.parse(j['at'] as String),
+      );
 }
 
 class QuizStats {
@@ -115,6 +147,9 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   List<PracticeRecord> _practice = [];
   AdCapState _ads = AdCapState.initial;
   bool _practiceTimerOn = true;
+  String? _subjectId;
+  Map<String, AnswerStats> _answers = {};
+  Map<String, String> _recent = {};
 
   // ---- loading -------------------------------------------------------------
 
@@ -151,8 +186,18 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
         ]);
     _ads = _read(StorageKeys.ads, AdCapState.initial,
         (j) => AdCapState.fromJson(j as Map<String, dynamic>));
-    _practiceTimerOn = _read(StorageKeys.settings, true,
-        (j) => (j as Map<String, dynamic>)['practiceTimerOn'] as bool? ?? true);
+    final settings = _read<Map<String, dynamic>>(
+        StorageKeys.settings, const {}, (j) => j as Map<String, dynamic>);
+    _practiceTimerOn = settings['practiceTimerOn'] as bool? ?? true;
+    _subjectId = settings['subjectId'] as String?;
+    _answers = _read(StorageKeys.answers, {}, (j) => {
+          for (final e in (j as Map<String, dynamic>).entries)
+            e.key: AnswerStats.fromJson(e.value as Map<String, dynamic>),
+        });
+    _recent = _read(StorageKeys.recent, {}, (j) => {
+          for (final e in (j as Map<String, dynamic>).entries)
+            e.key: e.value as String,
+        });
   }
 
   /// Schema migrations. v1 is the first schema, so an unknown or missing
@@ -303,13 +348,67 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _write(StorageKeys.ads, value.toJson());
   }
 
+  // ---- answer history ------------------------------------------------------
+
+  AnswerStats? answerStats(String questionId) => _answers[questionId];
+
+  Map<String, AnswerStats> get answerHistory => Map.unmodifiable(_answers);
+
+  /// Records every question in a finished attempt (unanswered = wrong).
+  void recordAnswers(QuizAttempt attempt) {
+    final now = clock.now();
+    for (final p in attempt.questions) {
+      final id = p.question.id;
+      final ok = attempt.correct(p);
+      final prev = _answers[id];
+      _answers[id] = AnswerStats(
+        seen: (prev?.seen ?? 0) + 1,
+        correct: (prev?.correct ?? 0) + (ok ? 1 : 0),
+        lastCorrect: ok,
+        lastAt: now,
+      );
+    }
+    _write(StorageKeys.answers, {
+      for (final e in _answers.entries) e.key: e.value.toJson(),
+    });
+    notifyListeners();
+  }
+
+  // ---- where the learner is ------------------------------------------------
+
+  /// Most recently opened topic in [subjectId].
+  String? recentTopic(String subjectId) => _recent[subjectId];
+
+  void markTopicVisited(String subjectId, String topicId) {
+    if (_recent[subjectId] == topicId) return;
+    _recent[subjectId] = topicId;
+    _write(StorageKeys.recent, _recent);
+    // Called from initState; notify after the current build completes.
+    Future.microtask(notifyListeners);
+  }
+
   // ---- settings ------------------------------------------------------------
+
+  void _saveSettings() => _write(StorageKeys.settings, {
+        'practiceTimerOn': _practiceTimerOn,
+        if (_subjectId != null) 'subjectId': _subjectId,
+      });
 
   bool get practiceTimerOn => _practiceTimerOn;
 
   set practiceTimerOn(bool value) {
     _practiceTimerOn = value;
-    _write(StorageKeys.settings, {'practiceTimerOn': value});
+    _saveSettings();
+    notifyListeners();
+  }
+
+  /// Selected subject (null = first in catalog).
+  String? get subjectId => _subjectId;
+
+  set subjectId(String? value) {
+    if (value == _subjectId) return;
+    _subjectId = value;
+    _saveSettings();
     notifyListeners();
   }
 
@@ -323,9 +422,13 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       StorageKeys.quiz,
       StorageKeys.practice,
       StorageKeys.ads,
+      StorageKeys.answers,
+      StorageKeys.recent,
     ]) {
       await _prefs.remove(key);
     }
+    _answers = {};
+    _recent = {};
     _notes = {};
     _cards = {};
     _quiz = {};

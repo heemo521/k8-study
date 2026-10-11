@@ -8,45 +8,36 @@ import 'package:k8_study/content/content_loader.dart';
 import 'package:k8_study/content/models.dart';
 import 'package:k8_study/engine/practice.dart';
 
-const _allowedEverywhere = [
-  'https://kubernetes.io/docs/',
-  'https://minikube.sigs.k8s.io/docs/',
-];
-
-// Vendor docs are allowed only for the managed-k8s topic (spec §12.1).
-const _vendorPrefixes = [
-  'https://docs.aws.amazon.com/eks/',
-  'https://cloud.google.com/kubernetes-engine/docs/',
-  'https://learn.microsoft.com/en-us/azure/aks/',
-];
-
-bool _allowed(String topicId, String url) =>
-    _allowedEverywhere.any(url.startsWith) ||
-    (topicId == 'managed-k8s' && _vendorPrefixes.any(url.startsWith));
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  late ContentBundle content;
+  late Catalog catalog;
 
   setUpAll(() async {
-    content = await ContentLoader(rootBundle).load();
+    catalog = await ContentLoader(rootBundle).load();
   });
 
-  test('manifest lists exactly the topic files on disk', () {
-    final onDisk = Directory('assets/content/topics')
+  test('catalog lists every subject directory', () {
+    final onDisk = Directory('assets/content/subjects')
         .listSync()
-        .whereType<File>()
-        .map((f) => f.uri.pathSegments.last.replaceAll('.json', ''))
+        .whereType<Directory>()
+        .map((d) => d.uri.pathSegments.where((s) => s.isNotEmpty).last)
         .toSet();
-    expect(content.manifest.topicIds.toSet(), onDisk);
-    expect(content.manifest.topicIds.length, onDisk.length,
-        reason: 'no duplicate manifest entries');
+    expect(catalog.subjects.map((s) => s.subject.id).toSet(), onDisk);
   });
 
-  test('ids are unique and prefixed with their topic id', () {
+  test('pubspec declares every subject asset directory', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    for (final s in catalog.subjects) {
+      final id = s.subject.id;
+      expect(pubspec, contains('assets/content/subjects/$id/\n'), reason: id);
+      expect(pubspec, contains('assets/content/subjects/$id/topics/'), reason: id);
+    }
+  });
+
+  test('ids are unique across all subjects', () {
     final topicIds = <String>{};
     final itemIds = <String>{};
-    for (final t in content.topics) {
+    for (final t in catalog.subjects.expand((s) => s.topics)) {
       expect(topicIds.add(t.id), isTrue, reason: 'duplicate topic ${t.id}');
       for (final id in [
         ...t.sections.map((s) => s.id),
@@ -60,19 +51,29 @@ void main() {
     }
   });
 
-  test('every section, card and question has an allow-listed source URL', () {
+  // Per-subject rules.
+  void subjectTest(String name, void Function(ContentBundle content) body) {
+    test(name, () {
+      for (final content in catalog.subjects) {
+        body(content);
+      }
+    });
+  }
+
+  subjectTest('every section, card and question has an allow-listed source URL', (content) {
     for (final t in content.topics) {
       for (final (id, url) in [
         for (final s in t.sections) (s.id, s.sourceUrl),
         for (final c in t.flashcards) (c.id, c.sourceUrl),
         for (final q in t.questions) (q.id, q.sourceUrl),
       ]) {
-        expect(_allowed(t.id, url), isTrue, reason: '$id → $url');
+        expect(content.subject.sourceAllowed(t.id, url), isTrue,
+            reason: '$id → $url');
       }
     }
   });
 
-  test('question shape rules', () {
+  subjectTest('question shape rules', (content) {
     for (final q in content.allQuestions) {
       final correct = q.options.where((o) => o.correct).length;
       final optionIds = q.options.map((o) => o.id).toSet();
@@ -101,7 +102,7 @@ void main() {
     }
   });
 
-  test('domain and competency references resolve', () {
+  subjectTest('domain and competency references resolve', (content) {
     for (final t in content.topics) {
       for (final d in t.domainIds) {
         expect(content.domain(d), isNotNull, reason: '${t.id} → domain $d');
@@ -123,7 +124,7 @@ void main() {
     }
   });
 
-  test('volume minimums per topic', () {
+  subjectTest('volume minimums per topic', (content) {
     for (final t in content.topics) {
       expect(t.sections.length, inInclusiveRange(4, 8), reason: t.id);
       expect(t.flashcards.length, greaterThanOrEqualTo(10), reason: t.id);
@@ -134,7 +135,7 @@ void main() {
     }
   });
 
-  test('tables have at most 3 columns and rectangular rows', () {
+  subjectTest('tables have at most 3 columns and rectangular rows', (content) {
     for (final t in content.topics) {
       for (final s in t.sections) {
         for (final b in s.blocks.whereType<TableBlock>()) {
@@ -147,7 +148,7 @@ void main() {
     }
   });
 
-  test('topic notes stay concise (≤ 1,500 words)', () {
+  subjectTest('topic notes stay concise (≤ 1,500 words)', (content) {
     for (final t in content.topics) {
       var words = 0;
       for (final s in t.sections) {
@@ -167,7 +168,7 @@ void main() {
     }
   });
 
-  test('every practice test can be filled', () {
+  subjectTest('every practice test can be filled', (content) {
     for (final test in content.practiceTests) {
       expect(practicePool(test, content).length,
           greaterThanOrEqualTo(test.questionCount),
@@ -175,10 +176,40 @@ void main() {
     }
   });
 
-  test('exam domain weights sum to 100', () {
-    final sum = content.curriculum.domains
-        .where((d) => d.isExamDomain)
-        .fold<int>(0, (a, d) => a + d.weightPercent!);
-    expect(sum, 100);
+  subjectTest('exam domain weights sum to 100 (when a subject has weights)', (content) {
+    final weighted = content.domains.where((d) => d.weightPercent != null);
+    if (weighted.isEmpty) return;
+    expect(weighted.fold<int>(0, (a, d) => a + d.weightPercent!), 100);
+  });
+
+  subjectTest('topic list matches the files on disk', (content) {
+    final onDisk = Directory('assets/content/subjects/${content.subject.id}/topics')
+        .listSync()
+        .whereType<File>()
+        .map((f) => f.uri.pathSegments.last.replaceAll('.json', ''))
+        .toSet();
+    expect(content.subject.topicIds.toSet(), onDisk);
+    expect(content.subject.topicIds.length, onDisk.length,
+        reason: 'no duplicate topic entries');
+  });
+
+  subjectTest('prerequisites resolve and come earlier in study order', (content) {
+    for (final t in content.topics) {
+      for (final pre in t.prerequisites) {
+        final p = content.topic(pre);
+        expect(p, isNotNull, reason: '${t.id} → $pre');
+        expect(content.topics.indexOf(p!), lessThan(content.topics.indexOf(t)),
+            reason: '${t.id}: prerequisite $pre must be studied first');
+      }
+    }
+  });
+
+  subjectTest('every competency is covered by at least one question', (content) {
+    final covered = {for (final q in content.allQuestions) q.competencyId};
+    for (final d in content.domains) {
+      for (final c in d.competencies) {
+        expect(covered, contains(c.id), reason: '${content.subject.id}: ${c.id}');
+      }
+    }
   });
 }

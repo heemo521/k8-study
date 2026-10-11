@@ -1,0 +1,753 @@
+{
+  "id": "coredns",
+  "title": "DNS & CoreDNS",
+  "summary": "How Services and Pods get DNS names, how Pods search them, how CoreDNS is configured, and how to debug DNS with a test Pod.",
+  "order": 3,
+  "domainIds": [
+    "services-networking"
+  ],
+  "competencyIds": [
+    "sn-coredns"
+  ],
+  "prerequisites": [
+    "services"
+  ],
+  "estMinutes": 16,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "coredns-service-records",
+      "heading": "DNS records for Services",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "sourceTitle": "DNS for Services and Pods",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Kubernetes creates DNS records for **Services and Pods**, so clients can use stable names instead of IPs. The kubelet configures each Pod's DNS."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Record",
+            "Name",
+            "Resolves to"
+          ],
+          "rows": [
+            [
+              "A/AAAA (normal Service)",
+              "`my-svc.my-namespace.svc.cluster-domain.example`",
+              "The Service's cluster IP"
+            ],
+            [
+              "A/AAAA (headless Service)",
+              "`my-svc.my-namespace.svc.cluster-domain.example`",
+              "The IPs of all selected Pods"
+            ],
+            [
+              "SRV (named port)",
+              "`_port-name._port-protocol.my-svc.my-namespace.svc.cluster-domain.example`",
+              "Port number plus a domain name"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "For a headless Service, the SRV query returns one answer per backing Pod, using the Pod's `hostname.my-svc.my-namespace.svc...` name."
+        }
+      ]
+    },
+    {
+      "id": "coredns-search",
+      "heading": "Namespaces and search domains",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "sourceTitle": "DNS for Services and Pods",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "An unqualified name is looked up in the **Pod's own namespace**. The kubelet writes each Pod's `/etc/resolv.conf`, and its `search` list expands short names:"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "text": "nameserver <cluster-dns-ip>\nsearch <namespace>.svc.cluster.local svc.cluster.local cluster.local\noptions ndots:5"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A Pod in namespace `test` looking up `data` will not find Service `data` in namespace `prod`.",
+            "`data.prod` or `data.prod.svc.cluster.local` both work from `test`.",
+            "Limits: at most **32** search domains, or **2048** characters across all of them."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coredns-pod-records",
+      "heading": "Pod records, hostname and subdomain",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "sourceTitle": "DNS for Services and Pods",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Pod A record form: `<pod-IPv4-address>.<namespace>.pod.<cluster-domain>` with dots in the IP turned into dashes, e.g. `172-17-0-3.default.pod.cluster.local`.",
+            "A Pod's hostname is its `metadata.name` unless `spec.hostname` is set.",
+            "With `spec.hostname: foo` and `spec.subdomain: bar` in `my-namespace`, the FQDN is `foo.bar.my-namespace.svc.cluster.local`.",
+            "DNS only serves records for that FQDN if a **headless Service named like the subdomain** exists in the same namespace.",
+            "The Pod must be ready to get a record, unless the Service sets `publishNotReadyAddresses`.",
+            "`setHostnameAsFQDN: true` makes `hostname` return the full FQDN (max 64 characters, or the Pod won't start)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coredns-dnspolicy",
+      "heading": "dnsPolicy and dnsConfig",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "sourceTitle": "DNS for Services and Pods",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "dnsPolicy",
+            "Behaviour"
+          ],
+          "rows": [
+            [
+              "ClusterFirst (the default)",
+              "Use cluster DNS; names outside the cluster domain go upstream"
+            ],
+            [
+              "Default",
+              "Inherit name resolution from the node"
+            ],
+            [
+              "ClusterFirstWithHostNet",
+              "Use for `hostNetwork: true` Pods that still need cluster DNS"
+            ],
+            [
+              "None",
+              "Ignore Kubernetes DNS settings; everything comes from `dnsConfig`"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "\"Default\" is **not** the default. If `dnsPolicy` is unset, `ClusterFirst` applies. A `hostNetwork` Pod left on ClusterFirst falls back to Default behaviour."
+        },
+        {
+          "type": "p",
+          "text": "`dnsConfig` works with any policy and is required with `None`. Fields: `nameservers` (up to 3 IPs), `searches`, and `options` (name plus optional value, e.g. `ndots`)."
+        }
+      ]
+    },
+    {
+      "id": "coredns-corefile",
+      "heading": "CoreDNS and the Corefile",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/",
+      "sourceTitle": "Customizing DNS Service",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "CoreDNS's Service is named **kube-dns** for compatibility with the legacy kube-dns name.",
+            "The kubelet tells containers the DNS server with `--cluster-dns=<dns-service-ip>` and the domain with `--cluster-domain=<default-local-domain>`.",
+            "Configuration lives in the **Corefile**, stored in ConfigMap `coredns` in namespace `kube-system`.",
+            "After editing the ConfigMap, the `reload` plugin applies it; allow about two minutes."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Plugin",
+            "Role"
+          ],
+          "rows": [
+            [
+              "kubernetes",
+              "Answers queries for Service and Pod records in `cluster.local`"
+            ],
+            [
+              "forward",
+              "Sends non-cluster queries upstream (default `/etc/resolv.conf`)"
+            ],
+            [
+              "cache",
+              "Frontend cache (`cache 30` in the default Corefile)"
+            ],
+            [
+              "health / ready",
+              "Health at `:8080/health`; readiness on port 8181"
+            ],
+            [
+              "prometheus",
+              "Metrics on `:9153`"
+            ],
+            [
+              "errors / loop / reload / loadbalance",
+              "Log errors, halt on forwarding loops, auto-reload, randomize record order"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "A **stub domain** is an extra server block that forwards one domain to its own nameserver:"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "text": "<domain>:53 {\n    errors\n    cache 30\n    forward . <nameserver-ip>\n}"
+        }
+      ]
+    },
+    {
+      "id": "coredns-about",
+      "heading": "CoreDNS in the cluster",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/coredns/",
+      "sourceTitle": "Using CoreDNS for Service Discovery",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "CoreDNS is the **default** cluster DNS implementation; it's a CNCF-hosted project.",
+            "When you upgrade with kubeadm, it keeps your existing Corefile automatically.",
+            "When upgrading CoreDNS manually, make sure to keep your Corefile."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coredns-debug",
+      "heading": "Debugging DNS",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "sourceTitle": "Debugging DNS Resolution",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "sh",
+          "text": "kubectl apply -f https://k8s.io/examples/admin/dns/dnsutils.yaml\nkubectl exec -i -t dnsutils -- nslookup kubernetes.default\nkubectl exec -ti dnsutils -- cat /etc/resolv.conf\nkubectl get pods --namespace=kube-system -l k8s-app=kube-dns\nkubectl logs --namespace=kube-system -l k8s-app=kube-dns\nkubectl get svc --namespace=kube-system\nkubectl get endpointslice -l kubernetes.io/service-name=kube-dns --namespace=kube-system"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "CoreDNS Pods carry the label `k8s-app=kube-dns` (kept for compatibility).",
+            "To see each query, add the `log` plugin: `kubectl -n kube-system edit configmap coredns`.",
+            "CoreDNS needs list/watch on Services and EndpointSlices; check `kubectl describe clusterrole system:coredns`.",
+            "Service in another namespace? Query `<service-name>.<namespace>`.",
+            "Ubuntu's systemd-resolved can cause a forwarding loop; point the kubelet's `--resolv-conf` at `/run/systemd/resolve/resolv.conf` (kubeadm does this automatically)."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Check DNS from a throwaway Pod with `kubectl exec -i -t dnsutils -- nslookup <service-name>.<namespace>`. If it fails, check in order: resolv.conf, CoreDNS Pods, logs, the kube-dns Service, then its EndpointSlices."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "coredns-fc-01",
+      "front": "FQDN of a Service?",
+      "back": "my-svc.my-namespace.svc.cluster-domain.example (cluster.local in most clusters).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "coredns-fc-02",
+      "front": "What does a headless Service's A record resolve to?",
+      "back": "The IPs of all Pods selected by the Service.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "coredns-fc-03",
+      "front": "SRV record format for a named port?",
+      "back": "_port-name._port-protocol.my-svc.my-namespace.svc.cluster-domain.example",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "coredns-fc-04",
+      "front": "Typical search line in a Pod's /etc/resolv.conf?",
+      "back": "search <namespace>.svc.cluster.local svc.cluster.local cluster.local (with options ndots:5).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "coredns-fc-05",
+      "front": "Default dnsPolicy when none is set?",
+      "back": "ClusterFirst. (\"Default\" means inherit from the node, and is not the default.)",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "coredns-fc-06",
+      "front": "dnsPolicy for a hostNetwork Pod that needs cluster DNS?",
+      "back": "ClusterFirstWithHostNet.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "coredns-fc-07",
+      "front": "When is dnsConfig required?",
+      "back": "When dnsPolicy is None. It may list up to 3 nameservers.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "coredns-fc-08",
+      "front": "Where is the CoreDNS Corefile stored?",
+      "back": "ConfigMap coredns in namespace kube-system.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/"
+    },
+    {
+      "id": "coredns-fc-09",
+      "front": "What is CoreDNS's Service called?",
+      "back": "kube-dns (kept for compatibility with legacy kube-dns).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/"
+    },
+    {
+      "id": "coredns-fc-10",
+      "front": "Which kubelet flags set the cluster DNS IP and domain?",
+      "back": "--cluster-dns=<dns-service-ip> and --cluster-domain=<default-local-domain>.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/"
+    },
+    {
+      "id": "coredns-fc-11",
+      "front": "Which Corefile plugin sends non-cluster names to upstream resolvers?",
+      "back": "forward (default target /etc/resolv.conf).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/"
+    },
+    {
+      "id": "coredns-fc-12",
+      "front": "Label selector for CoreDNS Pods?",
+      "back": "k8s-app=kube-dns",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+    },
+    {
+      "id": "coredns-fc-13",
+      "front": "First command to test cluster DNS from the dnsutils Pod?",
+      "back": "kubectl exec -i -t dnsutils -- nslookup kubernetes.default",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "coredns-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-coredns",
+      "stem": "Service web lives in namespace shop and the cluster domain is cluster.local. What is its FQDN?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "web.shop.svc.cluster.local",
+          "correct": true,
+          "explanation": "Form: <service>.<namespace>.svc.<cluster-domain>."
+        },
+        {
+          "id": "b",
+          "text": "shop.web.svc.cluster.local",
+          "correct": false,
+          "explanation": "The Service name comes before the namespace."
+        },
+        {
+          "id": "c",
+          "text": "web.shop.pod.cluster.local",
+          "correct": false,
+          "explanation": "The pod label is for Pod records; Services use svc."
+        },
+        {
+          "id": "d",
+          "text": "web.svc.shop.cluster.local",
+          "correct": false,
+          "explanation": "svc comes after the namespace."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-coredns",
+      "stem": "A Pod in namespace test runs nslookup data. Service data exists only in namespace prod. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "No result; the short name is searched in the Pod's own namespace",
+          "correct": true,
+          "explanation": "Queries without a namespace are limited to the Pod's namespace."
+        },
+        {
+          "id": "b",
+          "text": "It resolves to data in prod",
+          "correct": false,
+          "explanation": "You need data.prod for another namespace."
+        },
+        {
+          "id": "c",
+          "text": "It resolves to the first matching Service in any namespace",
+          "correct": false,
+          "explanation": "DNS doesn't search all namespaces."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "sn-coredns",
+      "stem": "If dnsPolicy is not set on a Pod, the policy named \"Default\" is used.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "The default is ClusterFirst; \"Default\" means inherit from the node."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. ClusterFirst is used when dnsPolicy is unset."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-coredns",
+      "stem": "A Pod uses hostNetwork: true but must resolve cluster Service names. Which dnsPolicy should it set?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ClusterFirstWithHostNet",
+          "correct": true,
+          "explanation": "Without it, a hostNetwork Pod on ClusterFirst falls back to Default behaviour."
+        },
+        {
+          "id": "b",
+          "text": "Default",
+          "correct": false,
+          "explanation": "Default inherits node resolution and skips cluster DNS."
+        },
+        {
+          "id": "c",
+          "text": "None",
+          "correct": false,
+          "explanation": "None ignores Kubernetes DNS settings entirely."
+        },
+        {
+          "id": "d",
+          "text": "ClusterFirst",
+          "correct": false,
+          "explanation": "With hostNetwork, ClusterFirst falls back to Default behaviour."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-05",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-coredns",
+      "stem": "A Pod sets dnsPolicy: None. Which are true? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "dnsConfig must be specified",
+          "correct": true,
+          "explanation": "With None, all DNS settings come from dnsConfig."
+        },
+        {
+          "id": "b",
+          "text": "dnsConfig.nameservers must list at least one IP",
+          "correct": true,
+          "explanation": "Required when the policy is None."
+        },
+        {
+          "id": "c",
+          "text": "dnsConfig.nameservers can list any number of IPs",
+          "correct": false,
+          "explanation": "At most 3 nameserver IPs are allowed."
+        },
+        {
+          "id": "d",
+          "text": "The node's resolv.conf is merged in",
+          "correct": false,
+          "explanation": "None ignores the Kubernetes-provided DNS settings."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-06",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-coredns",
+      "stem": "A Pod sets hostname: db-0 and subdomain: db in namespace data, but its FQDN doesn't resolve from other Pods. What's most likely missing?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A headless Service named db in namespace data",
+          "correct": true,
+          "explanation": "DNS serves the Pod's FQDN only if a headless Service with the subdomain's name exists."
+        },
+        {
+          "id": "b",
+          "text": "setHostnameAsFQDN: true",
+          "correct": false,
+          "explanation": "That only changes what hostname returns inside the Pod."
+        },
+        {
+          "id": "c",
+          "text": "A NodePort Service named db-0",
+          "correct": false,
+          "explanation": "The Service must be headless and match the subdomain."
+        },
+        {
+          "id": "d",
+          "text": "dnsPolicy: Default",
+          "correct": false,
+          "explanation": "That would stop the Pod using cluster DNS."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-07",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-coredns",
+      "stem": "Where do you edit the CoreDNS configuration in a typical cluster?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ConfigMap coredns in namespace kube-system",
+          "correct": true,
+          "explanation": "It holds the Corefile."
+        },
+        {
+          "id": "b",
+          "text": "Each Pod's /etc/resolv.conf",
+          "correct": false,
+          "explanation": "That's the client side, written by the kubelet."
+        },
+        {
+          "id": "c",
+          "text": "The kube-dns Service spec",
+          "correct": false,
+          "explanation": "The Service only exposes CoreDNS; it holds no config."
+        },
+        {
+          "id": "d",
+          "text": "ConfigMap kube-proxy in kube-system",
+          "correct": false,
+          "explanation": "That configures kube-proxy, not DNS."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-coredns",
+      "stem": "All names under consul.local must be answered by a nameserver at a given IP. What do you add to the Corefile?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A consul.local:53 server block with forward . <nameserver-ip>",
+          "correct": true,
+          "explanation": "That's a stub domain using the forward plugin."
+        },
+        {
+          "id": "b",
+          "text": "A cache 30 line in the .:53 block",
+          "correct": false,
+          "explanation": "cache only enables caching."
+        },
+        {
+          "id": "c",
+          "text": "The loadbalance plugin",
+          "correct": false,
+          "explanation": "loadbalance randomizes record order."
+        },
+        {
+          "id": "d",
+          "text": "A prometheus :9153 line",
+          "correct": false,
+          "explanation": "That exposes metrics."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-09",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-coredns",
+      "stem": "Match the default Corefile plugins correctly. Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "loop: detects simple forwarding loops and halts CoreDNS",
+          "correct": true,
+          "explanation": "Matches the plugin list."
+        },
+        {
+          "id": "b",
+          "text": "reload: reloads a changed Corefile automatically",
+          "correct": true,
+          "explanation": "Allow about two minutes after editing."
+        },
+        {
+          "id": "c",
+          "text": "kubernetes: answers queries for Services and Pods",
+          "correct": true,
+          "explanation": "It replies based on Service and Pod IPs."
+        },
+        {
+          "id": "d",
+          "text": "forward: forwards cluster.local queries to the API server",
+          "correct": false,
+          "explanation": "forward sends queries outside the cluster domain to upstream resolvers."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-10",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "sn-coredns",
+      "stem": "In clusters running CoreDNS, the DNS Service in kube-system is still named kube-dns.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": true,
+          "explanation": "The name is kept for compatibility with workloads that expect kube-dns."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": false,
+          "explanation": "The CoreDNS Service is named kube-dns."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-coredns",
+      "stem": "nslookup kubernetes.default fails from the dnsutils Pod. Which command checks whether the CoreDNS Pods are running?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl get pods --namespace=kube-system -l k8s-app=kube-dns",
+          "correct": true,
+          "explanation": "CoreDNS Pods keep the k8s-app=kube-dns label."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get pods --namespace=default -l k8s-app=kube-dns",
+          "correct": false,
+          "explanation": "CoreDNS runs in kube-system."
+        },
+        {
+          "id": "c",
+          "text": "kubectl get svc --namespace=kube-system",
+          "correct": false,
+          "explanation": "That checks the Service, not the Pods."
+        },
+        {
+          "id": "d",
+          "text": "kubectl describe clusterrole system:coredns",
+          "correct": false,
+          "explanation": "That checks CoreDNS's permissions."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-12",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-coredns",
+      "stem": "CoreDNS Pods run but return SERVFAIL for Service names. Logs suggest it can't read Services. What should you check?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The system:coredns ClusterRole has list and watch on services and endpointslices",
+          "correct": true,
+          "explanation": "CoreDNS needs these permissions to resolve Service names."
+        },
+        {
+          "id": "b",
+          "text": "The kubelet's --cluster-domain flag on every node",
+          "correct": false,
+          "explanation": "That sets Pods' domain; it doesn't grant CoreDNS access."
+        },
+        {
+          "id": "c",
+          "text": "The Pod's dnsPolicy",
+          "correct": false,
+          "explanation": "Queries are reaching CoreDNS; the problem is on its side."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-coredns",
+      "stem": "You want CoreDNS to log every query it receives while debugging. What do you do?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Add the log plugin to the Corefile with kubectl -n kube-system edit configmap coredns",
+          "correct": true,
+          "explanation": "The log plugin records queries; changes reach the Pods within a minute or two."
+        },
+        {
+          "id": "b",
+          "text": "Add the errors plugin",
+          "correct": false,
+          "explanation": "errors is already in the default Corefile and only logs errors."
+        },
+        {
+          "id": "c",
+          "text": "Run kubectl logs on the dnsutils Pod",
+          "correct": false,
+          "explanation": "dnsutils is the client; its logs don't show CoreDNS queries."
+        }
+      ]
+    },
+    {
+      "id": "coredns-q-14",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "sn-coredns",
+      "stem": "When you upgrade a cluster with kubeadm, it can retain your existing CoreDNS Corefile automatically.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/coredns/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": true,
+          "explanation": "kubeadm takes care of keeping the existing CoreDNS configuration."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": false,
+          "explanation": "The page says kubeadm retains it automatically."
+        }
+      ]
+    }
+  ]
+}

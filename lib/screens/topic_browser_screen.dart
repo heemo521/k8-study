@@ -4,87 +4,220 @@ import 'package:provider/provider.dart';
 
 import '../ads/ads_service.dart';
 import '../content/models.dart';
+import '../engine/clock.dart';
+import '../progress/insights.dart';
 import '../progress/progress_store.dart';
 import '../widgets/page_body.dart';
 import '../widgets/progress_ring.dart';
+import '../widgets/subject_switcher.dart';
+import '../widgets/topic_status.dart';
 
-/// S1 — topics grouped by CKA domain.
+/// S1 — where you are (continue card, reviews due) and every topic grouped
+/// by domain, in study order.
 class TopicBrowserScreen extends StatelessWidget {
   const TopicBrowserScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final content = context.read<ContentBundle>();
+    final content = context.watch<ContentBundle>();
     final progress = context.watch<ProgressStore>();
     final ads = context.read<AdsService>();
-    final textTheme = Theme.of(context).textTheme;
-    final complete = content.topics.where(progress.topicComplete).length;
-    final total = content.topics.length;
+    final now = context.read<Clock>().now();
+
+    final due = dueCardCount(content, progress, now);
+    final missed = missedQuestions(content, progress).length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('K8 Study')),
+      appBar: AppBar(
+        title: const SubjectTitle(),
+        actions: [
+          IconButton(
+            key: const ValueKey('open-search'),
+            tooltip: 'Search',
+            icon: const Icon(Icons.search),
+            onPressed: () => context.go('/search'),
+          ),
+        ],
+      ),
       body: PageList(children: [
-        Text('$complete of $total topics complete', style: textTheme.titleSmall),
-        const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: total == 0 ? 0 : complete / total,
-          minHeight: 6,
-          borderRadius: BorderRadius.circular(3),
-          semanticsLabel: 'Overall progress',
-        ),
+        _ContinueCard(content: content, progress: progress),
+        if (due > 0 || missed > 0) ...[
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            if (due > 0)
+              ActionChip(
+                key: const ValueKey('chip-due-cards'),
+                avatar: const Icon(Icons.style_outlined, size: 18),
+                label: Text('$due ${due == 1 ? 'card' : 'cards'} due'),
+                onPressed: () => context.go('/progress/cards'),
+              ),
+            if (missed > 0)
+              ActionChip(
+                key: const ValueKey('chip-missed'),
+                avatar: const Icon(Icons.replay, size: 18),
+                label: Text('$missed missed ${missed == 1 ? 'question' : 'questions'}'),
+                onPressed: () => context.go('/progress/review?kind=missed'),
+              ),
+            ActionChip(
+              avatar: const Icon(Icons.insights_outlined, size: 18),
+              label: const Text('Find my gaps'),
+              onPressed: () => context.go('/progress'),
+            ),
+          ]),
+        ],
         const SizedBox(height: 16),
         for (final domain in content.domainsInDisplayOrder)
-          _DomainSection(domain: domain, topics: content.topicsForDomain(domain.id)),
+          _DomainSection(
+            content: content,
+            domain: domain,
+            topics: content.topicsForDomain(domain.id),
+          ),
         ads.banner(AdPlacement.topicListBanner),
       ]),
     );
   }
 }
 
-class _DomainSection extends StatelessWidget {
-  const _DomainSection({required this.domain, required this.topics});
+/// "Where am I": the next recommended step and overall position.
+class _ContinueCard extends StatelessWidget {
+  const _ContinueCard({required this.content, required this.progress});
 
+  final ContentBundle content;
+  final ProgressStore progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final total = content.topics.length;
+    final complete = content.topics.where(progress.topicComplete).length;
+    final next = nextAction(content, progress);
+
+    return Card(
+      key: const ValueKey('continue-card'),
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('$complete of $total topics complete',
+                style: textTheme.labelLarge
+                    ?.copyWith(color: scheme.onPrimaryContainer)),
+            const SizedBox(height: 6),
+            LinearProgressIndicator(
+              value: total == 0 ? 0 : complete / total,
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(3),
+              semanticsLabel: 'Overall progress',
+            ),
+            const SizedBox(height: 14),
+            if (next == null) ...[
+              Text('Every topic is complete',
+                  style: textTheme.titleLarge
+                      ?.copyWith(color: scheme.onPrimaryContainer)),
+              const SizedBox(height: 4),
+              Text('Keep your flashcards up to date and try a practice test.',
+                  style: textTheme.bodyMedium
+                      ?.copyWith(color: scheme.onPrimaryContainer)),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => context.go('/practice'),
+                child: const Text('Practice tests'),
+              ),
+            ] else ...[
+              Text(
+                '${next.resuming ? 'Continue' : (complete == 0 && !progress.topicStarted(next.topic) ? 'Start here' : 'Up next')}'
+                ' · Topic ${next.position} of ${next.total}',
+                style: textTheme.labelMedium
+                    ?.copyWith(color: scheme.onPrimaryContainer),
+              ),
+              const SizedBox(height: 2),
+              Text(next.topic.title,
+                  style: textTheme.titleLarge
+                      ?.copyWith(color: scheme.onPrimaryContainer)),
+              const SizedBox(height: 8),
+              TopicStepRow(topic: next.topic),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                key: const ValueKey('continue-button'),
+                onPressed: () => context.go(stepPath(next.topic, next.step)),
+                icon: const Icon(Icons.play_arrow),
+                label: Text(stepLabel(next.step)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DomainSection extends StatelessWidget {
+  const _DomainSection({
+    required this.content,
+    required this.domain,
+    required this.topics,
+  });
+
+  final ContentBundle content;
   final Domain domain;
   final List<Topic> topics;
 
   @override
   Widget build(BuildContext context) {
+    final progress = context.watch<ProgressStore>();
     final textTheme = Theme.of(context).textTheme;
-    final title = domain.weightPercent == null
-        ? domain.title
-        : '${domain.title} · ${domain.weightPercent}%';
+    final complete = topics.where(progress.topicComplete).length;
+    final weight = domain.weightPercent == null
+        ? (domain.isExamDomain ? '' : 'Prerequisites')
+        : '${domain.weightPercent}% of ${content.exam?.name ?? 'exam'}';
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Semantics(
-              header: true,
-              child: Text(title, style: textTheme.titleMedium),
-            ),
+          Semantics(
+            header: true,
+            child: Text(domain.title, style: textTheme.titleMedium),
           ),
-          if (!domain.isExamDomain)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text('Prerequisites — not an exam domain.',
-                  style: textTheme.bodySmall),
+          const SizedBox(height: 2),
+          Row(children: [
+            Expanded(
+              child: Text(
+                [
+                  if (weight.isNotEmpty) weight,
+                  if (topics.isNotEmpty) '$complete/${topics.length} complete',
+                ].join(' · '),
+                style: textTheme.bodySmall,
+              ),
             ),
+          ]),
+          if (topics.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            LinearProgressIndicator(
+              value: topics.isEmpty ? 0 : complete / topics.length,
+              minHeight: 3,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ],
+          const SizedBox(height: 10),
           if (topics.isEmpty)
-            Card(
+            const Card(
               child: ListTile(
                 enabled: false,
-                leading: const Icon(Icons.schedule),
-                title: const Text('Coming later'),
-                subtitle: const Text('No topics for this domain yet.'),
+                leading: Icon(Icons.schedule),
+                title: Text('Coming later'),
+                subtitle: Text('No topics for this domain yet.'),
               ),
             )
           else
             for (final t in topics)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _TopicCard(topic: t),
+                child: _TopicCard(
+                    topic: t, position: content.topics.indexOf(t) + 1),
               ),
         ],
       ),
@@ -93,19 +226,16 @@ class _DomainSection extends StatelessWidget {
 }
 
 class _TopicCard extends StatelessWidget {
-  const _TopicCard({required this.topic});
+  const _TopicCard({required this.topic, required this.position});
 
   final Topic topic;
+  final int position;
 
   @override
   Widget build(BuildContext context) {
     final progress = context.watch<ProgressStore>();
     final textTheme = Theme.of(context).textTheme;
-    final status = progress.topicComplete(topic)
-        ? 'Complete'
-        : progress.topicStarted(topic)
-            ? 'In progress'
-            : 'Not started';
+    final complete = progress.topicComplete(topic);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -115,7 +245,13 @@ class _TopicCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              ProgressRing(value: progress.topicProgress(topic)),
+              Stack(alignment: Alignment.center, children: [
+                ProgressRing(value: progress.topicProgress(topic), size: 40),
+                complete
+                    ? Icon(Icons.check,
+                        size: 18, color: Theme.of(context).colorScheme.primary)
+                    : Text('$position', style: textTheme.labelMedium),
+              ]),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -123,43 +259,21 @@ class _TopicCard extends StatelessWidget {
                   children: [
                     Text(topic.title, style: textTheme.titleSmall),
                     const SizedBox(height: 2),
-                    Text(topic.summary, style: textTheme.bodySmall),
+                    Text(topic.summary,
+                        style: textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 6),
-                    Wrap(spacing: 8, runSpacing: 4, children: [
-                      _Chip(status),
-                      _Chip('${topic.estMinutes} min'),
-                    ]),
+                    TopicStepRow(topic: topic),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              const SizedBox(width: 4),
+              Text('${topic.estMinutes}m', style: textTheme.labelSmall),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(label,
-          style: Theme.of(context)
-              .textTheme
-              .labelSmall
-              ?.copyWith(color: scheme.onSecondaryContainer)),
     );
   }
 }

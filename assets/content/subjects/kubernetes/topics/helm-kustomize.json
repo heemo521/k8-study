@@ -1,0 +1,824 @@
+{
+  "id": "helm-kustomize",
+  "title": "Helm & Kustomize",
+  "summary": "Customise manifests with a kustomization file and kubectl -k; install, configure, upgrade and roll back packaged apps with Helm.",
+  "order": 8,
+  "domainIds": [
+    "cluster-arch"
+  ],
+  "competencyIds": [
+    "ca-helm-kustomize"
+  ],
+  "prerequisites": [
+    "kubectl-basics"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "helm-kustomize-kbasics",
+      "heading": "Kustomize in kubectl",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "sourceTitle": "Declarative Management of Kubernetes Objects Using Kustomize",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Kustomize customises Kubernetes objects through a **kustomization file** (`kustomization.yaml`). It is a standalone tool, and kubectl has also understood kustomization files since 1.14."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl kustomize <kustomization_directory>   # render and print, nothing is applied\nkubectl apply -k <kustomization_directory>     # -k is short for --kustomize"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Generate** resources from other sources (ConfigMaps and Secrets).",
+            "**Set cross-cutting fields** on every resource (namespace, name prefix/suffix, labels, annotations).",
+            "**Compose and customise** collections of resources (resources, patches, overlays)."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Always preview with `kubectl kustomize <dir>` before `kubectl apply -k <dir>`. Note that `-k` takes a **directory** that contains a kustomization.yaml, not a file."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-generators",
+      "heading": "ConfigMap & Secret generators",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "sourceTitle": "Declarative Management of Kubernetes Objects Using Kustomize",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "configMapGenerator:\n- name: <cm-name>\n  files:\n  - application.properties   # whole file becomes one key\n- name: <cm-name-2>\n  envs:\n  - .env                     # each line becomes its own key\n- name: <cm-name-3>\n  literals:\n  - FOO=Bar\nsecretGenerator:\n- name: <secret-name>\n  literals:\n  - username=<user>\n  - password=<password>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Generated names get a **content hash suffix**, so changing the data produces a new ConfigMap or Secret.",
+            "Reference the generator's **name** in your Deployment; Kustomize rewrites it to the hashed name for you.",
+            "`generatorOptions` applies to all generators: `disableNameSuffixHash: true` turns the suffix off, and you can add shared `labels` and `annotations`."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-customise",
+      "heading": "Cross-cutting fields, patches & images",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "sourceTitle": "Declarative Management of Kubernetes Objects Using Kustomize",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "namespace: <namespace>\nnamePrefix: dev-\nnameSuffix: \"-001\"\nlabels:\n  - pairs:\n      app: <app>\n    includeSelectors: true\ncommonAnnotations:\n  <key>: <value>\nresources:\n- deployment.yaml\n- service.yaml\npatches:\n  - path: increase_replicas.yaml          # strategic merge patch\n  - target:                               # JSON 6902 patch needs a target\n      group: apps\n      version: v1\n      kind: Deployment\n      name: <deployment-name>\n    path: patch.yaml\nimages:\n- name: nginx\n  newName: <registry>/nginx\n  newTag: \"<tag>\""
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`resources` lists the files (or directories) to include.",
+            "`patches` supports **strategic merge** and **JSON 6902** patches, applied in the listed order. A JSON 6902 patch must name its `target`.",
+            "Keep patches small and single-purpose, for example one for replicas and one for memory limits.",
+            "`images` changes an image's name, tag or digest **without** writing a patch.",
+            "`replacements` copies a field from one resource (such as a prefixed Service name) into other resources."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-overlays",
+      "heading": "Bases, overlays & -k commands",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "sourceTitle": "Declarative Management of Kubernetes Objects Using Kustomize",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A **base** is a directory with a kustomization.yaml and its resources. An **overlay** is a kustomization directory that lists other kustomization directories as its bases and customises them. A base never knows about its overlays, so one base can feed many."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "# dev/kustomization.yaml\nresources:\n- ../base\nnamePrefix: dev-\n\n# prod/kustomization.yaml\nresources:\n- ../base\nnamePrefix: prod-"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl apply -k <dir>/\nkubectl get -k <dir>/\nkubectl describe -k <dir>/\nkubectl diff -k <dir>/      # compare with what applying would change\nkubectl delete -k <dir>/"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Field",
+            "Effect"
+          ],
+          "rows": [
+            [
+              "commonLabels",
+              "Adds labels to all resources **and selectors**"
+            ],
+            [
+              "labels",
+              "Adds labels without automatically adding them to selectors"
+            ],
+            [
+              "commonAnnotations",
+              "Adds annotations to all resources"
+            ],
+            [
+              "namePrefix / nameSuffix",
+              "Prepends / appends to every resource name"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-helm-install",
+      "heading": "Helm: repos, install & values",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/",
+      "sourceTitle": "Using Helm",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Helm installs **charts** (packages). Each install creates a **release** with a name you choose. Helm 3 ships with **no default repository**, so you add one first."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "helm repo add <name> <url>\nhelm repo update                 # refresh chart lists from repos\nhelm repo list\nhelm search repo <keyword>       # searches repos you added (local data)\nhelm search hub <keyword>        # searches Artifact Hub\nhelm show values <repo>/<chart>  # see configurable options\nhelm install <release> <repo>/<chart> -f values.yaml --set <key>=<value>\nhelm install <repo>/<chart> --generate-name\nhelm status <release>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`-f` / `--values` takes a YAML file and can be repeated; the **rightmost** file wins.",
+            "`--set` values are merged on top with **higher precedence** than `--values`.",
+            "`helm get values <release>` shows the values set on a release.",
+            "`helm install` can also install from a local `.tgz` archive, an unpacked chart directory or a full URL.",
+            "Helm does not wait for resources to be running before it exits (unless you pass `--wait`)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-helm-lifecycle",
+      "heading": "Helm: upgrade, rollback, uninstall",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/",
+      "sourceTitle": "Using Helm",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "helm upgrade -f <file>.yaml <release> <repo>/<chart>\nhelm history <release>             # list revisions\nhelm rollback <release> <revision>\nhelm uninstall <release>\nhelm list                          # releases Helm has kept a record of\nhelm list --deployed"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Every install, upgrade or rollback adds **1** to the revision number. The first revision is always **1**.",
+            "`helm upgrade` only changes what differs from the last release. `--reset-values` clears earlier `--set` values.",
+            "`--wait` waits for Pods ready, PVCs bound and Services with an IP; `--timeout` defaults to `5m0s`. If the timeout is hit the release is marked FAILED.",
+            "`helm uninstall` removes the release record too, so you **cannot roll back** an uninstalled release. Use `--keep-history` to keep the record."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "`helm rollback` needs both the release name and a revision number. Check `helm history <release>` first."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-charts",
+      "heading": "Charts",
+      "sourceUrl": "https://helm.sh/docs/topics/charts/",
+      "sourceTitle": "Charts",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "text",
+          "text": "<chart>/\n  Chart.yaml        # required: apiVersion, name, version\n  values.yaml       # default configuration values\n  charts/           # charts this chart depends on\n  crds/             # CustomResourceDefinitions (plain YAML)\n  templates/        # templates + values = manifests\n  templates/NOTES.txt"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Use `apiVersion: v2` for charts that need Helm 3 or later.",
+            "`version` is the chart's SemVer version; `appVersion` is the app's version and is only informational.",
+            "The defaults file inside a chart must be called `values.yaml`; files on the command line can have any name.",
+            "Templates read values from `.Values` and predefined values such as `Release.Name` and `Release.Namespace`.",
+            "CRDs in `crds/` are installed before the templates, are **never** upgraded or deleted by Helm, and cannot be templated.",
+            "`helm create <name>` scaffolds a chart, `helm lint` checks it and `helm package` builds the `.tgz`."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "A chart **repository** is an HTTP server that serves an `index.yaml` plus packaged charts."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-template",
+      "heading": "helm template",
+      "sourceUrl": "https://helm.sh/docs/helm/helm_template/",
+      "sourceTitle": "helm template",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "`helm template` renders a chart's templates **locally** and prints the manifests. It doesn't contact the cluster: in-cluster lookups are faked and no server-side validity checks run."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "helm template [NAME] [CHART] [flags]\nhelm template <release> <chart> -f <values>.yaml --set <key>=<value> -n <namespace>\nhelm template <release> <chart> --output-dir <dir>   # write files instead of stdout\nhelm template <release> <chart> -s templates/<file>.yaml   # --show-only one template"
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Because no server-side checks run, a clean render does not prove the cluster will accept the manifests (for example, that an API is supported)."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "helm-kustomize-fc-01",
+      "front": "Render a kustomization directory without applying it?",
+      "back": "kubectl kustomize <dir>",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "id": "helm-kustomize-fc-02",
+      "front": "Apply a kustomization directory?",
+      "back": "kubectl apply -k <dir> (or --kustomize).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "id": "helm-kustomize-fc-03",
+      "front": "Why does a generated ConfigMap have a suffix like -8mbdf7882g?",
+      "back": "Kustomize appends a content hash so new data creates a new object. Turn it off with generatorOptions.disableNameSuffixHash: true.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "id": "helm-kustomize-fc-04",
+      "front": "configMapGenerator: files vs envs?",
+      "back": "files embeds a whole file as one key; envs turns each line of the .env file into its own key.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "id": "helm-kustomize-fc-05",
+      "front": "commonLabels vs labels in kustomization.yaml?",
+      "back": "commonLabels also adds the labels to selectors; labels adds them without automatically injecting selectors.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "id": "helm-kustomize-fc-06",
+      "front": "Base vs overlay?",
+      "back": "A base is a kustomization dir with resources; an overlay is a kustomization dir that references bases and customises them. Bases don't know about overlays.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "id": "helm-kustomize-fc-07",
+      "front": "What does a JSON 6902 patch in kustomization.yaml require?",
+      "back": "A target (group, version, kind, name) so Kustomize knows which resource to patch.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"
+    },
+    {
+      "id": "helm-kustomize-fc-08",
+      "front": "Add a Helm chart repository and refresh it?",
+      "back": "helm repo add <name> <url> then helm repo update.",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/"
+    },
+    {
+      "id": "helm-kustomize-fc-09",
+      "front": "Precedence of -f vs --set in Helm?",
+      "back": "--set wins over --values/-f. With several -f files, the rightmost wins.",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/"
+    },
+    {
+      "id": "helm-kustomize-fc-10",
+      "front": "Roll back a Helm release?",
+      "back": "helm rollback <release> <revision>. Find revisions with helm history <release>.",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/"
+    },
+    {
+      "id": "helm-kustomize-fc-11",
+      "front": "Revision number after install, then upgrade, then rollback?",
+      "back": "1, 2, 3. Every install/upgrade/rollback adds 1.",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/"
+    },
+    {
+      "id": "helm-kustomize-fc-12",
+      "front": "Keep the release record when uninstalling?",
+      "back": "helm uninstall <release> --keep-history",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/"
+    },
+    {
+      "id": "helm-kustomize-fc-13",
+      "front": "Which file in a chart is required?",
+      "back": "Chart.yaml (with apiVersion, name and version).",
+      "sourceUrl": "https://helm.sh/docs/topics/charts/"
+    },
+    {
+      "id": "helm-kustomize-fc-14",
+      "front": "Does Helm upgrade or delete CRDs from a chart's crds/ directory?",
+      "back": "No. Helm only creates them on install; it never reinstalls, upgrades or deletes them.",
+      "sourceUrl": "https://helm.sh/docs/topics/charts/"
+    },
+    {
+      "id": "helm-kustomize-fc-15",
+      "front": "Render a chart's manifests locally?",
+      "back": "helm template <release> <chart>",
+      "sourceUrl": "https://helm.sh/docs/helm/helm_template/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "helm-kustomize-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "Which command applies the resources defined by the kustomization.yaml in the current directory?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl apply -k ./",
+          "correct": true,
+          "explanation": "-k (--kustomize) points kubectl at a kustomization directory."
+        },
+        {
+          "id": "b",
+          "text": "kubectl apply -f kustomization.yaml",
+          "correct": false,
+          "explanation": "-f applies manifest files; it does not run the kustomization."
+        },
+        {
+          "id": "c",
+          "text": "kubectl kustomize ./",
+          "correct": false,
+          "explanation": "This only renders and prints the output; it doesn't apply it."
+        },
+        {
+          "id": "d",
+          "text": "kubectl get -k ./",
+          "correct": false,
+          "explanation": "That views the objects; it doesn't apply them."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "You change a literal in a `configMapGenerator` and re-apply. What happens to the ConfigMap name?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A new ConfigMap with a different hash suffix is generated, and references are updated to it",
+          "correct": true,
+          "explanation": "The content hash suffix changes when the content changes."
+        },
+        {
+          "id": "b",
+          "text": "The existing ConfigMap is edited in place with the same name",
+          "correct": false,
+          "explanation": "Only when disableNameSuffixHash is true does the name stay fixed."
+        },
+        {
+          "id": "c",
+          "text": "Kustomize refuses to apply because the name is taken",
+          "correct": false,
+          "explanation": "The hash suffix avoids that clash."
+        },
+        {
+          "id": "d",
+          "text": "The Deployment keeps pointing to the old name",
+          "correct": false,
+          "explanation": "Kustomize rewrites references to the generated name."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "Which kustomization field stops the hash suffix on generated ConfigMaps and Secrets?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "options": [
+        {
+          "id": "a",
+          "text": "generatorOptions.disableNameSuffixHash: true",
+          "correct": true,
+          "explanation": "generatorOptions modifies all ConfigMap and Secret generators."
+        },
+        {
+          "id": "b",
+          "text": "nameSuffix: \"\"",
+          "correct": false,
+          "explanation": "nameSuffix appends text to all resource names; it doesn't control the hash."
+        },
+        {
+          "id": "c",
+          "text": "commonAnnotations",
+          "correct": false,
+          "explanation": "That adds annotations to all resources."
+        },
+        {
+          "id": "d",
+          "text": "replacements",
+          "correct": false,
+          "explanation": "That copies field values between resources."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "Which are cross-cutting fields you can set in kustomization.yaml for all resources? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "options": [
+        {
+          "id": "a",
+          "text": "namespace",
+          "correct": true,
+          "explanation": "Sets the same namespace on all resources."
+        },
+        {
+          "id": "b",
+          "text": "namePrefix",
+          "correct": true,
+          "explanation": "Prepended to every resource name."
+        },
+        {
+          "id": "c",
+          "text": "commonAnnotations",
+          "correct": true,
+          "explanation": "Adds annotations to all resources."
+        },
+        {
+          "id": "d",
+          "text": "configMapGenerator",
+          "correct": false,
+          "explanation": "That generates ConfigMaps; it doesn't set a field across all resources."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-05",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "You want to replace `spec.replicas` with a JSON 6902 patch file `patch.yaml`. What else must the `patches` entry contain?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A target naming group, version, kind and name of the resource",
+          "correct": true,
+          "explanation": "Specifying target is mandatory for a Json6902 patch."
+        },
+        {
+          "id": "b",
+          "text": "An images entry",
+          "correct": false,
+          "explanation": "images changes image names/tags, unrelated to JSON patches."
+        },
+        {
+          "id": "c",
+          "text": "A secretGenerator",
+          "correct": false,
+          "explanation": "Generators create ConfigMaps/Secrets."
+        },
+        {
+          "id": "d",
+          "text": "Nothing, Kustomize finds the resource from the patch body",
+          "correct": false,
+          "explanation": "That's how strategic merge patches are matched, not JSON 6902 ones."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "A dev overlay should reuse the manifests in `../base` and prefix all names with `dev-`. Which kustomization.yaml does that?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "options": [
+        {
+          "id": "a",
+          "text": "resources: [../base] plus namePrefix: dev-",
+          "correct": true,
+          "explanation": "Overlays reference bases via resources and add cross-cutting fields."
+        },
+        {
+          "id": "b",
+          "text": "bases: [dev] inside base/kustomization.yaml",
+          "correct": false,
+          "explanation": "A base has no knowledge of its overlays."
+        },
+        {
+          "id": "c",
+          "text": "nameSuffix: dev- with no resources",
+          "correct": false,
+          "explanation": "Without resources, nothing is included; and a suffix is appended, not prepended."
+        },
+        {
+          "id": "d",
+          "text": "patchesStrategicMerge: [../base]",
+          "correct": false,
+          "explanation": "That field takes strategic merge patch files, not a base directory."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-07",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "True or false: `kubectl diff -k <dir>` shows how the cluster would change if the kustomization were applied.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct: diff -k compares live objects with the rendered kustomization."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "It does exactly that comparison."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-08",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "A fresh Helm 3 install has no repositories. Which command adds one named `<name>`?",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "helm repo add <name> <url>",
+          "correct": true,
+          "explanation": "Helm 3 ships without a default repo; add one with helm repo add."
+        },
+        {
+          "id": "b",
+          "text": "helm repo update <name>",
+          "correct": false,
+          "explanation": "update refreshes repos that are already added."
+        },
+        {
+          "id": "c",
+          "text": "helm search hub <name>",
+          "correct": false,
+          "explanation": "That searches Artifact Hub; it doesn't add a repo."
+        },
+        {
+          "id": "d",
+          "text": "helm install <name> <url>",
+          "correct": false,
+          "explanation": "install creates a release from a chart."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "You run `helm install <rel> <chart> -f a.yaml -f b.yaml --set replicaCount=3`. Both files also set replicaCount. Which value is used?",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "3, from --set",
+          "correct": true,
+          "explanation": "--set is merged into --values with higher precedence."
+        },
+        {
+          "id": "b",
+          "text": "The value in a.yaml",
+          "correct": false,
+          "explanation": "The rightmost file wins among -f files, and --set beats both."
+        },
+        {
+          "id": "c",
+          "text": "The value in b.yaml",
+          "correct": false,
+          "explanation": "b.yaml beats a.yaml, but --set has higher precedence still."
+        },
+        {
+          "id": "d",
+          "text": "The chart default",
+          "correct": false,
+          "explanation": "Defaults are overridden by user-supplied values."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "An upgrade broke release `web`. `helm history web` shows revisions 1–3. How do you return to revision 2?",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "helm rollback web 2",
+          "correct": true,
+          "explanation": "helm rollback [RELEASE] [REVISION]."
+        },
+        {
+          "id": "b",
+          "text": "helm upgrade web <chart> --reset-values",
+          "correct": false,
+          "explanation": "That upgrades again and clears --set values; it doesn't restore revision 2."
+        },
+        {
+          "id": "c",
+          "text": "helm uninstall web --keep-history",
+          "correct": false,
+          "explanation": "That removes the release from the cluster."
+        },
+        {
+          "id": "d",
+          "text": "helm get values web",
+          "correct": false,
+          "explanation": "That only shows the release's values."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-11",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "Which statements about Helm revisions and uninstall are correct? Select 2.",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The first revision of a release is always 1",
+          "correct": true,
+          "explanation": "Stated in the Using Helm guide."
+        },
+        {
+          "id": "b",
+          "text": "A rollback also increments the revision number",
+          "correct": true,
+          "explanation": "Install, upgrade and rollback each add 1."
+        },
+        {
+          "id": "c",
+          "text": "You can roll back a release after a plain helm uninstall",
+          "correct": false,
+          "explanation": "Uninstall deletes the release record, so rollback is no longer possible."
+        },
+        {
+          "id": "d",
+          "text": "helm uninstall keeps the release record by default",
+          "correct": false,
+          "explanation": "You need --keep-history for that."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "What does `--wait` do on `helm install` or `helm upgrade`?",
+      "sourceUrl": "https://helm.sh/docs/intro/using_helm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Waits until Pods are ready, PVCs bound and Services have an IP, up to --timeout",
+          "correct": true,
+          "explanation": "Otherwise Helm exits without waiting for resources."
+        },
+        {
+          "id": "b",
+          "text": "Waits 5 minutes before starting the install",
+          "correct": false,
+          "explanation": "5m0s is the default --timeout, not a delay."
+        },
+        {
+          "id": "c",
+          "text": "Skips running hooks",
+          "correct": false,
+          "explanation": "That's --no-hooks."
+        },
+        {
+          "id": "d",
+          "text": "Renders templates locally without installing",
+          "correct": false,
+          "explanation": "That's helm template."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-13",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "True or false: When you upgrade a release, Helm also upgrades the CRDs in the chart's `crds/` directory.",
+      "sourceUrl": "https://helm.sh/docs/topics/charts/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Helm never installs CRDs on upgrade or rollback, and never reinstalls existing ones."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: CRDs are only created on install; upgrade or delete them manually."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-14",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "Which file must every Helm chart contain?",
+      "sourceUrl": "https://helm.sh/docs/topics/charts/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Chart.yaml",
+          "correct": true,
+          "explanation": "Chart.yaml is required and holds apiVersion, name and version."
+        },
+        {
+          "id": "b",
+          "text": "values.schema.json",
+          "correct": false,
+          "explanation": "Optional."
+        },
+        {
+          "id": "c",
+          "text": "templates/NOTES.txt",
+          "correct": false,
+          "explanation": "Optional usage notes."
+        },
+        {
+          "id": "d",
+          "text": "LICENSE",
+          "correct": false,
+          "explanation": "Optional plain-text licence file."
+        }
+      ]
+    },
+    {
+      "id": "helm-kustomize-q-15",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-helm-kustomize",
+      "stem": "Which statement about `helm template` is correct?",
+      "sourceUrl": "https://helm.sh/docs/helm/helm_template/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It renders chart templates locally and prints the manifests",
+          "correct": true,
+          "explanation": "That's its synopsis."
+        },
+        {
+          "id": "b",
+          "text": "It checks against the cluster that every API used is supported",
+          "correct": false,
+          "explanation": "No server-side validity testing is done."
+        },
+        {
+          "id": "c",
+          "text": "It installs the release first, then prints the manifests",
+          "correct": false,
+          "explanation": "It only renders locally."
+        },
+        {
+          "id": "d",
+          "text": "It always needs --output-dir",
+          "correct": false,
+          "explanation": "--output-dir is optional and writes files instead of stdout."
+        }
+      ]
+    }
+  ]
+}

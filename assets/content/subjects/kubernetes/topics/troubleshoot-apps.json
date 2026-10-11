@@ -1,0 +1,787 @@
+{
+  "id": "troubleshoot-apps",
+  "title": "Troubleshooting Applications",
+  "summary": "Pod states, describe and events, logs, exec, kubectl debug and termination messages: symptom to command.",
+  "order": 1,
+  "domainIds": [
+    "troubleshooting"
+  ],
+  "competencyIds": [
+    "ts-output-streams"
+  ],
+  "prerequisites": [
+    "pods"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "troubleshoot-apps-triage",
+      "heading": "Triage by Pod state",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/",
+      "sourceTitle": "Debug Pods",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Start every app investigation with `kubectl describe`. It shows container state, restarts and recent events. Then follow the branch that matches what you see."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl describe pods <pod-name>"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Symptom",
+            "What it means / what to check"
+          ],
+          "rows": [
+            [
+              "Stuck in **Pending**",
+              "Can't be scheduled. Read the scheduler messages in describe: not enough CPU/memory, or a `hostPort` limiting where it fits"
+            ],
+            [
+              "Stuck **Waiting**",
+              "Scheduled but can't start. Most often an image pull failure: check the image name, that it was pushed, and try pulling it by hand"
+            ],
+            [
+              "Stuck **Terminating**",
+              "Deletion requested but not finished. Usually a finalizer plus a webhook (`ValidatingWebhookConfiguration` / `MutatingWebhookConfiguration`) that blocks UPDATE on pods"
+            ],
+            [
+              "Running but misbehaving",
+              "A key in the spec may be misspelled or mis-nested and silently ignored"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "For the last case, recreate the Pod with validation on, and diff what the API server stored against your file:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl apply --validate -f <file>.yaml\nkubectl get pods/<pod-name> -o yaml > <pod-name>-on-apiserver.yaml"
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Pending fixes from the page: delete Pods, lower resource requests, or add nodes. If you need `hostPort`, you can run at most one such Pod per node."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-describe",
+      "heading": "Reading describe output and events",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/",
+      "sourceTitle": "Debug Running Pods",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "A container's **State** is `Waiting`, `Running` or `Terminated`, with extra detail for each.",
+            "**Ready** reports whether the last readiness probe passed. With no probe, the container counts as ready.",
+            "**Restart Count** climbing is your hint of a crash loop (restart policy `Always`).",
+            "**Events** list what happened: `From` is the reporting component; `Reason` and `Message` explain it."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "A Pod that fits on no node shows a `FailedScheduling` event from the scheduler with the per-node reason (for example, not enough CPU). One fix shown is `kubectl scale` to fewer replicas."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get events\nkubectl get events --namespace=<namespace>\nkubectl get pod <pod-name> -o yaml"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Events are **namespaced**. Pass `--namespace`, or `--all-namespaces` to see everything.",
+            "`-o yaml` shows everything the system holds about the Pod, beyond describe."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "A crashing container in describe looks like `State: Waiting` with `Reason: CrashLoopBackOff`, and `Last State: Terminated` with the exit code."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-logs",
+      "heading": "Container logs",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/",
+      "sourceTitle": "Logging Architecture",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Write to **stdout/stderr** and Kubernetes captures it. `kubectl logs` asks the kubelet, which reads the log file on the node."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl logs <pod-name>\nkubectl logs <pod-name> -c <container-name>   # multi-container Pods\nkubectl logs <pod-name> --previous            # the previous instance (after a crash)"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "On a restart, the kubelet keeps **one** terminated container and its logs. Evicting a Pod removes its containers and their logs.",
+            "Log rotation is set in the kubelet config: `containerLogMaxSize` (default **10Mi**) and `containerLogMaxFiles` (default **5**).",
+            "`kubectl logs` only returns the **latest** log file, so you may see at most one rotation's worth.",
+            "By default the runtime writes container logs under `/var/log/pods` (changeable with the kubelet's `podLogsDir`).",
+            "Kubernetes has no built-in log storage. Cluster-level logging needs a separate backend, often fed by a node agent run as a **DaemonSet**."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "App writes to files instead? A **streaming sidecar** can tail each file to its own stdout, so `kubectl logs <pod-name> <sidecar-name>` works. A sidecar that runs its own logging agent does **not** show up in `kubectl logs`."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-cheats",
+      "heading": "Logs and events cheat sheet",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "sourceTitle": "kubectl Quick Reference",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl logs -f <pod-name>                        # stream\nkubectl logs -f <pod-name> -c <container-name>\nkubectl logs -l <label>=<value>                   # by label\nkubectl logs -f -l <label>=<value> --all-containers\nkubectl logs deploy/<deployment-name>\nkubectl get events --sort-by=.metadata.creationTimestamp\nkubectl events --types=Warning\nkubectl get pods --sort-by='.status.containerStatuses[0].restartCount'"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Sorting events by `.metadata.creationTimestamp` puts the newest last, which is quick for spotting what just broke. `kubectl events --types=Warning` filters out the noise."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-exec",
+      "heading": "exec and kubectl debug",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/",
+      "sourceTitle": "Debug Running Pods",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "If the image has tools, run them in place. `-c` is optional for single-container Pods."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl exec <pod-name> -c <container-name> -- <cmd> <args>\nkubectl exec -it <pod-name> -- sh"
+        },
+        {
+          "type": "p",
+          "text": "No shell (distroless) or the container already crashed? Add an **ephemeral container** (stable since v1.25):"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl debug -it <pod-name> --image=busybox:1.28 --target=<container-name>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`--target` joins the process namespace of that container. The runtime must support it.",
+            "The ephemeral container is listed under **Ephemeral Containers** in `kubectl describe pod`."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Or debug a **copy** of the Pod:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "# copy + extra container, shared process namespace\nkubectl debug <pod-name> -it --image=ubuntu --share-processes --copy-to=<pod-name>-debug\n# copy with a container's command replaced by a shell\nkubectl debug <pod-name> -it --copy-to=<pod-name>-debug --container=<container-name> -- sh\n# copy with every image swapped\nkubectl debug <pod-name> --copy-to=<pod-name>-debug --set-image=*=ubuntu"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "To change an existing container's command you must name it with `--container`; otherwise a new container is added.",
+            "`--attach=false` stops auto-attach; reconnect with `kubectl attach`.",
+            "Profiles via `--profile`: `legacy` (current default, planned for deprecation), `general`, `baseline`, `restricted`, `netadmin`, `sysadmin`.",
+            "Clean up afterwards: `kubectl delete pod <pod-name> <pod-name>-debug`."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-term",
+      "heading": "Termination messages",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/determine-reason-pod-failure/",
+      "sourceTitle": "Determine the Reason for Pod Failure",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A container can write a short final status to a file. Kubernetes copies it into the container's status so tools can show it."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Default file: `terminationMessagePath` = `/dev/termination-log`. It can't be changed after the Pod starts.",
+            "The kubelet truncates a message over **4096 bytes**. All containers share **12KiB** in total, split equally.",
+            "`terminationMessagePolicy`: `File` (default) or `FallbackToLogsOnError`, which uses the end of the log when the file is empty and the container failed (max **2048 bytes or 80 lines**, whichever is smaller)."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get pod <pod-name> -o go-template=\"{{range .status.containerStatuses}}{{.lastState.terminated.message}}{{end}}\""
+        },
+        {
+          "type": "p",
+          "text": "In `-o yaml`, look under `status.containerStatuses[].lastState.terminated.message`, next to `exitCode`."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "troubleshoot-apps-fc-01",
+      "front": "First command for any misbehaving Pod?",
+      "back": "`kubectl describe pods <pod-name>`: container state, restarts and recent events.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-02",
+      "front": "A Pod stays Pending. What does that mean?",
+      "back": "It can't be scheduled. Check scheduler messages: insufficient CPU/memory, or `hostPort` restrictions.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-03",
+      "front": "A Pod stays Waiting. Most common cause?",
+      "back": "Failing to pull the image. Check the name, that it was pushed, and try a manual pull.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-04",
+      "front": "A Pod is stuck Terminating. What should you suspect?",
+      "back": "A finalizer plus an admission webhook that blocks UPDATE operations on pods.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-05",
+      "front": "How do you catch a misspelled field such as `commnd`?",
+      "back": "Recreate with `kubectl apply --validate -f <file>.yaml`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-06",
+      "front": "Are events namespaced?",
+      "back": "Yes. Use `kubectl get events --namespace=<ns>` or `--all-namespaces`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-07",
+      "front": "Get logs from the crashed previous instance of a container?",
+      "back": "`kubectl logs <pod> -c <container> --previous`",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-08",
+      "front": "Kubelet log rotation settings and defaults?",
+      "back": "`containerLogMaxSize` 10Mi, `containerLogMaxFiles` 5.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-09",
+      "front": "Default directory for container logs on a Linux node?",
+      "back": "`/var/log/pods`",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-10",
+      "front": "Stream logs live?",
+      "back": "`kubectl logs -f <pod-name>` (add `-c` for a specific container).",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-11",
+      "front": "Container image has no shell. How do you get a shell in that Pod?",
+      "back": "`kubectl debug -it <pod> --image=busybox:1.28 --target=<container>` adds an ephemeral container.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-12",
+      "front": "What does `--copy-to` do in `kubectl debug`?",
+      "back": "Creates a copy of the Pod with changes (extra container, new command, new images), leaving the original alone.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-13",
+      "front": "Default termination message file?",
+      "back": "`/dev/termination-log` (set by `terminationMessagePath`).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/determine-reason-pod-failure/"
+    },
+    {
+      "id": "troubleshoot-apps-fc-14",
+      "front": "What does `terminationMessagePolicy: FallbackToLogsOnError` do?",
+      "back": "If the message file is empty and the container errored, use the tail of the log (max 2048 bytes or 80 lines).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/determine-reason-pod-failure/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "troubleshoot-apps-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ts-output-streams",
+      "stem": "A Pod has been in Pending for ten minutes. What does Pending most directly tell you?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It can't be scheduled onto a node",
+          "correct": true,
+          "explanation": "Pending means the scheduler hasn't placed it; describe shows why."
+        },
+        {
+          "id": "b",
+          "text": "The image failed to pull",
+          "correct": false,
+          "explanation": "Image pull problems show up after scheduling, as a Waiting container."
+        },
+        {
+          "id": "c",
+          "text": "The container exited with an error",
+          "correct": false,
+          "explanation": "That would show a Terminated/crashing container, not an unscheduled Pod."
+        },
+        {
+          "id": "d",
+          "text": "A finalizer is blocking deletion",
+          "correct": false,
+          "explanation": "That's the Terminating case."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-output-streams",
+      "stem": "`kubectl describe pod` shows a container in `Waiting` on a node. According to the debug guide, what is the most common cause?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The image can't be pulled",
+          "correct": true,
+          "explanation": "The guide calls image pull failure the most common cause of Waiting."
+        },
+        {
+          "id": "b",
+          "text": "The node has no CPU left",
+          "correct": false,
+          "explanation": "Lack of resources keeps the Pod Pending (unscheduled), not Waiting on a node."
+        },
+        {
+          "id": "c",
+          "text": "The Service has no endpoints",
+          "correct": false,
+          "explanation": "Services don't stop a container from starting."
+        },
+        {
+          "id": "d",
+          "text": "The termination message is too long",
+          "correct": false,
+          "explanation": "That only truncates a message."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-output-streams",
+      "stem": "Your app container crashed and restarted. Which command shows the output from the crashed instance?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl logs <pod> -c <container> --previous",
+          "correct": true,
+          "explanation": "`--previous` reads the earlier instance's log."
+        },
+        {
+          "id": "b",
+          "text": "kubectl logs <pod> -c <container> -f",
+          "correct": false,
+          "explanation": "`-f` streams the current instance."
+        },
+        {
+          "id": "c",
+          "text": "kubectl events --types=Warning",
+          "correct": false,
+          "explanation": "Events show what happened, not app output."
+        },
+        {
+          "id": "d",
+          "text": "kubectl top pod <pod> --containers",
+          "correct": false,
+          "explanation": "Shows resource usage, not output."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-04",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ts-output-streams",
+      "stem": "True or false: `kubectl get events` with no flags shows events from every namespace.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Events are namespaced; you need `--all-namespaces`."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. Without a namespace flag you only see the current namespace."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-output-streams",
+      "stem": "A Pod runs a distroless image with no shell, so `kubectl exec -it <pod> -- sh` fails. What's the documented way in?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl debug -it <pod> --image=busybox:1.28 --target=<container>",
+          "correct": true,
+          "explanation": "Adds an ephemeral container with tools, sharing the target's process namespace."
+        },
+        {
+          "id": "b",
+          "text": "kubectl attach <pod> -i",
+          "correct": false,
+          "explanation": "Attach connects to the existing process; it gives no tools."
+        },
+        {
+          "id": "c",
+          "text": "kubectl logs <pod> --previous",
+          "correct": false,
+          "explanation": "Shows logs only; no interactive access."
+        },
+        {
+          "id": "d",
+          "text": "kubectl get pod <pod> -o yaml",
+          "correct": false,
+          "explanation": "Shows the full object; doesn't open a shell."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-06",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ts-output-streams",
+      "stem": "Which commands show container log output? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl logs -f <pod>",
+          "correct": true,
+          "explanation": "Streams the Pod's logs."
+        },
+        {
+          "id": "b",
+          "text": "kubectl logs -l <label>=<value>",
+          "correct": true,
+          "explanation": "Dumps logs from Pods matching the label."
+        },
+        {
+          "id": "c",
+          "text": "kubectl logs deploy/<deployment>",
+          "correct": true,
+          "explanation": "Dumps logs from a Deployment's Pod."
+        },
+        {
+          "id": "d",
+          "text": "kubectl events --types=Warning",
+          "correct": false,
+          "explanation": "Lists warning events, not container output."
+        },
+        {
+          "id": "e",
+          "text": "kubectl top pod <pod>",
+          "correct": false,
+          "explanation": "Shows CPU/memory usage, not logs."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-07",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ts-output-streams",
+      "stem": "A Pod writes 40 MiB of logs and the kubelet rotates at 10 MiB. How much can `kubectl logs` return?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/",
+      "options": [
+        {
+          "id": "a",
+          "text": "At most 10 MiB, only the latest file",
+          "correct": true,
+          "explanation": "Only the latest log file is served."
+        },
+        {
+          "id": "b",
+          "text": "All 40 MiB across rotated files",
+          "correct": false,
+          "explanation": "Older rotated files aren't returned."
+        },
+        {
+          "id": "c",
+          "text": "Nothing until rotation finishes",
+          "correct": false,
+          "explanation": "The latest file is readable."
+        },
+        {
+          "id": "d",
+          "text": "Exactly 5 files' worth, one per containerLogMaxFiles",
+          "correct": false,
+          "explanation": "Only the latest file is returned, whatever the file count setting."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ts-output-streams",
+      "stem": "Which are true about kubelet log handling? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/",
+      "options": [
+        {
+          "id": "a",
+          "text": "`containerLogMaxSize` defaults to 10Mi",
+          "correct": true,
+          "explanation": "Stated default."
+        },
+        {
+          "id": "b",
+          "text": "`containerLogMaxFiles` defaults to 5",
+          "correct": true,
+          "explanation": "Stated default."
+        },
+        {
+          "id": "c",
+          "text": "Kubernetes ships a native log storage backend",
+          "correct": false,
+          "explanation": "It doesn't; you need a separate backend."
+        },
+        {
+          "id": "d",
+          "text": "Evicted Pods keep their container logs on the node",
+          "correct": false,
+          "explanation": "Evicting a Pod also removes its containers' logs."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-output-streams",
+      "stem": "You run a logging agent inside a sidecar container. Which limitation does the logging page call out?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Those logs aren't available through kubectl logs",
+          "correct": true,
+          "explanation": "They aren't controlled by the kubelet."
+        },
+        {
+          "id": "b",
+          "text": "The sidecar must run as a DaemonSet",
+          "correct": false,
+          "explanation": "DaemonSets are for node-level agents, not sidecars."
+        },
+        {
+          "id": "c",
+          "text": "The Pod can't use emptyDir volumes",
+          "correct": false,
+          "explanation": "The example sidecars share an emptyDir."
+        },
+        {
+          "id": "d",
+          "text": "The app must stop writing to stdout",
+          "correct": false,
+          "explanation": "No such requirement."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-output-streams",
+      "stem": "Where does a container write its termination message by default?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/determine-reason-pod-failure/",
+      "options": [
+        {
+          "id": "a",
+          "text": "/dev/termination-log",
+          "correct": true,
+          "explanation": "The default `terminationMessagePath`."
+        },
+        {
+          "id": "b",
+          "text": "/tmp/my-log",
+          "correct": false,
+          "explanation": "That's the page's example of a custom `terminationMessagePath`."
+        },
+        {
+          "id": "c",
+          "text": "The container's stdout stream",
+          "correct": false,
+          "explanation": "The message comes from a file; logs are only a fallback with FallbackToLogsOnError."
+        },
+        {
+          "id": "d",
+          "text": "An annotation on the Pod",
+          "correct": false,
+          "explanation": "Kubernetes reads it from the file and puts it into the container status."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-11",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ts-output-streams",
+      "stem": "True or false: With `terminationMessagePolicy: FallbackToLogsOnError`, Kubernetes uses the end of the container log if the message file is empty and the container exited with an error.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/determine-reason-pod-failure/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct. The fallback is capped at 2048 bytes or 80 lines, whichever is smaller."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "That is exactly what the policy does."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-12",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ts-output-streams",
+      "stem": "You want to change the command of container `app` in a crashing Pod to `sh`, without touching the original Pod. Which command fits?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl debug <pod> -it --copy-to=<pod>-debug --container=app -- sh",
+          "correct": true,
+          "explanation": "Copies the Pod and replaces app's command."
+        },
+        {
+          "id": "b",
+          "text": "kubectl debug <pod> -it --copy-to=<pod>-debug -- sh",
+          "correct": false,
+          "explanation": "Without `--container`, kubectl debug adds a new container instead."
+        },
+        {
+          "id": "c",
+          "text": "kubectl exec -it <pod> -c app -- sh",
+          "correct": false,
+          "explanation": "A crashing container won't stay up for exec, and this doesn't change its command."
+        },
+        {
+          "id": "d",
+          "text": "kubectl debug <pod> --copy-to=<pod>-debug --set-image=*=ubuntu",
+          "correct": false,
+          "explanation": "That swaps images, not the command."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-13",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ts-output-streams",
+      "stem": "A Pod spec has `commnd` instead of `command` and the Pod runs the wrong thing. What does the guide suggest first?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Delete it and recreate with kubectl apply --validate -f <file>.yaml",
+          "correct": true,
+          "explanation": "Validation flags the unknown field."
+        },
+        {
+          "id": "b",
+          "text": "Read the container's logs",
+          "correct": false,
+          "explanation": "Logs won't reveal an ignored spec key."
+        },
+        {
+          "id": "c",
+          "text": "Add an ephemeral container",
+          "correct": false,
+          "explanation": "Doesn't fix the spec."
+        },
+        {
+          "id": "d",
+          "text": "Restart the kubelet",
+          "correct": false,
+          "explanation": "The kubelet ran what the API server stored."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-apps-q-14",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ts-output-streams",
+      "stem": "A Pod is stuck in Terminating. Which belong to the documented diagnosis? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Check for a ValidatingWebhookConfiguration or MutatingWebhookConfiguration targeting pod UPDATEs",
+          "correct": true,
+          "explanation": "A webhook can block finalizer removal."
+        },
+        {
+          "id": "b",
+          "text": "Look for a finalizer on the Pod",
+          "correct": true,
+          "explanation": "The scenario needs a finalizer the control plane can't remove."
+        },
+        {
+          "id": "c",
+          "text": "Check that the image was pushed to the registry",
+          "correct": false,
+          "explanation": "That's for Waiting Pods."
+        },
+        {
+          "id": "d",
+          "text": "Check for insufficient node CPU",
+          "correct": false,
+          "explanation": "That's for Pending Pods."
+        }
+      ]
+    }
+  ]
+}

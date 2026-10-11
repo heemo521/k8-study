@@ -11,16 +11,42 @@ import '../widgets/page_body.dart';
 import '../widgets/source_link.dart';
 
 /// S2 — hub for one topic: Notes → Flashcards → Quiz.
-class TopicDetailScreen extends StatelessWidget {
+class TopicDetailScreen extends StatefulWidget {
   const TopicDetailScreen({super.key, required this.topicId});
 
   final String topicId;
 
   @override
-  Widget build(BuildContext context) {
+  State<TopicDetailScreen> createState() => _TopicDetailScreenState();
+}
+
+class _TopicDetailScreenState extends State<TopicDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
     final content = context.read<ContentBundle>();
+    if (content.topic(widget.topicId) != null) {
+      // Deferred: notifying listeners during the first build isn't allowed.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context
+              .read<ProgressStore>()
+              .markTopicVisited(content.subject.id, widget.topicId);
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topicId = widget.topicId;
+    final content = context.watch<ContentBundle>();
     final topic = content.topic(topicId);
     if (topic == null) return const NotFoundView(message: 'Topic not found.');
+    final index = content.topics.indexOf(topic);
+    final prev = index > 0 ? content.topics[index - 1] : null;
+    final next =
+        index + 1 < content.topics.length ? content.topics[index + 1] : null;
 
     final progress = context.watch<ProgressStore>();
     final now = context.read<Clock>().now();
@@ -41,8 +67,15 @@ class TopicDetailScreen extends StatelessWidget {
             : ('Take the quiz', '$base/quiz');
 
     return Scaffold(
-      appBar: AppBar(title: Text(topic.title)),
+      appBar: AppBar(
+        title: Text(topic.title),
+        leading: BackButton(onPressed: () => context.go('/')),
+      ),
       body: PageList(children: [
+        Text('Topic ${index + 1} of ${content.topics.length}',
+            key: const ValueKey('topic-position'),
+            style: textTheme.labelMedium),
+        const SizedBox(height: 4),
         Text(topic.summary, style: textTheme.bodyLarge),
         const SizedBox(height: 12),
         Wrap(spacing: 8, runSpacing: 8, children: [
@@ -50,6 +83,25 @@ class TopicDetailScreen extends StatelessWidget {
             Chip(label: Text(content.domain(d)?.title ?? d)),
           Chip(label: Text('${topic.estMinutes} min')),
         ]),
+        if (topic.prerequisites.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text('Study first', style: textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final id in topic.prerequisites)
+              if (content.topic(id) case final pre?)
+                ActionChip(
+                  avatar: Icon(
+                    progress.topicComplete(pre)
+                        ? Icons.check_circle
+                        : Icons.radio_button_unchecked,
+                    size: 18,
+                  ),
+                  label: Text(pre.title),
+                  onPressed: () => context.go('/topic/${pre.id}'),
+                ),
+          ]),
+        ],
         if (topic.competencyIds.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text('CKA competencies', style: textTheme.titleSmall),
@@ -105,6 +157,31 @@ class TopicDetailScreen extends StatelessWidget {
           ],
         ),
         Text('Content reviewed ${topic.reviewedAt}.', style: textTheme.bodySmall),
+        const SizedBox(height: 16),
+        Row(children: [
+          if (prev != null)
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () => context.go('/topic/${prev.id}'),
+                icon: const Icon(Icons.chevron_left),
+                label: Text(prev.title, overflow: TextOverflow.ellipsis),
+              ),
+            )
+          else
+            const Spacer(),
+          if (next != null)
+            Expanded(
+              child: TextButton.icon(
+                key: const ValueKey('next-topic-link'),
+                onPressed: () => context.go('/topic/${next.id}'),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.chevron_right),
+                label: Text(next.title, overflow: TextOverflow.ellipsis),
+              ),
+            )
+          else
+            const Spacer(),
+        ]),
       ]),
     );
   }

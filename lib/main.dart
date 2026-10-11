@@ -11,7 +11,7 @@ import 'progress/progress_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final content = await ContentLoader(rootBundle).load();
+  final catalog = await ContentLoader(rootBundle).load();
   final progress = ProgressStore(await SharedPreferences.getInstance());
 
   // The only place an ads implementation is chosen (spec §9.1).
@@ -20,5 +20,5 @@ Future<void> main() async {
       : const NoopAdsService();
   await ads.init();
 
-  runApp(K8StudyApp(content: content, progress: progress, ads: ads));
+  runApp(K8StudyApp(catalog: catalog, progress: progress, ads: ads));
 }

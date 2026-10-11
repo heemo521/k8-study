@@ -112,7 +112,8 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
     final content = context.read<ContentBundle>();
     final duration = _timer.elapsed(_clock.now());
     final breakdown = domainBreakdown(attempt, content);
-    context.read<ProgressStore>().recordPractice(PracticeRecord(
+    final progress = context.read<ProgressStore>()..recordAnswers(attempt);
+    progress.recordPractice(PracticeRecord(
           testId: widget.testId,
           pct: attempt.percent,
           perDomain: breakdown,

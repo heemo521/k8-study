@@ -5,22 +5,22 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../ads/ads_service.dart';
+import '../app/quiz_spec.dart';
 import '../app/session_store.dart';
 import '../content/models.dart';
 import '../engine/quiz.dart';
+import '../progress/insights.dart';
 import '../progress/progress_store.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
 import '../widgets/question_view.dart';
 
-/// S5 — 10-question topic quiz with instant feedback.
+/// S5 — 10-question quiz with instant feedback. Draws from one topic, or from
+/// a cross-topic review pool (missed questions, a competency, a domain).
 class QuizScreen extends StatefulWidget {
-  const QuizScreen({super.key, required this.topicId, this.retryMissed = false});
+  const QuizScreen({super.key, required this.spec});
 
-  final String topicId;
-
-  /// Only the questions missed last time; doesn't count toward best score.
-  final bool retryMissed;
+  final QuizSpec spec;
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -28,7 +28,8 @@ class QuizScreen extends StatefulWidget {
 
 class _QuizScreenState extends State<QuizScreen> {
   QuizAttempt? _attempt;
-  late bool _retryMissed;
+  late QuizSpec _spec = widget.spec;
+  String _title = 'Quiz';
   int _index = 0;
   Set<String> _selected = {};
   bool _revealed = false;
@@ -37,21 +38,41 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void initState() {
     super.initState();
-    final topic = context.read<ContentBundle>().topic(widget.topicId);
-    if (topic == null) return;
+    final content = context.read<ContentBundle>();
+    final progress = context.read<ProgressStore>();
     final random = context.read<Random>();
-    final stats = context.read<ProgressStore>().quizStats(topic.id);
-    final missed = {...?stats?.missed};
-    _retryMissed = widget.retryMissed && missed.isNotEmpty;
-    _attempt = QuizAttempt(
-      _retryMissed
-          ? drawQuiz(
-              bank: topic.questions.where((q) => missed.contains(q.id)).toList(),
-              random: random,
-              count: missed.length,
-            )
-          : drawQuiz(bank: topic.questions, random: random, priorityIds: missed),
-    );
+    switch (_spec) {
+      case TopicQuizSpec(:final topicId, :final retryMissed):
+        final topic = content.topic(topicId);
+        if (topic == null) return;
+        progress.markTopicVisited(content.subject.id, topicId);
+        final missed = {...?progress.quizStats(topicId)?.missed};
+        final retry = retryMissed && missed.isNotEmpty;
+        _spec = TopicQuizSpec(topicId, retryMissed: retry);
+        _title = retry ? 'Retry missed' : '${topic.title} · Quiz';
+        _attempt = QuizAttempt(retry
+            ? drawQuiz(
+                bank: topic.questions.where((q) => missed.contains(q.id)).toList(),
+                random: random,
+                count: missed.length,
+              )
+            : drawQuiz(bank: topic.questions, random: random, priorityIds: missed));
+      case ReviewQuizSpec(:final kind, :final id):
+        final pool = reviewPool(content, progress, kind: kind, id: id);
+        _title = switch (kind) {
+          'missed' => 'Review missed questions',
+          'competency' => 'Review: ${content.competencyText(id ?? '') ?? id}',
+          'domain' => 'Review: ${content.domain(id ?? '')?.title ?? id}',
+          _ => 'Review',
+        };
+        // Prioritise questions answered wrong last time, then unseen ones.
+        final weak = {
+          for (final q in pool)
+            if (progress.answerStats(q.id)?.lastCorrect != true) q.id,
+        };
+        _attempt = QuizAttempt(
+            drawQuiz(bank: pool, random: random, priorityIds: weak));
+    }
   }
 
   PresentedQuestion get _current => _attempt!.questions[_index];
@@ -78,21 +99,21 @@ class _QuizScreenState extends State<QuizScreen> {
     _finishing = true;
     final attempt = _attempt!;
     final progress = context.read<ProgressStore>();
-    if (_retryMissed) {
-      progress.recordRetryMissed(widget.topicId, attempt.missedIds);
-    } else {
-      progress.recordQuiz(widget.topicId, attempt.percent, attempt.missedIds);
+    progress.recordAnswers(attempt);
+    if (_spec case TopicQuizSpec(:final topicId, :final retryMissed)) {
+      if (retryMissed) {
+        progress.recordRetryMissed(topicId, attempt.missedIds);
+      } else {
+        progress.recordQuiz(topicId, attempt.percent, attempt.missedIds);
+      }
     }
-    context.read<SessionStore>().lastQuiz = QuizResult(
-      topicId: widget.topicId,
-      attempt: attempt,
-      retryMissed: _retryMissed,
-    );
+    context.read<SessionStore>().lastQuiz =
+        QuizResult(spec: _spec, attempt: attempt);
     // Interstitial (if any) shows before the results screen renders.
     await context
         .read<AdsService>()
         .maybeShowInterstitial(context, AdPlacement.quizComplete);
-    if (mounted) context.go('/topic/${widget.topicId}/quiz/result');
+    if (mounted) context.go(_spec.resultPath);
   }
 
   Future<void> _confirmLeave() async {
@@ -111,22 +132,27 @@ class _QuizScreenState extends State<QuizScreen> {
         ],
       ),
     );
-    if (leave == true && mounted) context.go('/topic/${widget.topicId}');
+    if (leave == true && mounted) context.go(_spec.exitPath);
   }
 
   @override
   Widget build(BuildContext context) {
-    final topic = context.read<ContentBundle>().topic(widget.topicId);
     final attempt = _attempt;
-    if (topic == null || attempt == null || attempt.questions.isEmpty) {
-      return const NotFoundView(message: 'Quiz not available.');
+    if (attempt == null || attempt.questions.isEmpty) {
+      return NotFoundView(
+        message: _spec is ReviewQuizSpec
+            ? 'Nothing to review here yet. Take some quizzes first.'
+            : 'Quiz not available.',
+        backTo: _spec.exitPath,
+      );
     }
     final total = attempt.questions.length;
     final answered = attempt.answers.length;
-    final score = attempt.questions
-        .take(answered)
-        .where(attempt.correct)
-        .length;
+    final score =
+        attempt.questions.take(answered).where(attempt.correct).length;
+    final topicTitle = _spec is ReviewQuizSpec
+        ? context.read<ContentBundle>().topic(_current.question.topicId)?.title
+        : null;
 
     return PopScope(
       canPop: false,
@@ -136,23 +162,36 @@ class _QuizScreenState extends State<QuizScreen> {
       child: Scaffold(
         appBar: AppBar(
           leading: CloseButton(onPressed: _confirmLeave),
-          title: Text(_retryMissed ? 'Retry missed' : '${topic.title} · Quiz'),
+          title: Text(_title, overflow: TextOverflow.ellipsis),
           bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(28),
+            preferredSize: const Size.fromHeight(34),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Row(children: [
-                Text('Q ${_index + 1}/$total',
-                    key: const ValueKey('quiz-position'),
-                    style: Theme.of(context).textTheme.labelLarge),
-                const Spacer(),
-                Text('Score $score/$answered',
-                    style: Theme.of(context).textTheme.labelLarge),
+              child: Column(children: [
+                LinearProgressIndicator(
+                  value: (_index + (_revealed ? 1 : 0)) / total,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Text('Q ${_index + 1}/$total',
+                      key: const ValueKey('quiz-position'),
+                      style: Theme.of(context).textTheme.labelLarge),
+                  const Spacer(),
+                  Text('Score $score/$answered',
+                      style: Theme.of(context).textTheme.labelLarge),
+                ]),
               ]),
             ),
           ),
         ),
         body: PageList(children: [
+          if (topicTitle != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('From: $topicTitle',
+                  style: Theme.of(context).textTheme.labelMedium),
+            ),
           QuestionView(
             key: ValueKey(_current.question.id),
             presented: _current,

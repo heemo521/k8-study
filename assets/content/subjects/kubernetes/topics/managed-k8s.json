@@ -94,7 +94,7 @@
         {
           "type": "callout",
           "kind": "exam",
-          "text": "The CKA curriculum lists \"Create and manage Kubernetes clusters using kubeadm\". Managed offerings give real-world context, but study the kubeadm topic for hands-on setup."
+          "text": "Managed offerings give real-world context. For hands-on cluster setup practice, study the kubeadm topic."
         }
       ]
     },
@@ -247,7 +247,7 @@
           "id": "c",
           "text": "Nothing; you still run etcd yourself",
           "correct": false,
-          "explanation": "The control plane, etcd included, is the provider's job in this option."
+          "explanation": "In this option the provider manages the control plane."
         },
         {
           "id": "d",
@@ -610,7 +610,7 @@
           "id": "d",
           "text": "Because kubeadm only supports multi-zone clusters",
           "correct": false,
-          "explanation": "kubeadm works on a single machine too."
+          "explanation": "Not a reason the production guide gives."
         }
       ]
     }

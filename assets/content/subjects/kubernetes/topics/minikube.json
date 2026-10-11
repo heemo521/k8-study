@@ -84,7 +84,7 @@
         {
           "type": "code",
           "lang": "shell",
-          "text": "minikube start\nminikube status\nkubectl get po -A"
+          "text": "minikube start\nminikube status"
         },
         {
           "type": "p",
@@ -97,7 +97,27 @@
         {
           "type": "code",
           "lang": "shell",
-          "text": "# no kubectl installed? minikube can fetch a matching one\nminikube kubectl -- get po -A\n\n# open the Kubernetes Dashboard (add --url to just print the URL)\nminikube dashboard"
+          "text": "# open the Kubernetes Dashboard (add --url to just print the URL)\nminikube dashboard"
+        }
+      ]
+    },
+    {
+      "id": "minikube-interact",
+      "heading": "Talk to the cluster",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/",
+      "sourceTitle": "minikube start",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get po -A\n\n# no kubectl installed? minikube can fetch a matching one\nminikube kubectl -- get po -A"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`minikube tunnel` gives LoadBalancer Services a routable IP. Run it in a separate window and read the EXTERNAL-IP column.",
+            "`kubectl port-forward service/<name> <local-port>:<service-port>` is another way to reach a Service."
+          ]
         }
       ]
     },
@@ -110,7 +130,7 @@
         {
           "type": "code",
           "lang": "shell",
-          "text": "kubectl create deployment hello-node --image=<image>\nkubectl get deployments\nkubectl get pods\nkubectl get events\nkubectl logs <pod-name>"
+          "text": "# the tutorial's test image serves HTTP on port 8080\nkubectl create deployment hello-node --image=registry.k8s.io/e2e-test-images/agnhost:2.53 -- /agnhost netexec --http-port=8080\nkubectl get deployments\nkubectl get pods\nkubectl get events\nkubectl logs <pod-name>"
         },
         {
           "type": "p",
@@ -125,8 +145,7 @@
           "type": "bullets",
           "items": [
             "On cloud providers, a LoadBalancer Service gets an external IP. On minikube, use `minikube service <name>` to open it.",
-            "`minikube tunnel` gives LoadBalancer Services a routable IP. Run it in a separate window.",
-            "`kubectl port-forward service/<name> <local-port>:<service-port>` is another way to reach a Service."
+            "The app only listens on 8080, so exposing a different port won't work."
           ]
         }
       ]
@@ -168,10 +187,6 @@
             [
               "minikube stop",
               "Halt the cluster"
-            ],
-            [
-              "minikube delete",
-              "Delete the cluster (local VM/container)"
             ],
             [
               "minikube delete --all",
@@ -572,7 +587,7 @@
           "id": "b",
           "text": "minikube start",
           "correct": false,
-          "explanation": "Without -p it starts (or reuses) the default cluster."
+          "explanation": "That starts the default cluster; the -p flag is what creates a separately named one."
         },
         {
           "id": "c",

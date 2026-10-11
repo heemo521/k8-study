@@ -1,0 +1,604 @@
+{
+  "id": "etcd-backup",
+  "title": "etcd Backup & Restore",
+  "summary": "Snapshot etcd with etcdctl, check and restore it with etcdutl, and size the cluster for quorum.",
+  "order": 7,
+  "domainIds": [
+    "cluster-arch"
+  ],
+  "competencyIds": [
+    "ca-lifecycle",
+    "ca-ha"
+  ],
+  "prerequisites": [
+    "architecture"
+  ],
+  "estMinutes": 12,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "etcd-backup-why",
+      "heading": "Why back up etcd",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "sourceTitle": "Operating etcd clusters for Kubernetes",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "etcd is the key-value store that holds **all** Kubernetes objects.",
+            "Regular backups let you recover from disasters such as losing every control plane node.",
+            "A snapshot contains all cluster state, including sensitive data, so **encrypt** snapshot files.",
+            "Access to etcd is equivalent to root on the cluster. Ideally only the API server talks to it.",
+            "Back up etcd before upgrading it, too."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-tools",
+      "heading": "etcdctl vs etcdutl",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "sourceTitle": "Operating etcd clusters for Kubernetes",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Tool",
+            "Works on",
+            "Typical jobs"
+          ],
+          "rows": [
+            [
+              "etcdctl",
+              "A running cluster, over the network",
+              "Keys and values, cluster admin, health, `snapshot save`"
+            ],
+            [
+              "etcdutl",
+              "etcd data files directly",
+              "Restoring snapshots, checking snapshot status, defragmenting, migrating data"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "You may need both. `etcdctl snapshot status` and `etcdctl snapshot restore` are deprecated since etcd v3.5.x and slated for removal in v3.6; use `etcdutl` for those."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-save",
+      "heading": "Taking a snapshot",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "sourceTitle": "Operating etcd clusters for Kubernetes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Use `etcdctl snapshot save` against a live member. Taking it doesn't affect the member's performance. Against a TLS-secured etcd you pass the endpoint and the client certificates:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \\\n  --cacert=<trusted-ca-file> --cert=<cert-file> --key=<key-file> \\\n  snapshot save <backup-file-location>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Find the CA, cert and key file paths in the description of the etcd Pod.",
+            "The page's secure-client example uses `/etc/kubernetes/pki/etcd/ca.crt`, `/etc/kubernetes/pki/etcd/server.crt` and `/etc/kubernetes/pki/etcd/server.key`.",
+            "Alternative: copy the `member/snap/db` file from an etcd data directory that no etcd process is using.",
+            "**Volume snapshot**: if etcd sits on a storage volume that supports backup (such as Amazon EBS), snapshot the volume instead."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Don't memorise the paths: take the trusted CA, cert and key from the etcd Pod's description, map them to `--cacert`, `--cert` and `--key`, and remember `ETCDCTL_API=3` and `--endpoints`."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-verify",
+      "heading": "Verifying a snapshot",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "sourceTitle": "Operating etcd clusters for Kubernetes",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "etcdutl --write-out=table snapshot status snapshot.db"
+        },
+        {
+          "type": "p",
+          "text": "The table shows the snapshot's **HASH**, **REVISION**, **TOTAL KEYS** and **TOTAL SIZE**. The older `etcdctl --write-out=table snapshot status` still prints the table but warns that it is deprecated."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-restore",
+      "heading": "Restoring",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "sourceTitle": "Operating etcd clusters for Kubernetes",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Don't restore etcd while API servers are running. Stop every API server, restore all etcd instances, then start the API servers again. Also restart kube-scheduler, kube-controller-manager and the kubelet so they don't rely on stale data."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "etcdutl --data-dir <data-dir-location> snapshot restore snapshot.db"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`--data-dir` names a directory that the restore **creates**.",
+            "Reusing the old directory? Stop etcd and delete it before restoring.",
+            "Using a new directory? In `/etc/kubernetes/manifests/etcd.yaml`, point the `etcd-data` volume's `hostPath.path` at it, then `kubectl -n kube-system delete pod <name-of-etcd-pod>` or `systemctl restart kubelet.service` (or both).",
+            "If the restored cluster's URLs changed, restart the API servers with the new `--etcd-servers` value (or update the load balancer in front of etcd).",
+            "Snapshots restore across patch versions of the same etcd major.minor."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-quorum",
+      "heading": "Cluster size and quorum",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "sourceTitle": "Operating etcd clusters for Kubernetes",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Run etcd with an **odd number** of members. Recommended minimum versions in production: 3.4.29+ and 3.5.11+.",
+            "A **five-member** cluster is recommended for production. Don't autoscale etcd; going from three to five members is a reasonable way to gain reliability.",
+            "Scaling out improves availability at the cost of performance, not capacity.",
+            "If a **majority** of members fail permanently, the etcd cluster has failed: running Pods may keep going, but no new Pods can be scheduled and nothing in the cluster can change.",
+            "Replace failed members promptly and one by one: `etcdctl member remove <id>`, then `etcdctl member add <name> --peer-urls=<url>`."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "etcd-backup-fc-01",
+      "front": "Why back up etcd?",
+      "back": "It holds every Kubernetes object; a snapshot lets you recover from disasters such as losing all control plane nodes.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-02",
+      "front": "Command to snapshot a TLS etcd?",
+      "back": "ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 --cacert=<ca> --cert=<cert> --key=<key> snapshot save <file>",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-03",
+      "front": "Where do you find the cert/key paths for etcdctl?",
+      "back": "In the description of the etcd Pod.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-04",
+      "front": "Recommended way to check a snapshot?",
+      "back": "etcdutl --write-out=table snapshot status <file>",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-05",
+      "front": "Recommended way to restore a snapshot?",
+      "back": "etcdutl --data-dir <data-dir-location> snapshot restore <file>",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-06",
+      "front": "etcdctl vs etcdutl?",
+      "back": "etcdctl talks to a live cluster over the network; etcdutl works directly on data files (restore, status, defrag).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-07",
+      "front": "What must happen to API servers before an etcd restore?",
+      "back": "Stop them all; restore every etcd instance; then restart them.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-08",
+      "front": "After restoring into a new directory with kubeadm, what do you edit?",
+      "back": "/etc/kubernetes/manifests/etcd.yaml: the hostPath.path of the etcd-data volume.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-09",
+      "front": "Recommended etcd cluster size for production?",
+      "back": "Five members (always an odd number).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-10",
+      "front": "What if most etcd members fail permanently?",
+      "back": "The etcd cluster has failed; existing Pods may run but no new Pods can be scheduled until etcd is recovered.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    },
+    {
+      "id": "etcd-backup-fc-11",
+      "front": "Backup alternative to etcd snapshots?",
+      "back": "A snapshot of the storage volume etcd runs on (e.g. Amazon EBS), if it supports backup.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "etcd-backup-q-01",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "Which command backs up a kubeadm-managed, TLS-secured etcd from a control plane node?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 --cacert=<ca> --cert=<cert> --key=<key> snapshot save <file>",
+          "correct": true,
+          "explanation": "Endpoint plus CA, client cert and key, then snapshot save."
+        },
+        {
+          "id": "b",
+          "text": "etcdutl --data-dir <dir> snapshot restore <file>",
+          "correct": false,
+          "explanation": "That restores, it does not back up."
+        },
+        {
+          "id": "c",
+          "text": "etcdutl --write-out=table snapshot status <file>",
+          "correct": false,
+          "explanation": "That inspects an existing snapshot."
+        },
+        {
+          "id": "d",
+          "text": "etcdctl member list",
+          "correct": false,
+          "explanation": "That lists members."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-02",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-lifecycle",
+      "stem": "Where does the page say to find the trusted CA, cert and key paths for etcdctl?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "In the description of the etcd Pod",
+          "correct": true,
+          "explanation": "Stated next to the snapshot command."
+        },
+        {
+          "id": "b",
+          "text": "In the output of etcdctl member list",
+          "correct": false,
+          "explanation": "That lists member IDs, names and URLs."
+        },
+        {
+          "id": "c",
+          "text": "In the kube-proxy ConfigMap",
+          "correct": false,
+          "explanation": "Unrelated to etcd."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ca-lifecycle",
+      "stem": "True or false: Taking an etcd snapshot with `etcdctl snapshot save` slows the member down noticeably.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "The page says creating it does not affect performance."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. Snapshotting does not affect the member's performance."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "Which tool is recommended for restoring an etcd snapshot?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "etcdutl",
+          "correct": true,
+          "explanation": "Restore via etcdctl is deprecated since etcd v3.5.x."
+        },
+        {
+          "id": "b",
+          "text": "etcdctl",
+          "correct": false,
+          "explanation": "Its restore is deprecated and slated for removal in v3.6."
+        },
+        {
+          "id": "c",
+          "text": "etcdctl snapshot save",
+          "correct": false,
+          "explanation": "That creates a snapshot; it doesn't restore one."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-05",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ca-lifecycle",
+      "stem": "Which steps belong to a safe etcd restore? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Stop all API server instances first",
+          "correct": true,
+          "explanation": "Don't restore while API servers run."
+        },
+        {
+          "id": "b",
+          "text": "Restore state in all etcd instances",
+          "correct": true,
+          "explanation": "Every instance is restored."
+        },
+        {
+          "id": "c",
+          "text": "Restart API servers, then kube-scheduler, kube-controller-manager and kubelet",
+          "correct": true,
+          "explanation": "Recommended so components don't use stale data."
+        },
+        {
+          "id": "d",
+          "text": "Keep one API server running to serve reads during the restore",
+          "correct": false,
+          "explanation": "The page says to stop all API servers."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-06",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ca-lifecycle",
+      "stem": "On a kubeadm node you restored the snapshot into a new directory `<new-data-dir>`. What else must you change?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The etcd-data volume hostPath.path in /etc/kubernetes/manifests/etcd.yaml",
+          "correct": true,
+          "explanation": "etcd must be pointed at the new data directory."
+        },
+        {
+          "id": "b",
+          "text": "The --etcd-servers flag on kube-apiserver",
+          "correct": false,
+          "explanation": "Only needed if the etcd access URLs changed."
+        },
+        {
+          "id": "c",
+          "text": "Nothing; etcd picks up the newest directory",
+          "correct": false,
+          "explanation": "You must reconfigure etcd to use it."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-07",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "True or false: With `etcdutl snapshot restore`, the `--data-dir` directory is created by the restore.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct. The page says the directory is created during restore."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "It is created by the restore process."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "What size etcd cluster does the page recommend for production?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Five members",
+          "correct": true,
+          "explanation": "A five-member cluster is recommended."
+        },
+        {
+          "id": "b",
+          "text": "Two members",
+          "correct": false,
+          "explanation": "An odd number is required."
+        },
+        {
+          "id": "c",
+          "text": "One member",
+          "correct": false,
+          "explanation": "Single-node etcd is for testing only."
+        },
+        {
+          "id": "d",
+          "text": "Autoscaled based on load",
+          "correct": false,
+          "explanation": "Do not configure autoscaling for etcd."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "A majority of etcd members have permanently failed. What is the effect on Kubernetes?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Running Pods may continue, but no new Pods can be scheduled and no state can change",
+          "correct": true,
+          "explanation": "The etcd cluster is considered failed."
+        },
+        {
+          "id": "b",
+          "text": "Nothing; the API server caches all writes",
+          "correct": false,
+          "explanation": "Kubernetes cannot change its state."
+        },
+        {
+          "id": "c",
+          "text": "All running Pods are killed immediately",
+          "correct": false,
+          "explanation": "Scheduled Pods might keep running."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-10",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "Which statements about etcd cluster sizing are correct? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Run an odd number of members",
+          "correct": true,
+          "explanation": "Stated in the key details."
+        },
+        {
+          "id": "b",
+          "text": "Scaling out trades performance for availability",
+          "correct": true,
+          "explanation": "Scaling does not raise performance or capability."
+        },
+        {
+          "id": "c",
+          "text": "Add an autoscaling group for spikes",
+          "correct": false,
+          "explanation": "Explicitly discouraged."
+        },
+        {
+          "id": "d",
+          "text": "Scaling out raises write throughput",
+          "correct": false,
+          "explanation": "It does not increase performance."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "Which command checks a snapshot's hash, revision, key count and size?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "etcdutl --write-out=table snapshot status snapshot.db",
+          "correct": true,
+          "explanation": "Prints the HASH / REVISION / TOTAL KEYS / TOTAL SIZE table."
+        },
+        {
+          "id": "b",
+          "text": "etcdctl member list",
+          "correct": false,
+          "explanation": "Lists cluster members."
+        },
+        {
+          "id": "c",
+          "text": "etcdutl --data-dir <dir> snapshot restore snapshot.db",
+          "correct": false,
+          "explanation": "Restores the snapshot."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-12",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ca-lifecycle",
+      "stem": "True or false: If etcd runs on a storage volume that supports backup, a volume snapshot is a documented alternative to `etcdctl snapshot save`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct. The page lists built-in snapshot and volume snapshot."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "Volume snapshots are one of the two documented methods."
+        }
+      ]
+    },
+    {
+      "id": "etcd-backup-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "One member of a three-member etcd cluster has failed. What does the page recommend?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Replace it promptly: etcdctl member remove <id>, then etcdctl member add with the new peer URL",
+          "correct": true,
+          "explanation": "Replacing a failed member is remove then add."
+        },
+        {
+          "id": "b",
+          "text": "Restore every member from a snapshot",
+          "correct": false,
+          "explanation": "The cluster still has quorum; restore is for a failed cluster."
+        },
+        {
+          "id": "c",
+          "text": "Leave it; etcd tolerates minor failures indefinitely",
+          "correct": false,
+          "explanation": "Replace failed members immediately for overall health."
+        }
+      ]
+    }
+  ]
+}

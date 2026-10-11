@@ -10,7 +10,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('practice tests draw the configured count from their pool', () async {
-    final content = await ContentLoader(rootBundle).load();
+    final content = (await ContentLoader(rootBundle).load()).subjects.first;
     for (final test in content.practiceTests) {
       final drawn = drawPractice(test: test, content: content, random: Random(7));
       final ids = drawn.map((p) => p.question.id).toSet();
@@ -22,7 +22,7 @@ void main() {
   });
 
   test('domain breakdown groups by primary domain', () async {
-    final content = await ContentLoader(rootBundle).load();
+    final content = (await ContentLoader(rootBundle).load()).subjects.first;
     final test = content.practiceTest('mixed')!;
     final attempt = QuizAttempt(
         drawPractice(test: test, content: content, random: Random(2)));

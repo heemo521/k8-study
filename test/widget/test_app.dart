@@ -30,21 +30,26 @@ Future<void> setPhoneViewport(WidgetTester tester,
 }
 
 class TestHarness {
-  TestHarness(this.content, this.progress, this.clock);
-  final ContentBundle content;
+  TestHarness(this.catalog, this.progress, this.clock);
+  final Catalog catalog;
+  ContentBundle get content => catalog.subjects.first;
   final ProgressStore progress;
   final FixedClock clock;
 }
 
-ContentBundle? _content;
+Catalog? _catalog;
+
+Future<Catalog> loadCatalog(WidgetTester tester) async =>
+    _catalog ??= (await tester.runAsync(() => ContentLoader(rootBundle).load()))!;
 
 Future<TestHarness> pumpApp(
   WidgetTester tester, {
+  Catalog? catalog,
   AdsService Function(ProgressStore)? ads,
   Map<String, Object> prefs = const {},
   String initialLocation = '/',
 }) async {
-  _content ??= await tester.runAsync(() => ContentLoader(rootBundle).load());
+  final cat = catalog ?? await loadCatalog(tester);
   SharedPreferences.setMockInitialValues(prefs);
   final clock = FixedClock(testNow);
   final progress =
@@ -52,7 +57,7 @@ Future<TestHarness> pumpApp(
   await tester.pumpWidget(K8StudyApp(
     // Fresh state per pump so a new initialLocation takes effect.
     key: UniqueKey(),
-    content: _content!,
+    catalog: cat,
     progress: progress,
     ads: ads?.call(progress) ?? const NoopAdsService(),
     clock: clock,
@@ -60,5 +65,5 @@ Future<TestHarness> pumpApp(
     initialLocation: initialLocation,
   ));
   await tester.pumpAndSettle();
-  return TestHarness(_content!, progress, clock);
+  return TestHarness(cat, progress, clock);
 }

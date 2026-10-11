@@ -16,26 +16,6 @@
   "reviewedAt": "2026-10-11",
   "sections": [
     {
-      "id": "kubeadm-what",
-      "heading": "What kubeadm does (and doesn't)",
-      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
-      "sourceTitle": "Installing kubeadm",
-      "blocks": [
-        {
-          "type": "p",
-          "text": "kubeadm is the command that **bootstraps** a cluster. It works alongside two other packages you install yourself."
-        },
-        {
-          "type": "bullets",
-          "items": [
-            "Install on **all** machines: `kubeadm` (bootstraps the cluster), `kubelet` (runs Pods and containers on every machine) and `kubectl` (talks to the cluster).",
-            "kubeadm does **not** install or manage kubelet or kubectl for you. Keep their versions matched to the control plane.",
-            "The kubelet may be one minor version behind the API server, but it must never be newer."
-          ]
-        }
-      ]
-    },
-    {
       "id": "kubeadm-hosts",
       "heading": "Prepare the hosts",
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
@@ -69,14 +49,14 @@
       ]
     },
     {
-      "id": "kubeadm-runtime",
-      "heading": "Container runtime & node networking",
-      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/",
-      "sourceTitle": "Container Runtimes",
+      "id": "kubeadm-cri",
+      "heading": "Choose a container runtime",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
+      "sourceTitle": "Installing kubeadm",
       "blocks": [
         {
           "type": "p",
-          "text": "Each node needs a runtime that conforms to the **CRI** (Container Runtime Interface). If you don't specify one, kubeadm looks for known socket endpoints. If it finds none, or more than one, it throws an error and asks you to choose with `--cri-socket`."
+          "text": "Each node needs a runtime that implements the **CRI** (Container Runtime Interface). If you don't specify one, kubeadm looks for known socket endpoints. If it finds none, or more than one, it throws an error and asks you to choose one with `--cri-socket`."
         },
         {
           "type": "table",
@@ -100,22 +80,46 @@
           ]
         },
         {
+          "type": "p",
+          "text": "Docker Engine doesn't implement the CRI, so it needs **cri-dockerd**. The built-in Docker support was removed from the kubelet in v1.24."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-runtime",
+      "heading": "Node networking & cgroup drivers",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/",
+      "sourceTitle": "Container Runtimes",
+      "blocks": [
+        {
           "type": "bullets",
           "items": [
-            "Docker Engine doesn't implement the CRI, so it needs **cri-dockerd**. The built-in dockershim was removed in v1.24.",
             "Linux doesn't route IPv4 packets between interfaces by default. Enable it with `net.ipv4.ip_forward = 1` in `/etc/sysctl.d/k8s.conf` followed by `sudo sysctl --system`.",
             "There are two cgroup drivers: **cgroupfs** (the kubelet's default) and **systemd**. The kubelet and the runtime **must use the same driver**.",
-            "When systemd is the init system, or with cgroup v2, use the systemd driver: set `cgroupDriver: systemd` in the KubeletConfiguration."
+            "When systemd is the init system, or with cgroup v2, use the systemd driver: set `cgroupDriver: systemd` in the KubeletConfiguration and configure the runtime to match."
           ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "In newer releases, with the `KubeletCgroupDriverFromCRI` feature gate and a runtime that supports the RuntimeConfig CRI RPC, the kubelet detects the driver from the runtime and ignores `cgroupDriver`. Check the page for your version."
         }
       ]
     },
     {
       "id": "kubeadm-packages",
-      "heading": "Install the packages",
+      "heading": "Install kubeadm, kubelet & kubectl",
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
       "sourceTitle": "Installing kubeadm",
       "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Install on **all** machines: `kubeadm` (bootstraps the cluster), `kubelet` (runs Pods and containers on every machine) and `kubectl` (talks to the cluster).",
+            "kubeadm does **not** install or manage kubelet or kubectl for you. Keep their versions matched to the control plane.",
+            "The kubelet may be one minor version behind the API server, but it must never be newer."
+          ]
+        },
         {
           "type": "p",
           "text": "Packages come from **pkgs.k8s.io**, which has one repository per Kubernetes minor version. The legacy `apt.kubernetes.io` and `yum.kubernetes.io` repositories have been deprecated and frozen since September 13, 2023."

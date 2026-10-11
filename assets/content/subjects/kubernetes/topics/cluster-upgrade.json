@@ -1,0 +1,632 @@
+{
+  "id": "cluster-upgrade",
+  "title": "Upgrading a kubeadm Cluster",
+  "summary": "Upgrade one minor version at a time: kubeadm upgrade plan/apply, upgrade node, drain, kubelet packages, uncordon.",
+  "order": 6,
+  "domainIds": [
+    "cluster-arch"
+  ],
+  "competencyIds": [
+    "ca-lifecycle"
+  ],
+  "prerequisites": [
+    "kubeadm"
+  ],
+  "estMinutes": 15,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "cluster-upgrade-rules",
+      "heading": "Ground rules",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "sourceTitle": "Upgrading kubeadm clusters",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Upgrade **one minor version at a time** (e.g. 1.36.x → 1.37.x). Skipping minor versions is unsupported. Patch upgrades within a minor (1.37.x → 1.37.y) follow the same steps.",
+            "Order: **primary control plane node → other control plane nodes → worker nodes**, one node at a time.",
+            "Swap must be disabled. Back up important components first; kubeadm upgrade doesn't touch your workloads.",
+            "Drain a node before a minor-version kubelet upgrade. Control plane nodes may be running CoreDNS or other critical Pods.",
+            "Match kubelet and kubeadm versions. An older kubelet is allowed if it is within the supported skew.",
+            "All containers restart after the upgrade because the container spec hash changes.",
+            "With pkgs.k8s.io, enable the package repository for the **target minor release** first. Find the latest patch with `sudo apt-cache madison kubeadm`."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-first-cp",
+      "heading": "First control plane node: plan and apply",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "sourceTitle": "Upgrading kubeadm clusters",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Pick a control plane node that has `/etc/kubernetes/admin.conf`."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "sudo apt-mark unhold kubeadm && \\\nsudo apt-get update && sudo apt-get install -y kubeadm='<version>-*' && \\\nsudo apt-mark hold kubeadm\n\nkubeadm version\nsudo kubeadm upgrade plan\nsudo kubeadm upgrade apply v<version>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`kubeadm upgrade plan` checks the cluster can be upgraded and lists target versions.",
+            "`kubeadm upgrade apply` checks health (API server reachable, all nodes Ready, control plane healthy), enforces version skew, upgrades the control plane static Pods (rolling back on failure), and applies new CoreDNS and kube-proxy manifests.",
+            "It also renews the certificates kubeadm manages on that node. Opt out with `--certificate-renewal=false`.",
+            "Then upgrade your CNI plugin by hand, following its own instructions."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "On success you see `[upgrade/successful] SUCCESS!`. Only the control plane is done; next drain the node and upgrade its kubelet and kubectl. The node versions in `kubectl get nodes` update once the kubelets are upgraded."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-other-cp",
+      "heading": "Other control plane nodes",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "sourceTitle": "Upgrading kubeadm clusters",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "sudo kubeadm upgrade node"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Same steps as the first node, but use `kubeadm upgrade node` instead of `kubeadm upgrade apply`.",
+            "No need to run `kubeadm upgrade plan` or upgrade the CNI plugin again (if the CNI runs as a DaemonSet).",
+            "`kubeadm upgrade node` fetches the ClusterConfiguration from the cluster, upgrades the static Pod manifests and the node's kubelet configuration.",
+            "Since v1.28 the addons (CoreDNS, kube-proxy) are upgraded only after the **last** control plane instance is done, so upgrade them sequentially."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-kubelet",
+      "heading": "Drain, upgrade kubelet & kubectl, uncordon",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "sourceTitle": "Upgrading kubeadm clusters",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl drain <node-to-drain> --ignore-daemonsets\n\nsudo apt-mark unhold kubelet kubectl && \\\nsudo apt-get update && sudo apt-get install -y kubelet='<version>-*' kubectl='<version>-*' && \\\nsudo apt-mark hold kubelet kubectl\n\nsudo systemctl daemon-reload\nsudo systemctl restart kubelet\n\nkubectl uncordon <node-to-uncordon>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Check the kubelet came back with `systemctl status kubelet` or `journalctl -xeu kubelet`.",
+            "When every node is done, `kubectl get nodes` should show **Ready** and the new version."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-workers",
+      "heading": "Worker nodes",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/",
+      "sourceTitle": "Upgrading Linux nodes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Upgrade the control plane before the workers. Then, on each worker (one or a few at a time):"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Upgrade the **kubeadm and kubectl** packages. kubectl must stay within one minor version of kube-apiserver.",
+            "Run `sudo kubeadm upgrade node`. On a worker this upgrades the local kubelet configuration.",
+            "From a control plane node: `kubectl drain <node-to-drain> --ignore-daemonsets`.",
+            "Upgrade the **kubelet** package, then `sudo systemctl daemon-reload` and `sudo systemctl restart kubelet`.",
+            "From a control plane node: `kubectl uncordon <node-to-uncordon>`."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-drain",
+      "heading": "Draining safely",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/",
+      "sourceTitle": "Safely Drain a Node",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "`kubectl drain` evicts Pods so their containers terminate gracefully, and it respects your **PodDisruptionBudgets**.",
+            "DaemonSet Pods aren't evicted; the DaemonSet controller would just recreate them. Add `--ignore-daemonsets` so the drain can finish.",
+            "A drained node stays unschedulable. If it remains in the cluster, run `kubectl uncordon <node name>` afterwards so new Pods can land there.",
+            "Pods that tolerate the `node.kubernetes.io/unschedulable` taint, or have `nodeName` set directly, can still run on a drained node.",
+            "Run one drain per node; drains for several nodes can run in parallel and still honour PDBs."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-recover",
+      "heading": "When an upgrade fails",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "sourceTitle": "Upgrading kubeadm clusters",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "`kubeadm upgrade` is idempotent: just run it again. `sudo kubeadm upgrade apply --force` (same version) also recovers from a bad state.",
+            "Backups are written under `/etc/kubernetes/tmp`: `kubeadm-backup-etcd-<date>-<time>` (local etcd data; restore into `/var/lib/etcd`) and `kubeadm-backup-manifests-<date>-<time>` (restore into `/etc/kubernetes/manifests`).",
+            "These backups are not cleaned up automatically."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "cluster-upgrade-fc-01",
+      "front": "Can you upgrade a kubeadm cluster from 1.35 straight to 1.37?",
+      "back": "No. Skipping minor versions is unsupported; go one minor at a time.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "cluster-upgrade-fc-02",
+      "front": "Order of a kubeadm cluster upgrade?",
+      "back": "Primary control plane node, then other control plane nodes, then worker nodes.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "cluster-upgrade-fc-03",
+      "front": "Command to see available upgrade versions?",
+      "back": "sudo kubeadm upgrade plan",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "cluster-upgrade-fc-04",
+      "front": "Command to upgrade the first control plane node?",
+      "back": "sudo kubeadm upgrade apply v<version>",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "cluster-upgrade-fc-05",
+      "front": "Command on the other control plane nodes and on workers?",
+      "back": "sudo kubeadm upgrade node",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "cluster-upgrade-fc-06",
+      "front": "What must you restart after installing the new kubelet package?",
+      "back": "sudo systemctl daemon-reload && sudo systemctl restart kubelet",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "cluster-upgrade-fc-07",
+      "front": "Why apt-mark unhold before installing new versions?",
+      "back": "They are pinned with apt-mark hold. Unhold, install the exact version, then hold again.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "cluster-upgrade-fc-08",
+      "front": "How do you skip certificate renewal during kubeadm upgrade?",
+      "back": "--certificate-renewal=false",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "cluster-upgrade-fc-09",
+      "front": "Why --ignore-daemonsets on drain?",
+      "back": "DaemonSet Pods would be recreated on the same node; the flag lets drain skip them and finish.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/"
+    },
+    {
+      "id": "cluster-upgrade-fc-10",
+      "front": "Make a node schedulable again after maintenance?",
+      "back": "kubectl uncordon <node>",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/"
+    },
+    {
+      "id": "cluster-upgrade-fc-11",
+      "front": "Where does kubeadm put backups during an upgrade?",
+      "back": "/etc/kubernetes/tmp (kubeadm-backup-etcd-* and kubeadm-backup-manifests-*).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "cluster-upgrade-fc-12",
+      "front": "kubectl version skew rule on worker upgrade page?",
+      "back": "kubectl must be within one minor version of kube-apiserver.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "cluster-upgrade-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-lifecycle",
+      "stem": "Your cluster runs 1.35. The target is 1.37. What is the supported path?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Upgrade to 1.36, then to 1.37",
+          "correct": true,
+          "explanation": "Skipping minor versions is unsupported."
+        },
+        {
+          "id": "b",
+          "text": "Upgrade directly to 1.37 with kubeadm upgrade apply",
+          "correct": false,
+          "explanation": "That skips a minor version."
+        },
+        {
+          "id": "c",
+          "text": "Upgrade workers to 1.37 first, then the control plane",
+          "correct": false,
+          "explanation": "Control plane nodes go first."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "You have upgraded kubeadm on the first control plane node. Which command actually upgrades its control plane components?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "a",
+          "text": "sudo kubeadm upgrade apply v<version>",
+          "correct": true,
+          "explanation": "apply upgrades the control plane on the first node."
+        },
+        {
+          "id": "b",
+          "text": "sudo kubeadm upgrade plan",
+          "correct": false,
+          "explanation": "plan only checks and lists versions."
+        },
+        {
+          "id": "c",
+          "text": "sudo kubeadm upgrade node",
+          "correct": false,
+          "explanation": "That is for the other control plane nodes and workers."
+        },
+        {
+          "id": "d",
+          "text": "sudo systemctl restart kubelet",
+          "correct": false,
+          "explanation": "That restarts the kubelet after upgrading its package."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "On the second control plane node, after upgrading the kubeadm package, what do you run?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "a",
+          "text": "sudo kubeadm upgrade node",
+          "correct": true,
+          "explanation": "Additional control plane nodes use upgrade node."
+        },
+        {
+          "id": "b",
+          "text": "sudo kubeadm upgrade apply v<version>",
+          "correct": false,
+          "explanation": "apply is for the first control plane node."
+        },
+        {
+          "id": "c",
+          "text": "sudo kubeadm upgrade plan, then apply",
+          "correct": false,
+          "explanation": "plan is not needed on the other control plane nodes."
+        },
+        {
+          "id": "d",
+          "text": "sudo kubeadm upgrade apply --force",
+          "correct": false,
+          "explanation": "That is for recovering from a bad state on an unchanged version."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "Put together the steps for upgrading the kubelet on a control plane node. Which belong in the procedure? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl drain <node> --ignore-daemonsets",
+          "correct": true,
+          "explanation": "Drain before the kubelet minor upgrade."
+        },
+        {
+          "id": "b",
+          "text": "sudo systemctl daemon-reload && sudo systemctl restart kubelet",
+          "correct": true,
+          "explanation": "Restart the kubelet after installing the new package."
+        },
+        {
+          "id": "c",
+          "text": "kubectl uncordon <node>",
+          "correct": true,
+          "explanation": "Mark the node schedulable again afterwards."
+        },
+        {
+          "id": "d",
+          "text": "sudo kubeadm upgrade apply --force",
+          "correct": false,
+          "explanation": "That is a recovery command, not a kubelet upgrade step."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-05",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ca-lifecycle",
+      "stem": "True or false: `kubeadm upgrade apply` also upgrades the kubelet package on the node.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "kubelet and kubectl packages are upgraded separately with the package manager."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. The success message reminds you to upgrade the kubelets next."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "What does `kubeadm upgrade node` do on a worker node?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Fetches the ClusterConfiguration and upgrades the kubelet configuration for this node",
+          "correct": true,
+          "explanation": "Those are the two worker steps listed."
+        },
+        {
+          "id": "b",
+          "text": "Upgrades the static Pod manifests for control plane components",
+          "correct": false,
+          "explanation": "That step is listed only for control plane nodes."
+        },
+        {
+          "id": "c",
+          "text": "Applies new CoreDNS and kube-proxy manifests",
+          "correct": false,
+          "explanation": "kubeadm upgrade apply does that."
+        },
+        {
+          "id": "d",
+          "text": "Installs the new kubelet package",
+          "correct": false,
+          "explanation": "You upgrade the package with apt/dnf."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "`kubectl drain <node>` fails because the node runs DaemonSet-managed Pods. What do you add?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/",
+      "options": [
+        {
+          "id": "a",
+          "text": "--ignore-daemonsets",
+          "correct": true,
+          "explanation": "The page says this is required to drain nodes with DaemonSet Pods."
+        },
+        {
+          "id": "b",
+          "text": "Run kubectl uncordon <node name> first",
+          "correct": false,
+          "explanation": "Uncordon makes a node schedulable; it doesn't help a drain finish."
+        },
+        {
+          "id": "c",
+          "text": "Run kubectl get nodes first",
+          "correct": false,
+          "explanation": "That only lists the nodes."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-08",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "True or false: `kubectl drain` honours PodDisruptionBudgets, even when you drain several nodes in parallel.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct. Concurrent drains still respect the PDB."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "The page says parallel drains still respect PDBs."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-09",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-lifecycle",
+      "stem": "After maintenance, a drained node stays in the cluster but receives no new Pods. What did you forget?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl uncordon <node>",
+          "correct": true,
+          "explanation": "Uncordon tells Kubernetes it may schedule Pods there again."
+        },
+        {
+          "id": "b",
+          "text": "sudo kubeadm upgrade node",
+          "correct": false,
+          "explanation": "That upgrades configuration; it doesn't make the node schedulable."
+        },
+        {
+          "id": "c",
+          "text": "kubectl drain <node> --ignore-daemonsets",
+          "correct": false,
+          "explanation": "That is what made it unschedulable."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-10",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ca-lifecycle",
+      "stem": "A `kubeadm upgrade apply` was interrupted by a power loss and did not roll back. What does the guide recommend first?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Run kubeadm upgrade again; it is idempotent",
+          "correct": true,
+          "explanation": "Re-running converges the actual state to the desired state."
+        },
+        {
+          "id": "b",
+          "text": "Upgrade the kubelet package first, then retry",
+          "correct": false,
+          "explanation": "The kubelet upgrade comes after the control plane; it does not repair a failed apply."
+        },
+        {
+          "id": "c",
+          "text": "Delete /etc/kubernetes/tmp",
+          "correct": false,
+          "explanation": "That folder holds the backups you might need."
+        },
+        {
+          "id": "d",
+          "text": "Run kubectl uncordon on the node",
+          "correct": false,
+          "explanation": "Uncordon only affects scheduling."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-11",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ca-lifecycle",
+      "stem": "The upgrade broke a static Pod and automatic rollback did not work. Where can you restore the previous manifests from?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "a",
+          "text": "/etc/kubernetes/tmp/kubeadm-backup-manifests-<date>-<time>, copied into /etc/kubernetes/manifests",
+          "correct": true,
+          "explanation": "kubeadm writes manifest backups there."
+        },
+        {
+          "id": "b",
+          "text": "/var/lib/etcd",
+          "correct": false,
+          "explanation": "That is where the etcd data backup is restored to."
+        },
+        {
+          "id": "c",
+          "text": "/etc/kubernetes/admin.conf",
+          "correct": false,
+          "explanation": "That is the admin kubeconfig."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-12",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "Which checks does `kubeadm upgrade apply` perform before upgrading? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The API server is reachable",
+          "correct": true,
+          "explanation": "Listed under How it works."
+        },
+        {
+          "id": "b",
+          "text": "All nodes are in the Ready state",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "c",
+          "text": "The control plane is healthy",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "d",
+          "text": "All PodDisruptionBudgets allow eviction",
+          "correct": false,
+          "explanation": "Not one of the listed checks; PDBs matter for drain."
+        }
+      ]
+    },
+    {
+      "id": "cluster-upgrade-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "On a worker node, why upgrade kubectl together with kubeadm?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl must be within one minor version of kube-apiserver",
+          "correct": true,
+          "explanation": "The page notes the skew rule."
+        },
+        {
+          "id": "b",
+          "text": "kubeadm upgrade node requires the matching kubectl binary",
+          "correct": false,
+          "explanation": "The page gives skew, not this, as the reason."
+        },
+        {
+          "id": "c",
+          "text": "kubectl drain must run on the worker itself",
+          "correct": false,
+          "explanation": "The page runs drain from a control plane node."
+        }
+      ]
+    }
+  ]
+}

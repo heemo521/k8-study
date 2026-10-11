@@ -1,0 +1,779 @@
+{
+  "id": "rbac",
+  "title": "RBAC",
+  "summary": "Roles, ClusterRoles and their bindings, the default roles, ServiceAccounts, and checking access with kubectl auth can-i.",
+  "order": 4,
+  "domainIds": [
+    "cluster-arch"
+  ],
+  "competencyIds": [
+    "ca-rbac"
+  ],
+  "prerequisites": [
+    "namespaces"
+  ],
+  "estMinutes": 16,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "rbac-objects",
+      "heading": "The four RBAC objects",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "sourceTitle": "Using RBAC Authorization",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "RBAC lives in the `rbac.authorization.k8s.io` API group. It defines four kinds: two hold permissions (roles) and two hand those permissions to someone (bindings)."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Kind",
+            "Scope",
+            "Use it to"
+          ],
+          "rows": [
+            [
+              "Role",
+              "One namespace",
+              "Define permissions inside that namespace"
+            ],
+            [
+              "ClusterRole",
+              "Cluster (not namespaced)",
+              "Define permissions on cluster-scoped resources (nodes), non-resource URLs (`/healthz`), or namespaced resources reused in many or all namespaces"
+            ],
+            [
+              "RoleBinding",
+              "One namespace",
+              "Grant a Role, or a ClusterRole, inside the binding's namespace"
+            ],
+            [
+              "ClusterRoleBinding",
+              "Cluster",
+              "Grant a ClusterRole across every namespace"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Permissions only **add up**. There are no deny rules.",
+            "The API server enables RBAC when `--authorization-mode` includes `RBAC` (for example `--authorization-mode=...,RBAC`), or via an `--authorization-config` file listing the RBAC authorizer."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rbac-rules",
+      "heading": "Writing rules: apiGroups, resources, verbs",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "sourceTitle": "Using RBAC Authorization",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Each rule names the API groups, the resources (by the name used in the API URL, such as `pods`) and the verbs it allows."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  namespace: <namespace>\n  name: <role-name>\nrules:\n- apiGroups: [\"\"]          # \"\" = core API group\n  resources: [\"pods\", \"pods/log\"]\n  verbs: [\"get\", \"list\", \"watch\"]\n- apiGroups: [\"apps\"]\n  resources: [\"deployments\"]\n  verbs: [\"get\", \"list\", \"watch\", \"create\", \"update\", \"patch\", \"delete\"]"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Subresources** use a slash: `pods/log`, `pods/status`.",
+            "`resourceNames` limits a rule to named objects. It can't restrict `deletecollection` or top-level `create`.",
+            "`*` is a wildcard for resources, apiGroups and verbs. It also matches resources added later, so prefer explicit lists (least privilege).",
+            "`nonResourceURLs` (such as `/healthz`) only take effect in a ClusterRole bound with a ClusterRoleBinding."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rbac-bindings",
+      "heading": "Bindings and subjects",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "sourceTitle": "Using RBAC Authorization",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A binding has a list of **subjects** and one **roleRef**. Subjects are users, groups or ServiceAccounts."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "kind: RoleBinding\nmetadata:\n  name: <binding-name>\n  namespace: <namespace>\nsubjects:\n- kind: User\n  name: <user>             # case sensitive\n  apiGroup: rbac.authorization.k8s.io\n- kind: ServiceAccount\n  name: <sa-name>\n  namespace: <sa-namespace>\nroleRef:\n  kind: ClusterRole          # Role or ClusterRole\n  name: <role-name>\n  apiGroup: rbac.authorization.k8s.io"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A RoleBinding that points at a ClusterRole grants those rights **only in the binding's namespace**. This lets you define common roles once and reuse them.",
+            "`roleRef` is **immutable**. To change it, delete the binding and create a new one (`kubectl auth reconcile` can do this for you).",
+            "ServiceAccount usernames look like `system:serviceaccount:<namespace>:<name>` (singular). Their groups use `system:serviceaccounts:<namespace>` (plural).",
+            "The `system:` prefix is reserved for Kubernetes. Don't give users or groups names that start with it."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rbac-defaults",
+      "heading": "Default user-facing ClusterRoles",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "sourceTitle": "Using RBAC Authorization",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The API server creates default ClusterRoles and bindings and re-adds missing permissions to them at every start-up (auto-reconciliation). Four are meant for people:"
+        },
+        {
+          "type": "table",
+          "header": [
+            "ClusterRole",
+            "What it allows"
+          ],
+          "rows": [
+            [
+              "cluster-admin",
+              "Any action on any resource. Bound to the `system:masters` group by default. In a RoleBinding: full control of that namespace."
+            ],
+            [
+              "admin",
+              "Read/write most namespace objects, including Roles and RoleBindings. No write access to ResourceQuota or the namespace itself."
+            ],
+            [
+              "edit",
+              "Read/write most namespace objects, but cannot view or change Roles or RoleBindings. Can read Secrets and run Pods as any ServiceAccount in the namespace."
+            ],
+            [
+              "view",
+              "Read-only on most namespace objects. Cannot see Roles, RoleBindings or **Secrets**."
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "admin, edit and view are intended to be granted per namespace with a RoleBinding.",
+            "They are aggregated: a ClusterRole labelled `rbac.authorization.k8s.io/aggregate-to-edit: \"true\"` (or `-admin`, `-view`) has its rules merged in.",
+            "You can only create a role containing permissions you already hold, unless you have the `escalate` verb. Binding a role needs those permissions or the `bind` verb."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rbac-imperative",
+      "heading": "Imperative commands",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "sourceTitle": "Using RBAC Authorization",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods\nkubectl create role foo --verb=get,list,watch --resource=replicasets.apps\nkubectl create role pod-reader --verb=get --resource=pods --resource-name=<pod>\nkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods\n\nkubectl create rolebinding bob-admin-binding --clusterrole=admin --user=bob --namespace=acme\nkubectl create rolebinding myapp-view-binding --clusterrole=view \\\n  --serviceaccount=acme:myapp --namespace=acme\nkubectl create clusterrolebinding root-cluster-admin-binding \\\n  --clusterrole=cluster-admin --user=root"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`--resource=<resource>.<group>` sets the API group (for example `replicasets.apps`).",
+            "`--serviceaccount` takes `<namespace>:<name>`. `--group` binds a group such as `system:serviceaccounts:<namespace>` (all ServiceAccounts in that namespace).",
+            "`kubectl create clusterrolebinding` grants a ClusterRole across all namespaces; `kubectl create rolebinding` grants it in one."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Read-only access for one app's ServiceAccount, straight from the docs: `kubectl create rolebinding my-sa-view --clusterrole=view --serviceaccount=my-namespace:my-sa --namespace=my-namespace`. Reusing a default ClusterRole saves writing a Role."
+        }
+      ]
+    },
+    {
+      "id": "rbac-sa",
+      "heading": "ServiceAccounts",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/security/service-accounts/",
+      "sourceTitle": "Service Accounts",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "A ServiceAccount is a **namespaced**, non-human identity for workloads and automation. User accounts, by contrast, are not API objects.",
+            "Every namespace gets a `default` ServiceAccount. If you delete it, the control plane recreates it.",
+            "With RBAC, the default ServiceAccount has **no permissions** beyond API discovery.",
+            "A Pod with no ServiceAccount specified gets the namespace's `default` one. Set `spec.serviceAccountName` to use another.",
+            "Since v1.22 the Pod gets a short-lived, auto-rotating token from the TokenRequest API, mounted as a projected volume. Set `automountServiceAccountToken: false` to stop that.",
+            "To let a ServiceAccount act in another namespace, create the Role and RoleBinding in the **target** namespace and name the ServiceAccount as subject."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rbac-check",
+      "heading": "Checking access with kubectl auth can-i",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/",
+      "sourceTitle": "Authorization",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Authorization is **deny by default**: some authorizer must allow the request. With several modes (e.g. `--authorization-mode=Node,RBAC,Webhook`) they are checked in order; the first allow or deny wins. A denied request gets HTTP **403**."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl auth can-i create deployments --namespace dev\nkubectl auth can-i list secrets --namespace dev --as dave\nkubectl auth can-i list pods --namespace target \\\n  --as system:serviceaccount:dev:dev-sa"
+        },
+        {
+          "type": "table",
+          "header": [
+            "HTTP method",
+            "RBAC verb"
+          ],
+          "rows": [
+            [
+              "GET, HEAD",
+              "get (one object), list (collection), watch"
+            ],
+            [
+              "POST",
+              "create"
+            ],
+            [
+              "PUT / PATCH",
+              "update / patch"
+            ],
+            [
+              "DELETE",
+              "delete (one object), deletecollection (collection)"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "`get`, `list` and `watch` all return full objects. Granting `list` on Secrets reveals their data."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "rbac-fc-01",
+      "front": "Role vs ClusterRole?",
+      "back": "Role: permissions within one namespace. ClusterRole: not namespaced; for cluster-scoped resources, non-resource URLs, or namespaced resources across namespaces.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-02",
+      "front": "Can RBAC express a deny rule?",
+      "back": "No. Permissions are purely additive.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-03",
+      "front": "What happens when a RoleBinding references a ClusterRole?",
+      "back": "The ClusterRole's permissions apply only inside the RoleBinding's namespace.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-04",
+      "front": "How do you change the roleRef of an existing binding?",
+      "back": "You can't edit it (immutable). Delete the binding and recreate it, or use kubectl auth reconcile.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-05",
+      "front": "What apiGroups value means the core group (pods, services, secrets)?",
+      "back": "\"\" (empty string).",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-06",
+      "front": "How do you write the Pod logs subresource in a rule?",
+      "back": "pods/log",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-07",
+      "front": "Username format of a ServiceAccount?",
+      "back": "system:serviceaccount:<namespace>:<name>",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-08",
+      "front": "Group that contains all ServiceAccounts in one namespace?",
+      "back": "system:serviceaccounts:<namespace>",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-09",
+      "front": "Which default role can read/write most objects but NOT Roles/RoleBindings?",
+      "back": "edit",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-10",
+      "front": "Which default role cannot read Secrets?",
+      "back": "view (reading Secrets could expose ServiceAccount credentials).",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-11",
+      "front": "Which group is bound to cluster-admin by default?",
+      "back": "system:masters",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
+    },
+    {
+      "id": "rbac-fc-12",
+      "front": "Pod spec field to choose a ServiceAccount?",
+      "back": "spec.serviceAccountName (and automountServiceAccountToken: false disables token injection).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+    },
+    {
+      "id": "rbac-fc-13",
+      "front": "Check whether ServiceAccount dev-sa in namespace dev can list pods in namespace target?",
+      "back": "kubectl auth can-i list pods --namespace target --as system:serviceaccount:dev:dev-sa",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "rbac-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-rbac",
+      "stem": "A user must read Pods only in namespace `dev`. Which pair of objects is the minimal fit?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A Role in dev plus a RoleBinding in dev",
+          "correct": true,
+          "explanation": "A Role scopes permissions to one namespace and a RoleBinding grants them there."
+        },
+        {
+          "id": "b",
+          "text": "A ClusterRole plus a ClusterRoleBinding",
+          "correct": false,
+          "explanation": "A ClusterRoleBinding grants access in every namespace."
+        },
+        {
+          "id": "c",
+          "text": "A Role in dev plus a ClusterRoleBinding",
+          "correct": false,
+          "explanation": "A ClusterRoleBinding can only reference a ClusterRole."
+        },
+        {
+          "id": "d",
+          "text": "A ServiceAccount in dev",
+          "correct": false,
+          "explanation": "A ServiceAccount is an identity; it carries no permissions by itself."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-rbac",
+      "stem": "A RoleBinding in namespace `development` references the ClusterRole `secret-reader`. Where can the subject read Secrets?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Only in development",
+          "correct": true,
+          "explanation": "The binding's namespace limits where the ClusterRole's permissions apply."
+        },
+        {
+          "id": "b",
+          "text": "In every namespace",
+          "correct": false,
+          "explanation": "That would need a ClusterRoleBinding."
+        },
+        {
+          "id": "c",
+          "text": "Nowhere; a RoleBinding cannot reference a ClusterRole",
+          "correct": false,
+          "explanation": "RoleBindings may reference ClusterRoles."
+        },
+        {
+          "id": "d",
+          "text": "Only in kube-system",
+          "correct": false,
+          "explanation": "The binding namespace, not kube-system, decides."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ca-rbac",
+      "stem": "True or false: You can add a rule to a Role that explicitly denies `delete` on Secrets.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "RBAC has no deny rules."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. Permissions are purely additive; there are no deny rules."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-rbac",
+      "stem": "You try to edit an existing RoleBinding so its `roleRef` points to a different Role. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "options": [
+        {
+          "id": "a",
+          "text": "You get a validation error; you must delete and recreate the binding",
+          "correct": true,
+          "explanation": "roleRef is immutable after creation."
+        },
+        {
+          "id": "b",
+          "text": "The binding updates and keeps its subjects",
+          "correct": false,
+          "explanation": "Changing roleRef is rejected."
+        },
+        {
+          "id": "c",
+          "text": "The old Role is renamed to match",
+          "correct": false,
+          "explanation": "Roles are not renamed by bindings."
+        },
+        {
+          "id": "d",
+          "text": "The API server creates a second binding automatically",
+          "correct": false,
+          "explanation": "It does not; kubectl auth reconcile can delete and recreate for you, but a plain edit fails."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-rbac",
+      "stem": "Which command creates a Role in namespace `acme` that lets subjects get, list and watch ReplicaSets?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl create role foo --verb=get,list,watch --resource=replicasets.apps -n acme",
+          "correct": true,
+          "explanation": "`<resource>.<group>` sets the apps API group."
+        },
+        {
+          "id": "b",
+          "text": "kubectl create clusterrole foo --verb=get,list,watch --resource=replicasets.apps",
+          "correct": false,
+          "explanation": "This creates a cluster-scoped ClusterRole, not a Role in acme."
+        },
+        {
+          "id": "c",
+          "text": "kubectl create rolebinding foo --clusterrole=view -n acme",
+          "correct": false,
+          "explanation": "This binds the view role; it does not create a Role."
+        },
+        {
+          "id": "d",
+          "text": "kubectl auth can-i list replicasets --namespace acme",
+          "correct": false,
+          "explanation": "This only checks access; it creates nothing."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-06",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-rbac",
+      "stem": "Which statements about the default `view` ClusterRole are correct? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It is intended to be granted within a namespace using a RoleBinding",
+          "correct": true,
+          "explanation": "admin, edit and view are meant for per-namespace grants."
+        },
+        {
+          "id": "b",
+          "text": "It cannot read Secrets",
+          "correct": true,
+          "explanation": "Reading Secrets could expose ServiceAccount credentials."
+        },
+        {
+          "id": "c",
+          "text": "It can list Roles and RoleBindings",
+          "correct": false,
+          "explanation": "view does not allow viewing roles or role bindings."
+        },
+        {
+          "id": "d",
+          "text": "It can create Pods",
+          "correct": false,
+          "explanation": "view is read-only."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-rbac",
+      "stem": "Which default ClusterRole lets a namespace owner create Roles and RoleBindings in that namespace, but not modify its ResourceQuota?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "options": [
+        {
+          "id": "a",
+          "text": "admin",
+          "correct": true,
+          "explanation": "admin includes role and role binding management but no write on resource quota or the namespace."
+        },
+        {
+          "id": "b",
+          "text": "edit",
+          "correct": false,
+          "explanation": "edit cannot view or modify roles or role bindings."
+        },
+        {
+          "id": "c",
+          "text": "view",
+          "correct": false,
+          "explanation": "view is read-only."
+        },
+        {
+          "id": "d",
+          "text": "cluster-admin",
+          "correct": false,
+          "explanation": "cluster-admin can do anything, including quotas."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-rbac",
+      "stem": "Which subject grants a role to **all** ServiceAccounts in namespace `qa`?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kind: Group, name: system:serviceaccounts:qa",
+          "correct": true,
+          "explanation": "The plural prefix names the ServiceAccount group of that namespace."
+        },
+        {
+          "id": "b",
+          "text": "kind: User, name: system:serviceaccount:qa",
+          "correct": false,
+          "explanation": "The singular prefix is for one ServiceAccount username and needs a name after the namespace."
+        },
+        {
+          "id": "c",
+          "text": "kind: ServiceAccount, name: default, namespace: qa",
+          "correct": false,
+          "explanation": "That is only the default ServiceAccount."
+        },
+        {
+          "id": "d",
+          "text": "kind: Group, name: system:authenticated",
+          "correct": false,
+          "explanation": "That is every authenticated user cluster-wide."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-09",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-rbac",
+      "stem": "How do you check whether user `dave` can list Secrets in namespace `dev`?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl auth can-i list secrets --namespace dev --as dave",
+          "correct": true,
+          "explanation": "--as impersonates the user for the check."
+        },
+        {
+          "id": "b",
+          "text": "kubectl auth can-i list secrets --namespace dev",
+          "correct": false,
+          "explanation": "Without --as this checks the current user, not dave."
+        },
+        {
+          "id": "c",
+          "text": "kubectl auth reconcile --as dave",
+          "correct": false,
+          "explanation": "auth reconcile applies RBAC manifests."
+        },
+        {
+          "id": "d",
+          "text": "kubectl describe rolebinding dave -n dev",
+          "correct": false,
+          "explanation": "This shows one binding, not the effective decision."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-10",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-rbac",
+      "stem": "True or false: In a cluster with RBAC, a namespace's `default` ServiceAccount can list Pods in its namespace out of the box.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/security/service-accounts/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "The default ServiceAccount gets only API discovery permissions."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. It has no permissions beyond API discovery until you bind a role."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-rbac",
+      "stem": "A Pod in namespace `dev` uses ServiceAccount `reporter` and must list Jobs in namespace `maintenance`. Where do you create the RoleBinding?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/security/service-accounts/",
+      "options": [
+        {
+          "id": "a",
+          "text": "In maintenance, with the dev/reporter ServiceAccount as subject",
+          "correct": true,
+          "explanation": "Bind the Role in the namespace that holds the resources."
+        },
+        {
+          "id": "b",
+          "text": "In dev, with subject maintenance:reporter",
+          "correct": false,
+          "explanation": "A RoleBinding in dev only grants access in dev."
+        },
+        {
+          "id": "c",
+          "text": "Nowhere; ServiceAccounts cannot act across namespaces",
+          "correct": false,
+          "explanation": "RBAC allows cross-namespace access for ServiceAccounts."
+        },
+        {
+          "id": "d",
+          "text": "On the Pod via automountServiceAccountToken",
+          "correct": false,
+          "explanation": "That only controls token mounting."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-12",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ca-rbac",
+      "stem": "Which HTTP request / RBAC verb pairs are correct? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/",
+      "options": [
+        {
+          "id": "a",
+          "text": "POST → create",
+          "correct": true,
+          "explanation": "POST maps to create."
+        },
+        {
+          "id": "b",
+          "text": "GET on a collection → list",
+          "correct": true,
+          "explanation": "GET of a collection maps to list."
+        },
+        {
+          "id": "c",
+          "text": "DELETE on a collection → deletecollection",
+          "correct": true,
+          "explanation": "DELETE of a collection maps to deletecollection."
+        },
+        {
+          "id": "d",
+          "text": "PUT → patch",
+          "correct": false,
+          "explanation": "PUT maps to update; PATCH maps to patch."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-13",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ca-rbac",
+      "stem": "The API server runs with `--authorization-mode=Node,RBAC`. The Node authorizer has no opinion on a request and RBAC has no matching rule. What is the result?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Denied with HTTP 403",
+          "correct": true,
+          "explanation": "If every module has no opinion the request is denied."
+        },
+        {
+          "id": "b",
+          "text": "Allowed because no rule denies it",
+          "correct": false,
+          "explanation": "Authorization is deny by default."
+        },
+        {
+          "id": "c",
+          "text": "Passed to admission control to decide",
+          "correct": false,
+          "explanation": "Admission runs only after authorization allows."
+        },
+        {
+          "id": "d",
+          "text": "Allowed for authenticated users only",
+          "correct": false,
+          "explanation": "There is no such fallback."
+        }
+      ]
+    },
+    {
+      "id": "rbac-q-14",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-rbac",
+      "stem": "True or false: A user who cannot list Secrets cluster-wide can still create a ClusterRole granting that permission, as long as they may create ClusterRoles.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Escalation prevention blocks this unless they have the escalate verb."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. They need the permission themselves or the `escalate` verb on clusterroles."
+        }
+      ]
+    }
+  ]
+}

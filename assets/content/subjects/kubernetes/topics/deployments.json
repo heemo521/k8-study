@@ -1,0 +1,745 @@
+{
+  "id": "deployments",
+  "title": "Deployments, Rollouts & Rollbacks",
+  "summary": "How a Deployment drives ReplicaSets and Pods, and how to update, roll back, pause and scale it.",
+  "order": 1,
+  "domainIds": [
+    "workloads-scheduling"
+  ],
+  "competencyIds": [
+    "ws-rollouts",
+    "ws-self-healing"
+  ],
+  "prerequisites": [
+    "pods"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "deployments-model",
+      "heading": "Deployment → ReplicaSet → Pods",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "sourceTitle": "Deployments",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A Deployment is the usual way to run a **stateless** workload. You declare the desired state; the Deployment controller moves the cluster towards it at a controlled pace by creating and scaling **ReplicaSets**, which in turn create the Pods."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: <name>\nspec:\n  replicas: 3            # optional, defaults to 1\n  selector:\n    matchLabels:\n      app: <label>       # must match the template labels\n  template:\n    metadata:\n      labels:\n        app: <label>\n    spec:\n      containers:\n      - name: <container>\n        image: <image>:<tag>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`.spec.template` and `.spec.selector` are the only **required** fields of `.spec`.",
+            "The selector must match `.spec.template.metadata.labels` or the API rejects it. In `apps/v1` the selector is **immutable** once created.",
+            "The template's `restartPolicy` may only be `Always` (the default).",
+            "ReplicaSets are named `<deployment-name>-<hash>`. The hash is the `pod-template-hash` label the controller adds to each ReplicaSet and its Pods. Never change that label.",
+            "Don't manage ReplicaSets that a Deployment owns, and don't let other controllers or bare Pods share its selector. Kubernetes won't stop the overlap, and the controllers will fight."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get deployments          # READY / UP-TO-DATE / AVAILABLE\nkubectl get rs                   # DESIRED / CURRENT / READY\nkubectl get pods --show-labels   # shows pod-template-hash"
+        }
+      ]
+    },
+    {
+      "id": "deployments-replicaset",
+      "heading": "ReplicaSets and self-healing",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/",
+      "sourceTitle": "ReplicaSet",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A ReplicaSet keeps a fixed number of identical Pods running. It has a **selector**, a **replica count** and a **Pod template**, and it creates or deletes Pods to hit the count. Each Pod points back to its ReplicaSet through `metadata.ownerReferences`."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Pods that are deleted or lost (for example, a node fails) are **replaced**. Bare Pods are not, so the docs recommend a ReplicaSet even for a single Pod.",
+            "A ReplicaSet **adopts** any Pod with no controller owner whose labels match its selector, even one it didn't create. Extra Pods are then terminated if the count is exceeded.",
+            "Changing a Pod's labels so they no longer match removes it from the ReplicaSet (useful for debugging); a replacement is created.",
+            "ReplicaSets don't do rolling updates. Use a Deployment unless you need custom update orchestration or no updates at all.",
+            "`kubectl delete` with `--cascade=orphan` removes only the ReplicaSet and leaves its Pods running."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "On scale-down, Pending/unschedulable Pods go first, then Pods with a lower `controller.kubernetes.io/pod-deletion-cost` annotation, then Pods on nodes running more replicas, then newer Pods."
+        }
+      ]
+    },
+    {
+      "id": "deployments-strategy",
+      "heading": "Update strategies: RollingUpdate vs Recreate",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "sourceTitle": "Deployments",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "A rollout (and a new revision) happens **only** when `.spec.template` changes, such as an image or template label. Scaling does not trigger a rollout."
+        },
+        {
+          "type": "table",
+          "header": [
+            "`.spec.strategy.type`",
+            "Behaviour"
+          ],
+          "rows": [
+            [
+              "RollingUpdate (default)",
+              "New ReplicaSet scales up while the old one scales down, within maxSurge / maxUnavailable"
+            ],
+            [
+              "Recreate",
+              "All old Pods are killed, and their removal awaited, before any new Pod is created (downtime)"
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Field",
+            "Meaning",
+            "Default"
+          ],
+          "rows": [
+            [
+              "rollingUpdate.maxUnavailable",
+              "Max Pods unavailable during the update; % rounds **down**",
+              "25%"
+            ],
+            [
+              "rollingUpdate.maxSurge",
+              "Max Pods above the desired count; % rounds **up**",
+              "25%"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Values can be an absolute number or a percentage. They can't **both** be 0.",
+            "With the defaults and 3 replicas, at least 3 Pods stay available and at most 4 exist. With 4 replicas, the Pod count stays between 3 and 5.",
+            "`.spec.minReadySeconds` (default 0) is how long a new Pod must be ready without crashing before it counts as available.",
+            "If you update during an in-flight rollout, the controller starts a new ReplicaSet straight away and treats the half-scaled one as old (a **rollover**)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deployments-update",
+      "heading": "Updating and watching a rollout",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "sourceTitle": "Deployments",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl set image deployment/<name> <container>=<image>:<tag>\nkubectl edit deployment/<name>        # or edit .spec.template directly\nkubectl rollout status deployment/<name>\nkubectl describe deployment <name>    # events show RS scaled up/down"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "`kubectl rollout status` exits **0** when the rollout succeeds and **non-zero** (1) when the Deployment has exceeded its progress deadline. Handy for scripted checks."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`.spec.progressDeadlineSeconds` (default **600**) sets how long the controller waits before reporting the rollout as stalled: condition `Progressing`, status `False`, reason `ProgressDeadlineExceeded`. It must be greater than `minReadySeconds`.",
+            "Kubernetes only reports a stalled rollout; it does **not** roll back automatically.",
+            "Common causes of a stuck rollout: insufficient quota, failing readiness probes, image pull errors, insufficient permissions, limit ranges, app misconfiguration.",
+            "A finished rollout shows `Progressing` True with reason `NewReplicaSetAvailable`."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deployments-rollback",
+      "heading": "History and rollbacks",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "sourceTitle": "Deployments",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl rollout history deployment/<name>\nkubectl rollout history deployment/<name> --revision=<n>\nkubectl rollout undo deployment/<name>                    # previous revision\nkubectl rollout undo deployment/<name> --to-revision=<n>\nkubectl annotate deployment/<name> kubernetes.io/change-cause=\"<message>\""
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The CHANGE-CAUSE column is copied from the `kubernetes.io/change-cause` annotation. The old `--record` flag is deprecated.",
+            "Only the **Pod template** is rolled back. Replica count is not part of a revision.",
+            "Revisions live in the old ReplicaSets. `.spec.revisionHistoryLimit` (default **10**) controls how many are kept. Setting it to **0** removes them all, so you can't roll back.",
+            "You can't roll back a **paused** Deployment until you resume it."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deployments-pause-scale",
+      "heading": "Pause, resume and scale",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "sourceTitle": "Deployments",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Pause a Deployment to batch several template changes into **one** rollout. While paused, template edits don't start a rollout and the progress deadline isn't checked."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl rollout pause deployment/<name>\nkubectl set image deployment/<name> <container>=<image>:<tag>\nkubectl set resources deployment/<name> -c=<container> --limits=cpu=<cpu>,memory=<memory>\nkubectl rollout resume deployment/<name>\n\nkubectl scale deployment/<name> --replicas=<n>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A later `kubectl apply` of a manifest overwrites a manual `kubectl scale`.",
+            "If an HPA manages the Deployment, leave `.spec.replicas` out of the manifest and let the control plane own it.",
+            "Scaling mid-rollout spreads extra replicas across the active ReplicaSets in proportion to their size (**proportional scaling**)."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "deployments-fc-01",
+      "front": "What does a Deployment create to run its Pods?",
+      "back": "A ReplicaSet per Pod template version; the ReplicaSet creates the Pods.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-02",
+      "front": "What triggers a new Deployment rollout?",
+      "back": "Only a change to .spec.template (for example the image). Scaling does not.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-03",
+      "front": "Default Deployment strategy, and the alternative?",
+      "back": "RollingUpdate is the default; Recreate kills all old Pods before creating new ones.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-04",
+      "front": "Default maxUnavailable and maxSurge?",
+      "back": "25% each. maxUnavailable rounds down, maxSurge rounds up; they can't both be 0.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-05",
+      "front": "Change a Deployment's container image imperatively?",
+      "back": "kubectl set image deployment/<name> <container>=<image>:<tag>",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-06",
+      "front": "Roll back to a specific revision?",
+      "back": "kubectl rollout undo deployment/<name> --to-revision=<n>",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-07",
+      "front": "Where does the CHANGE-CAUSE in rollout history come from?",
+      "back": "The kubernetes.io/change-cause annotation on the Deployment.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-08",
+      "front": "Default revisionHistoryLimit, and what does 0 mean?",
+      "back": "10 old ReplicaSets. 0 cleans them all up, so you can't roll back.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-09",
+      "front": "Default progressDeadlineSeconds and the reason reported when exceeded?",
+      "back": "600 seconds; Progressing=False with reason ProgressDeadlineExceeded.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-10",
+      "front": "Why pause a Deployment rollout?",
+      "back": "To make several template changes and release them as one rollout after kubectl rollout resume.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    },
+    {
+      "id": "deployments-fc-11",
+      "front": "How does a ReplicaSet link to its Pods?",
+      "back": "Through each Pod's metadata.ownerReferences field.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/"
+    },
+    {
+      "id": "deployments-fc-12",
+      "front": "Delete a ReplicaSet but keep its Pods running?",
+      "back": "kubectl delete with --cascade=orphan.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/"
+    },
+    {
+      "id": "deployments-fc-13",
+      "front": "Which restartPolicy is allowed in a Deployment Pod template?",
+      "back": "Only Always (the default).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "deployments-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ws-rollouts",
+      "stem": "You need to update container `web` in Deployment `shop` to a new image tag. Which command starts the rolling update?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl set image deployment/shop web=<image>:<tag>",
+          "correct": true,
+          "explanation": "set image changes the Pod template, which triggers a rollout."
+        },
+        {
+          "id": "b",
+          "text": "kubectl scale deployment/shop --replicas=<n>",
+          "correct": false,
+          "explanation": "Scaling changes the replica count and does not trigger a rollout."
+        },
+        {
+          "id": "c",
+          "text": "kubectl rollout resume deployment/shop",
+          "correct": false,
+          "explanation": "resume only continues a paused Deployment; it doesn't change the image."
+        },
+        {
+          "id": "d",
+          "text": "kubectl rollout undo deployment/shop",
+          "correct": false,
+          "explanation": "undo goes back to the previous revision."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-02",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ws-rollouts",
+      "stem": "True or false: Running `kubectl scale` on a Deployment creates a new revision in its rollout history.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Revisions are created only when .spec.template changes."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Scaling doesn't create a revision, so rollbacks restore only the Pod template."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-rollouts",
+      "stem": "A Deployment has 4 replicas and the default rolling update settings. During an update, what range of Pod counts does the controller keep?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Between 3 and 5 Pods",
+          "correct": true,
+          "explanation": "25% max unavailable and 25% max surge give at least 3 available and at most 5."
+        },
+        {
+          "id": "b",
+          "text": "Exactly 4 Pods at all times",
+          "correct": false,
+          "explanation": "maxSurge and maxUnavailable both allow some movement."
+        },
+        {
+          "id": "c",
+          "text": "Between 0 and 8 Pods",
+          "correct": false,
+          "explanation": "That describes no limits at all; the defaults are 25%."
+        },
+        {
+          "id": "d",
+          "text": "Between 2 and 4 Pods",
+          "correct": false,
+          "explanation": "The default maxSurge lets the count go above 4."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-rollouts",
+      "stem": "Your app can't run two versions side by side, so every old Pod must be gone before new ones start. Which strategy fits?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "strategy.type: Recreate",
+          "correct": true,
+          "explanation": "Recreate kills existing Pods and waits for their removal before creating new ones."
+        },
+        {
+          "id": "b",
+          "text": "strategy.type: RollingUpdate with maxSurge: 1",
+          "correct": false,
+          "explanation": "That adds a new Pod while old ones still run."
+        },
+        {
+          "id": "c",
+          "text": "strategy.type: RollingUpdate with maxUnavailable: 0 and maxSurge: 0",
+          "correct": false,
+          "explanation": "The two values can't both be 0."
+        },
+        {
+          "id": "d",
+          "text": "spec.paused: true",
+          "correct": false,
+          "explanation": "Pausing stops rollouts; it isn't an update strategy."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-rollouts",
+      "stem": "A typo in the image tag leaves new Pods in ImagePullBackOff. How do you return to the version that worked just before?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl rollout undo deployment/<name>",
+          "correct": true,
+          "explanation": "undo with no revision rolls back to the previous one."
+        },
+        {
+          "id": "b",
+          "text": "kubectl rollout pause deployment/<name>",
+          "correct": false,
+          "explanation": "Pausing stops further rollouts but doesn't restore the old template."
+        },
+        {
+          "id": "c",
+          "text": "kubectl rollout history deployment/<name>",
+          "correct": false,
+          "explanation": "history lists revisions; it doesn't change anything."
+        },
+        {
+          "id": "d",
+          "text": "kubectl rollout status deployment/<name>",
+          "correct": false,
+          "explanation": "That only watches the rollout; it doesn't change anything."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-06",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ws-rollouts",
+      "stem": "Which statements about Deployment rollout history are correct? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Revisions are stored in the Deployment's old ReplicaSets",
+          "correct": true,
+          "explanation": "Each revision's configuration lives in its ReplicaSet."
+        },
+        {
+          "id": "b",
+          "text": "revisionHistoryLimit defaults to 10",
+          "correct": true,
+          "explanation": "By default 10 old ReplicaSets are kept."
+        },
+        {
+          "id": "c",
+          "text": "Setting revisionHistoryLimit to 0 keeps unlimited history",
+          "correct": false,
+          "explanation": "0 cleans up all old ReplicaSets, so rollback is impossible."
+        },
+        {
+          "id": "d",
+          "text": "--record is the recommended way to fill CHANGE-CAUSE",
+          "correct": false,
+          "explanation": "--record is deprecated; set the kubernetes.io/change-cause annotation instead."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-rollouts",
+      "stem": "You want to change the image and the resource limits of a Deployment but trigger only one rollout. What's the documented approach?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl rollout pause, make both changes, then kubectl rollout resume",
+          "correct": true,
+          "explanation": "Changes made while paused are rolled out together after resume."
+        },
+        {
+          "id": "b",
+          "text": "Set strategy.type to Recreate",
+          "correct": false,
+          "explanation": "Each template change would still trigger its own rollout."
+        },
+        {
+          "id": "c",
+          "text": "Scale the Deployment to 0 first",
+          "correct": false,
+          "explanation": "Scaling doesn't stop template changes from starting rollouts."
+        },
+        {
+          "id": "d",
+          "text": "Use kubectl rollout undo between the changes",
+          "correct": false,
+          "explanation": "undo reverts a change; it doesn't batch them."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-08",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ws-rollouts",
+      "stem": "True or false: When a Deployment exceeds its progress deadline, Kubernetes automatically rolls it back.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "It only sets a ProgressDeadlineExceeded condition."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Higher-level tooling (or you) must act on the condition, for example by rolling back."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-09",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-rollouts",
+      "stem": "A script runs `kubectl rollout status deployment/<name>` after a rollout that stalled past its progress deadline. What does it see?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "An error that the progress deadline was exceeded, and a non-zero exit code",
+          "correct": true,
+          "explanation": "rollout status returns non-zero (1) once the deadline is exceeded."
+        },
+        {
+          "id": "b",
+          "text": "\"successfully rolled out\" and exit code 0",
+          "correct": false,
+          "explanation": "That's what a completed rollout returns."
+        },
+        {
+          "id": "c",
+          "text": "It waits forever with no exit",
+          "correct": false,
+          "explanation": "It exits with an error once the deadline is exceeded."
+        },
+        {
+          "id": "d",
+          "text": "The rollout is automatically undone and it exits 0",
+          "correct": false,
+          "explanation": "Kubernetes doesn't roll back on its own."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "A node running one of a ReplicaSet's Pods fails. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The ReplicaSet creates a replacement Pod to restore the replica count",
+          "correct": true,
+          "explanation": "ReplicaSets replace Pods that are deleted or terminated, including after node failure."
+        },
+        {
+          "id": "b",
+          "text": "Nothing; Pods are only replaced if created as bare Pods",
+          "correct": false,
+          "explanation": "It's the other way round: bare Pods are not replaced."
+        },
+        {
+          "id": "c",
+          "text": "The ReplicaSet lowers its replica count",
+          "correct": false,
+          "explanation": "The desired count doesn't change; the controller works to meet it."
+        },
+        {
+          "id": "d",
+          "text": "The Deployment starts a new revision",
+          "correct": false,
+          "explanation": "Only Pod template changes create revisions."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-11",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-self-healing",
+      "stem": "A ReplicaSet with selector `tier: frontend` already runs its 3 desired Pods. You then create a bare Pod labelled `tier: frontend`. What happens to it?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The ReplicaSet adopts it and then terminates it, because it now has too many Pods",
+          "correct": true,
+          "explanation": "Matching Pods without a controller owner are acquired, and the excess is deleted."
+        },
+        {
+          "id": "b",
+          "text": "It runs alongside the 3 Pods, unmanaged",
+          "correct": false,
+          "explanation": "A ReplicaSet acquires matching Pods that have no controller owner."
+        },
+        {
+          "id": "c",
+          "text": "The API server rejects it",
+          "correct": false,
+          "explanation": "Kubernetes doesn't block overlapping labels."
+        },
+        {
+          "id": "d",
+          "text": "The ReplicaSet scales to 4",
+          "correct": false,
+          "explanation": ".spec.replicas doesn't change."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-12",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ws-rollouts",
+      "stem": "Which statements about a Deployment's spec are correct? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": ".spec.selector must match .spec.template.metadata.labels",
+          "correct": true,
+          "explanation": "Otherwise the API rejects the Deployment."
+        },
+        {
+          "id": "b",
+          "text": "In apps/v1, .spec.selector can't be changed after creation",
+          "correct": true,
+          "explanation": "To change it, delete and recreate the Deployment."
+        },
+        {
+          "id": "c",
+          "text": ".spec.replicas defaults to 1",
+          "correct": true,
+          "explanation": "It's optional and defaults to 1."
+        },
+        {
+          "id": "d",
+          "text": "The Pod template may use restartPolicy: OnFailure",
+          "correct": false,
+          "explanation": "Only Always is allowed in a Deployment template."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-13",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-rollouts",
+      "stem": "You ran `kubectl scale deployment/<name> --replicas=8`, then `kubectl apply -f` the original manifest, which has `replicas: 3`. How many replicas are desired now?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "3, because applying the manifest overwrites the manual scaling",
+          "correct": true,
+          "explanation": "The docs warn that apply overwrites an earlier manual scale."
+        },
+        {
+          "id": "b",
+          "text": "8, because manual scaling always wins",
+          "correct": false,
+          "explanation": "The applied manifest's replicas value replaces it."
+        },
+        {
+          "id": "c",
+          "text": "11, the two values added together",
+          "correct": false,
+          "explanation": "Replica counts are not summed."
+        },
+        {
+          "id": "d",
+          "text": "The apply fails with a conflict",
+          "correct": false,
+          "explanation": "The apply succeeds and sets replicas to 3."
+        }
+      ]
+    },
+    {
+      "id": "deployments-q-14",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-rollouts",
+      "stem": "You paused a Deployment and now want to run `kubectl rollout undo`. What must you do first?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Resume it with kubectl rollout resume",
+          "correct": true,
+          "explanation": "A paused Deployment can't be rolled back until it's resumed."
+        },
+        {
+          "id": "b",
+          "text": "Scale it to 0",
+          "correct": false,
+          "explanation": "Scaling doesn't unpause it."
+        },
+        {
+          "id": "c",
+          "text": "Set revisionHistoryLimit to 0",
+          "correct": false,
+          "explanation": "That deletes the history you need to roll back."
+        },
+        {
+          "id": "d",
+          "text": "Nothing; undo works while paused",
+          "correct": false,
+          "explanation": "The docs say you can't roll back while paused."
+        }
+      ]
+    }
+  ]
+}

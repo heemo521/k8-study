@@ -1,0 +1,755 @@
+{
+  "id": "extension-interfaces",
+  "title": "Extension Interfaces: CNI, CSI, CRI",
+  "summary": "How the kubelet plugs in container runtimes (CRI), Pod networking (CNI), storage (CSI) and special hardware (device plugins).",
+  "order": 9,
+  "domainIds": [
+    "cluster-arch"
+  ],
+  "competencyIds": [
+    "ca-extension"
+  ],
+  "prerequisites": [
+    "architecture"
+  ],
+  "estMinutes": 15,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "extension-interfaces-overview",
+      "heading": "Where Kubernetes can be extended",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/",
+      "sourceTitle": "Extending Kubernetes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Customising a cluster is either **configuration** (flags, config files, API resources) or an **extension** (extra programs or services). You rarely need to fork Kubernetes."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Webhook model:** Kubernetes calls a remote service over the network.",
+            "**Binary plugin model:** Kubernetes runs a program. The kubelet uses this for **CNI** network plugins and **CSI** storage plugins.",
+            "A **controller** is an API client that reads an object's `.spec`, acts, then updates its `.status`."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Extension point",
+            "What it adds"
+          ],
+          "rows": [
+            [
+              "Network plugins",
+              "Pod networking implementations"
+            ],
+            [
+              "Storage plugins (CSI)",
+              "New volume types"
+            ],
+            [
+              "Device plugins",
+              "Custom hardware advertised to Pods"
+            ],
+            [
+              "Custom resources / aggregation",
+              "New API types"
+            ],
+            [
+              "Authn / authz / admission webhooks",
+              "Checks on API requests"
+            ],
+            [
+              "Scheduler plugins / extender",
+              "Custom node filtering and scoring"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "FlexVolume storage plugins are **deprecated since v1.23** in favour of CSI."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-cri",
+      "heading": "CRI: kubelet ↔ container runtime",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/architecture/cri/",
+      "sourceTitle": "Container Runtime Interface (CRI)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The **CRI** is the main **gRPC** protocol between the kubelet and the container runtime. It lets the kubelet use many runtimes without recompiling cluster components. Every node needs a working runtime so the kubelet can start Pods."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The kubelet is the gRPC **client**; the runtime serves the runtime and image service endpoints.",
+            "Point the kubelet at the runtime with the `--container-runtime-endpoint` flag.",
+            "Since **v1.26** the kubelet needs a runtime that supports the **v1 CRI API**. If it doesn't, the kubelet won't register the node."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "After a node upgrade, if the kubelet fails to register, check that the container runtime supports CRI v1. Once the runtime is fixed, you may need to restart the kubelet."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-cni",
+      "heading": "CNI: Pod networking",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "sourceTitle": "Network Plugins",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A **CNI** (Container Network Interface) plugin is required to implement the Kubernetes network model. Use one compatible with CNI spec **v0.4.0 or later**; the project recommends one compatible with **v1.0.0**."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The **container runtime** loads the CNI plugins, not the kubelet. The kubelet flags `cni-bin-dir` and `network-plugin` were removed in **1.24**.",
+            "Runtimes must also provide a loopback interface `lo` for each sandbox; the CNI loopback plugin can do this.",
+            "`hostPort` support comes from the `portmap` plugin with the `portMappings` capability.",
+            "Traffic shaping uses the `bandwidth` plugin plus the `kubernetes.io/ingress-bandwidth` and `kubernetes.io/egress-bandwidth` Pod annotations."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Default path",
+            "Contents"
+          ],
+          "rows": [
+            [
+              "/etc/cni/net.d",
+              "CNI configuration files"
+            ],
+            [
+              "/opt/cni/bin",
+              "CNI plugin binaries"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-csi",
+      "heading": "CSI: storage drivers",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "sourceTitle": "Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "**CSI** (Container Storage Interface) is a standard way for orchestrators to expose any storage system to containers. Once a CSI driver is deployed, you use the `csi` volume type."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Ways to use a CSI volume in a Pod: through a **PersistentVolumeClaim**, a **generic ephemeral volume**, or a **CSI ephemeral volume** (if the driver supports it).",
+            "**CSI migration** sends operations for in-tree plugins to the matching CSI driver, so existing StorageClasses, PVs and PVCs need no changes. You still have to install that driver yourself.",
+            "FlexVolume is deprecated; out-of-tree CSI drivers are the recommended way to add external storage."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "CSI PV field",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "driver",
+              "Name of the CSI driver to call"
+            ],
+            [
+              "volumeHandle",
+              "Unique ID of the volume"
+            ],
+            [
+              "readOnly",
+              "Attach read-only (default false)"
+            ],
+            [
+              "fsType",
+              "Filesystem to use/format for Filesystem mode"
+            ],
+            [
+              "volumeAttributes",
+              "Static properties of the volume"
+            ],
+            [
+              "nodePublishSecretRef etc.",
+              "Secrets passed to specific CSI calls"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-devices",
+      "heading": "Device plugins",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/",
+      "sourceTitle": "Device Plugins",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Device plugins advertise hardware such as **GPUs, NICs and FPGAs** to the kubelet, so vendors don't change Kubernetes code. Deploy one as a **DaemonSet**, as an OS package, or by hand."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The plugin serves gRPC on a Unix socket under `/var/lib/kubelet/device-plugins/` and registers through `/var/lib/kubelet/device-plugins/kubelet.sock`.",
+            "Resource names use `vendor-domain/resourcetype`, for example `nvidia.com/gpu`. The kubelet reports the devices in the node status.",
+            "Extended resources are **integers only**, cannot be overcommitted, and a device is **not shared** between containers.",
+            "The device directory needs privileged access, so the plugin runs privileged. As a DaemonSet, mount that directory as a volume.",
+            "When the kubelet restarts it deletes the sockets; plugins must re-register.",
+            "An unhealthy device lowers the node's **allocatable** count; **capacity** stays the same."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "resources:\n  limits:\n    <vendor-domain>/<resourcetype>: 2"
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "extension-interfaces-fc-01",
+      "front": "What protocol does the kubelet use to talk to the container runtime?",
+      "back": "The CRI, a gRPC protocol. The kubelet is the client.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/architecture/cri/"
+    },
+    {
+      "id": "extension-interfaces-fc-02",
+      "front": "Kubelet flag that sets the container runtime endpoint?",
+      "back": "--container-runtime-endpoint",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/architecture/cri/"
+    },
+    {
+      "id": "extension-interfaces-fc-03",
+      "front": "Since v1.26, what happens if the runtime lacks the v1 CRI API?",
+      "back": "The kubelet won't register the node.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/architecture/cri/"
+    },
+    {
+      "id": "extension-interfaces-fc-04",
+      "front": "Who loads CNI plugins since Kubernetes 1.24?",
+      "back": "The container runtime. The kubelet flags cni-bin-dir and network-plugin were removed.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/"
+    },
+    {
+      "id": "extension-interfaces-fc-05",
+      "front": "Minimum CNI spec version supported? Recommended?",
+      "back": "v0.4.0 or later; v1.0.0 is recommended.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/"
+    },
+    {
+      "id": "extension-interfaces-fc-06",
+      "front": "Default CNI config dir and binary dir?",
+      "back": "/etc/cni/net.d and /opt/cni/bin",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/"
+    },
+    {
+      "id": "extension-interfaces-fc-07",
+      "front": "Which CNI plugin provides hostPort support?",
+      "back": "portmap, with the portMappings capability.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/"
+    },
+    {
+      "id": "extension-interfaces-fc-08",
+      "front": "Three ways a Pod can use a CSI volume?",
+      "back": "Via a PVC, a generic ephemeral volume, or a CSI ephemeral volume.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "extension-interfaces-fc-09",
+      "front": "Which CSI PV field uniquely identifies the volume?",
+      "back": "volumeHandle",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "extension-interfaces-fc-10",
+      "front": "FlexVolume status?",
+      "back": "Deprecated since v1.23; use a CSI driver instead.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/"
+    },
+    {
+      "id": "extension-interfaces-fc-11",
+      "front": "Which kubelet plugins use the binary (exec) model?",
+      "back": "CNI network plugins and CSI storage plugins.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/"
+    },
+    {
+      "id": "extension-interfaces-fc-12",
+      "front": "Where does a device plugin register with the kubelet?",
+      "back": "The Unix socket /var/lib/kubelet/device-plugins/kubelet.sock",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/"
+    },
+    {
+      "id": "extension-interfaces-fc-13",
+      "front": "Can two containers share one device from a device plugin?",
+      "back": "No. Devices can't be shared, and extended resources can't be overcommitted.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/"
+    },
+    {
+      "id": "extension-interfaces-fc-14",
+      "front": "Common way to deploy a device plugin?",
+      "back": "As a DaemonSet (also possible as an OS package or manually).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "extension-interfaces-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-extension",
+      "stem": "What is the CRI?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/architecture/cri/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The gRPC protocol the kubelet uses to talk to the container runtime",
+          "correct": true,
+          "explanation": "The CRI is the main protocol between those two node components."
+        },
+        {
+          "id": "b",
+          "text": "The protocol the API server uses to store objects in etcd",
+          "correct": false,
+          "explanation": "The CRI connects the kubelet and the container runtime."
+        },
+        {
+          "id": "c",
+          "text": "A runtime adapter compiled into the kubelet, so changing runtimes needs a rebuild",
+          "correct": false,
+          "explanation": "The CRI exists so the kubelet can use many runtimes without recompiling."
+        },
+        {
+          "id": "d",
+          "text": "A gRPC service the kubelet serves and the runtime calls as a client",
+          "correct": false,
+          "explanation": "It's the other way round: the kubelet is the gRPC client."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "After upgrading a node, the kubelet fails to register it and logs a CRI error. What's the most likely cause?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/architecture/cri/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The container runtime doesn't support the v1 CRI API",
+          "correct": true,
+          "explanation": "Since v1.26 the kubelet requires the v1 CRI API and won't register the node without it."
+        },
+        {
+          "id": "b",
+          "text": "No CNI plugin is installed",
+          "correct": false,
+          "explanation": "Missing networking doesn't stop the kubelet talking to the runtime."
+        },
+        {
+          "id": "c",
+          "text": "The device plugin socket was deleted",
+          "correct": false,
+          "explanation": "That affects device plugins, not node registration."
+        },
+        {
+          "id": "d",
+          "text": "FlexVolume is deprecated",
+          "correct": false,
+          "explanation": "Unrelated to the runtime connection."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "What does the kubelet's `--container-runtime-endpoint` flag configure?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/architecture/cri/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Where the container runtime's runtime and image service endpoints are",
+          "correct": true,
+          "explanation": "These endpoints can be set separately in the kubelet with this flag."
+        },
+        {
+          "id": "b",
+          "text": "Which CRI API version the kubelet requires",
+          "correct": false,
+          "explanation": "Since v1.26 the kubelet always requires the v1 CRI API; it isn't set by this flag."
+        },
+        {
+          "id": "c",
+          "text": "Whether list streaming is enabled",
+          "correct": false,
+          "explanation": "That's the CRIListStreaming feature gate."
+        },
+        {
+          "id": "d",
+          "text": "The address of the API server",
+          "correct": false,
+          "explanation": "The CRI page is about the kubelet–runtime connection only."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-04",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ca-extension",
+      "stem": "True or false: Since Kubernetes 1.24, the kubelet manages CNI plugins through its `network-plugin` and `cni-bin-dir` parameters.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Those flags were removed in 1.24; the container runtime loads CNI plugins now."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: the runtime is now responsible for CNI."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-05",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "Which statements about CNI are true? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A CNI plugin is required to implement the Kubernetes network model",
+          "correct": true,
+          "explanation": "Stated on the Network Plugins page."
+        },
+        {
+          "id": "b",
+          "text": "The project recommends a plugin compatible with CNI spec v1.0.0",
+          "correct": true,
+          "explanation": "v0.4.0+ is required; v1.0.0 is recommended."
+        },
+        {
+          "id": "c",
+          "text": "CNI plugins run as part of the API server",
+          "correct": false,
+          "explanation": "The container runtime on each node loads them."
+        },
+        {
+          "id": "d",
+          "text": "The kubelet loads CNI plugins using its network-plugin parameter",
+          "correct": false,
+          "explanation": "That flag was removed in 1.24; the container runtime loads CNI plugins."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "A Pod uses `hostPort`, but the port isn't reachable on the node. Which CNI plugin capability should the network config include?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "options": [
+        {
+          "id": "a",
+          "text": "portmap with portMappings",
+          "correct": true,
+          "explanation": "hostPort support comes from the portmap plugin (or one with port mapping)."
+        },
+        {
+          "id": "b",
+          "text": "bandwidth",
+          "correct": false,
+          "explanation": "That does traffic shaping."
+        },
+        {
+          "id": "c",
+          "text": "loopback",
+          "correct": false,
+          "explanation": "That provides the lo interface."
+        },
+        {
+          "id": "d",
+          "text": "host-local",
+          "correct": false,
+          "explanation": "In the example that's the IPAM type, not hostPort support."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-07",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-extension",
+      "stem": "On a node, where would you look for CNI plugin binaries by default?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
+      "options": [
+        {
+          "id": "a",
+          "text": "/opt/cni/bin",
+          "correct": true,
+          "explanation": "The default CNI bin dir."
+        },
+        {
+          "id": "b",
+          "text": "/etc/cni/net.d",
+          "correct": false,
+          "explanation": "That's the default CNI configuration directory."
+        },
+        {
+          "id": "c",
+          "text": "/etc/cni/net.d/calico-kubeconfig",
+          "correct": false,
+          "explanation": "In the example, that's a kubeconfig file referenced by the Calico config."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "Which are valid ways for a Pod to use a CSI-backed volume? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Through a PersistentVolumeClaim",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "b",
+          "text": "A generic ephemeral volume",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "c",
+          "text": "A CSI ephemeral volume, if the driver supports it",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "d",
+          "text": "A FlexVolume reference to the CSI driver",
+          "correct": false,
+          "explanation": "FlexVolume is a separate, deprecated exec-based interface."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "In a CSI PersistentVolume, which field names the driver Kubernetes should call?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "driver",
+          "correct": true,
+          "explanation": "It must match the name the driver reports in GetPluginInfoResponse."
+        },
+        {
+          "id": "b",
+          "text": "volumeHandle",
+          "correct": false,
+          "explanation": "That identifies the volume itself."
+        },
+        {
+          "id": "c",
+          "text": "fsType",
+          "correct": false,
+          "explanation": "That's the filesystem type."
+        },
+        {
+          "id": "d",
+          "text": "volumeAttributes",
+          "correct": false,
+          "explanation": "Static properties of the volume."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-10",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "True or false: With CSI migration enabled, Kubernetes installs the matching CSI driver for you.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "The core of Kubernetes does not install that software; an admin must install and configure the driver."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: you install the CSI driver yourself."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "Which kubelet extensions run as binaries that the kubelet executes, rather than as webhooks?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "CNI network plugins and CSI storage plugins",
+          "correct": true,
+          "explanation": "The Extending Kubernetes page gives these as binary plugin examples."
+        },
+        {
+          "id": "b",
+          "text": "Admission webhooks",
+          "correct": false,
+          "explanation": "Those use the webhook model."
+        },
+        {
+          "id": "c",
+          "text": "Authorization webhooks",
+          "correct": false,
+          "explanation": "Webhook model."
+        },
+        {
+          "id": "d",
+          "text": "Aggregated API servers",
+          "correct": false,
+          "explanation": "These are API extensions served over the network."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "A Pod requests a vendor GPU resource in its limits. Which kind of extension lets nodes offer that resource?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A device plugin",
+          "correct": true,
+          "explanation": "Device plugins let a node discover new Node resources beyond cpu and memory."
+        },
+        {
+          "id": "b",
+          "text": "A CSI storage plugin",
+          "correct": false,
+          "explanation": "CSI plugins add new kinds of volumes."
+        },
+        {
+          "id": "c",
+          "text": "A network plugin",
+          "correct": false,
+          "explanation": "Network plugins provide the Pod network."
+        },
+        {
+          "id": "d",
+          "text": "A CustomResourceDefinition",
+          "correct": false,
+          "explanation": "CRDs add new API types; they don't advertise node hardware."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-13",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ca-extension",
+      "stem": "Which statements about device plugin resources are correct? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Extended resources are integers and can't be overcommitted",
+          "correct": true,
+          "explanation": "Stated on the Device Plugins page."
+        },
+        {
+          "id": "b",
+          "text": "A device can't be shared between containers",
+          "correct": true,
+          "explanation": "Stated on the Device Plugins page."
+        },
+        {
+          "id": "c",
+          "text": "An unhealthy device lowers the node's capacity count",
+          "correct": false,
+          "explanation": "It lowers allocatable; capacity doesn't change."
+        },
+        {
+          "id": "d",
+          "text": "Requests can be fractional, like 0.5",
+          "correct": false,
+          "explanation": "Only integer amounts are supported."
+        }
+      ]
+    },
+    {
+      "id": "extension-interfaces-q-14",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "The kubelet on a GPU node restarts. What must the device plugin do?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Re-register with the new kubelet, because the kubelet deletes the old sockets",
+          "correct": true,
+          "explanation": "Plugins are expected to detect restarts and re-register."
+        },
+        {
+          "id": "b",
+          "text": "Nothing; registrations survive kubelet restarts",
+          "correct": false,
+          "explanation": "A new kubelet deletes all sockets under the device-plugins directory."
+        },
+        {
+          "id": "c",
+          "text": "Restart the container runtime",
+          "correct": false,
+          "explanation": "Not required by the docs."
+        },
+        {
+          "id": "d",
+          "text": "Reinstall the CNI plugin",
+          "correct": false,
+          "explanation": "Unrelated."
+        }
+      ]
+    }
+  ]
+}

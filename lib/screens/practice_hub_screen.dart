@@ -14,7 +14,7 @@ class PracticeHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = context.read<ContentBundle>();
+    final content = context.watch<ContentBundle>();
     final progress = context.watch<ProgressStore>();
     final ads = context.read<AdsService>();
     final textTheme = Theme.of(context).textTheme;
@@ -24,26 +24,31 @@ class PracticeHubScreen extends StatelessWidget {
       for (final t in content.topics)
         if (t.questions.isNotEmpty) ...t.domainIds,
     };
-    final uncovered = content.curriculum.domains
+    final uncovered = content.domains
         .where((d) => d.isExamDomain && !coveredDomains.contains(d.id))
         .toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Practice')),
       body: PageList(children: [
-        Card(
-          color: scheme.tertiaryContainer,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              'The real CKA is a hands-on, performance-based exam. These '
-              'multiple-choice tests check your knowledge of the concepts; '
-              'they are not a simulation of the exam.',
-              style: textTheme.bodyMedium
-                  ?.copyWith(color: scheme.onTertiaryContainer),
+        if (content.exam case final exam?)
+          Card(
+            color: scheme.tertiaryContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                exam.note,
+                style: textTheme.bodyMedium
+                    ?.copyWith(color: scheme.onTertiaryContainer),
+              ),
             ),
           ),
-        ),
+        if (content.practiceTests.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Text('No practice tests for ${content.subject.title} yet.',
+                style: textTheme.bodyMedium),
+          ),
         const SizedBox(height: 16),
         for (final test in content.practiceTests)
           Padding(

@@ -14,9 +14,12 @@ import '../widgets/source_link.dart';
 /// S3 — the topic's note sections. A section is marked read when its foot
 /// scrolls into view, or via "Mark read".
 class StudyNotesScreen extends StatefulWidget {
-  const StudyNotesScreen({super.key, required this.topicId});
+  const StudyNotesScreen({super.key, required this.topicId, this.sectionId});
 
   final String topicId;
+
+  /// Section to scroll to on open (e.g. from search).
+  final String? sectionId;
 
   @override
   State<StudyNotesScreen> createState() => _StudyNotesScreenState();
@@ -25,6 +28,7 @@ class StudyNotesScreen extends StatefulWidget {
 class _StudyNotesScreenState extends State<StudyNotesScreen> {
   final _scroll = ScrollController();
   final Map<String, GlobalKey> _footerKeys = {};
+  final Map<String, GlobalKey> _headingKeys = {};
 
   Topic? get _topic => context.read<ContentBundle>().topic(widget.topicId);
 
@@ -32,7 +36,46 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
   void initState() {
     super.initState();
     _scroll.addListener(_checkVisible);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkVisible());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final topic = _topic;
+      if (topic == null || !mounted) return;
+      context
+          .read<ProgressStore>()
+          .markTopicVisited(context.read<ContentBundle>().subject.id, topic.id);
+      if (widget.sectionId != null) {
+        _jumpTo(widget.sectionId!);
+      } else {
+        _checkVisible();
+      }
+    });
+  }
+
+  void _jumpTo(String sectionId) {
+    final ctx = _headingKeys[sectionId]?.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(ctx,
+        duration: const Duration(milliseconds: 250), alignment: 0.02);
+  }
+
+  Future<void> _showSections(Topic topic) async {
+    final read = context.read<ProgressStore>().readSections(topic.id);
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          for (var i = 0; i < topic.sections.length; i++)
+            ListTile(
+              leading: Icon(read.contains(topic.sections[i].id)
+                  ? Icons.check_circle
+                  : Icons.radio_button_unchecked),
+              title: Text('${i + 1}. ${topic.sections[i].heading}'),
+              onTap: () => Navigator.pop(sheet, topic.sections[i].id),
+            ),
+        ]),
+      ),
+    );
+    if (picked != null) _jumpTo(picked);
   }
 
   @override
@@ -75,8 +118,10 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
       final section = topic.sections[i];
       final isRead = progress.readSections(topic.id).contains(section.id);
       final footerKey = _footerKeys.putIfAbsent(section.id, GlobalKey.new);
+      final headingKey = _headingKeys.putIfAbsent(section.id, GlobalKey.new);
       children.addAll([
         Padding(
+          key: headingKey,
           padding: const EdgeInsets.only(top: 8, bottom: 8),
           child: Semantics(
             header: true,
@@ -125,6 +170,14 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
       appBar: AppBar(
         title: Text(topic.title),
         leading: BackButton(onPressed: () => context.go('/topic/${topic.id}')),
+        actions: [
+          IconButton(
+            key: const ValueKey('sections-menu'),
+            tooltip: 'Sections',
+            icon: const Icon(Icons.toc),
+            onPressed: () => _showSections(topic),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(28),
           child: Padding(

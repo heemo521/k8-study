@@ -16,7 +16,7 @@ import 'theme.dart';
 class K8StudyApp extends StatefulWidget {
   const K8StudyApp({
     super.key,
-    required this.content,
+    required this.catalog,
     required this.progress,
     required this.ads,
     this.clock = const SystemClock(),
@@ -24,7 +24,7 @@ class K8StudyApp extends StatefulWidget {
     this.initialLocation = '/',
   });
 
-  final ContentBundle content;
+  final Catalog catalog;
   final ProgressStore progress;
   final AdsService ads;
   final Clock clock;
@@ -51,8 +51,13 @@ class _K8StudyAppState extends State<K8StudyApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<ContentBundle>.value(value: widget.content),
+        Provider<Catalog>.value(value: widget.catalog),
         ChangeNotifierProvider<ProgressStore>.value(value: widget.progress),
+        // The selected subject; screens depend on this, not on the catalog.
+        ProxyProvider<ProgressStore, ContentBundle>(
+          update: (_, progress, _) => widget.catalog.subject(progress.subjectId),
+          updateShouldNotify: (a, b) => !identical(a, b),
+        ),
         Provider<AdsService>.value(value: widget.ads),
         Provider<Clock>.value(value: widget.clock),
         Provider<Random>.value(value: _random),

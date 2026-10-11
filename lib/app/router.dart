@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'quiz_spec.dart';
+
 import '../screens/about_screen.dart';
 import '../screens/flashcards_screen.dart';
 import '../screens/home_shell.dart';
@@ -10,6 +12,7 @@ import '../screens/practice_run_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/quiz_result_screen.dart';
 import '../screens/quiz_screen.dart';
+import '../screens/search_screen.dart';
 import '../screens/study_notes_screen.dart';
 import '../screens/topic_browser_screen.dart';
 import '../screens/topic_detail_screen.dart';
@@ -32,6 +35,12 @@ GoRouter buildRouter({String initialLocation = '/'}) {
               builder: (_, _) => const TopicBrowserScreen(),
               routes: [
                 GoRoute(
+                  path: 'search',
+                  parentNavigatorKey: rootKey,
+                  builder: (_, s) =>
+                      SearchScreen(initialQuery: s.uri.queryParameters['q']),
+                ),
+                GoRoute(
                   path: 'topic/:topicId',
                   builder: (_, s) =>
                       TopicDetailScreen(topicId: s.pathParameters['topicId']!),
@@ -40,7 +49,9 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                       path: 'notes',
                       parentNavigatorKey: rootKey,
                       builder: (_, s) => StudyNotesScreen(
-                          topicId: s.pathParameters['topicId']!),
+                          key: ValueKey(s.uri.toString()),
+                          topicId: s.pathParameters['topicId']!,
+                          sectionId: s.uri.queryParameters['section']),
                     ),
                     GoRoute(
                       path: 'cards',
@@ -53,8 +64,10 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                       parentNavigatorKey: rootKey,
                       builder: (_, s) => QuizScreen(
                         key: ValueKey(s.uri.toString()),
-                        topicId: s.pathParameters['topicId']!,
-                        retryMissed: s.uri.queryParameters['mode'] == 'missed',
+                        spec: TopicQuizSpec(
+                          s.pathParameters['topicId']!,
+                          retryMissed: s.uri.queryParameters['mode'] == 'missed',
+                        ),
                       ),
                     ),
                     // A sibling (not a child) of the quiz route, so the
@@ -92,7 +105,32 @@ GoRouter buildRouter({String initialLocation = '/'}) {
           ]),
           StatefulShellBranch(routes: [
             GoRoute(
-                path: '/progress', builder: (_, _) => const ProgressScreen()),
+              path: '/progress',
+              builder: (_, _) => const ProgressScreen(),
+              routes: [
+                GoRoute(
+                  path: 'review',
+                  parentNavigatorKey: rootKey,
+                  builder: (_, s) => QuizScreen(
+                    key: ValueKey(s.uri.toString()),
+                    spec: ReviewQuizSpec(
+                      s.uri.queryParameters['kind'] ?? 'missed',
+                      s.uri.queryParameters['id'],
+                    ),
+                  ),
+                ),
+                GoRoute(
+                  path: 'review/result',
+                  parentNavigatorKey: rootKey,
+                  builder: (_, _) => const QuizResultScreen(),
+                ),
+                GoRoute(
+                  path: 'cards',
+                  parentNavigatorKey: rootKey,
+                  builder: (_, _) => const FlashcardsScreen(),
+                ),
+              ],
+            ),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(path: '/about', builder: (_, _) => const AboutScreen()),

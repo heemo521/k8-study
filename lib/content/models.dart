@@ -81,27 +81,143 @@ class Domain {
   }
 }
 
-class Curriculum {
-  const Curriculum({
+/// Exam the subject's domains map to (e.g. the CKA). Optional per subject.
+class ExamInfo {
+  const ExamInfo({
+    required this.name,
+    required this.title,
     required this.source,
-    required this.examK8sVersion,
+    required this.examVersion,
     required this.checkedAt,
-    required this.domains,
+    required this.note,
   });
 
+  final String name;
+  final String title;
   final String source;
-  final String examK8sVersion;
+  final String examVersion;
   final String checkedAt;
+  final String note;
+
+  factory ExamInfo.fromJson(dynamic raw, String path) {
+    final json = _map(raw, path);
+    return ExamInfo(
+      name: _field<String>(json, 'name', path),
+      title: _field<String>(json, 'title', path),
+      source: _field<String>(json, 'source', path),
+      examVersion: _field<String>(json, 'examVersion', path),
+      checkedAt: _field<String>(json, 'checkedAt', path),
+      note: _field<String>(json, 'note', path),
+    );
+  }
+}
+
+class LinkRef {
+  const LinkRef({required this.label, required this.url});
+
+  final String label;
+  final String url;
+
+  factory LinkRef.fromJson(dynamic raw, String path) {
+    final json = _map(raw, path);
+    return LinkRef(
+      label: _field<String>(json, 'label', path),
+      url: _field<String>(json, 'url', path),
+    );
+  }
+}
+
+/// A licence/attribution or trademark statement shown on the About page.
+class Notice {
+  const Notice({required this.text, required this.links});
+
+  final String text;
+  final List<LinkRef> links;
+
+  factory Notice.fromJson(dynamic raw, String path) {
+    final json = _map(raw, path);
+    return Notice(
+      text: _field<String>(json, 'text', path),
+      links: _list(json, 'links', path, LinkRef.fromJson),
+    );
+  }
+}
+
+/// A permitted source URL prefix, optionally limited to some topics.
+class AllowedSource {
+  const AllowedSource({required this.prefix, this.topicIds});
+
+  final String prefix;
+  final List<String>? topicIds;
+
+  bool allows(String topicId, String url) =>
+      url.startsWith(prefix) &&
+      (topicIds == null || topicIds!.contains(topicId));
+
+  factory AllowedSource.fromJson(dynamic raw, String path) {
+    final json = _map(raw, path);
+    return AllowedSource(
+      prefix: _field<String>(json, 'prefix', path),
+      topicIds: json['topics'] == null
+          ? null
+          : _list(json, 'topics', path, _string),
+    );
+  }
+}
+
+/// Subject-level metadata from `subjects/<id>/subject.json`.
+class SubjectInfo {
+  const SubjectInfo({
+    required this.id,
+    required this.title,
+    required this.tagline,
+    required this.description,
+    required this.contentVersion,
+    required this.reviewedAt,
+    required this.exam,
+    required this.domains,
+    required this.topicIds,
+    required this.sourceAllowlist,
+    required this.attributions,
+    required this.trademarks,
+  });
+
+  final String id;
+  final String title;
+  final String tagline;
+  final String description;
+  final int contentVersion;
+  final String reviewedAt;
+  final ExamInfo? exam;
   final List<Domain> domains;
 
-  factory Curriculum.fromJson(dynamic raw) {
-    const path = 'domains.json';
+  /// Recommended study order.
+  final List<String> topicIds;
+  final List<AllowedSource> sourceAllowlist;
+  final List<Notice> attributions;
+  final List<Notice> trademarks;
+
+  bool sourceAllowed(String topicId, String url) =>
+      sourceAllowlist.any((a) => a.allows(topicId, url));
+
+  factory SubjectInfo.fromJson(dynamic raw, String path) {
     final json = _map(raw, path);
-    return Curriculum(
-      source: _field<String>(json, 'source', path),
-      examK8sVersion: _field<String>(json, 'examK8sVersion', path),
-      checkedAt: _field<String>(json, 'checkedAt', path),
+    return SubjectInfo(
+      id: _field<String>(json, 'id', path),
+      title: _field<String>(json, 'title', path),
+      tagline: _field<String>(json, 'tagline', path),
+      description: _field<String>(json, 'description', path),
+      contentVersion: _field<int>(json, 'contentVersion', path),
+      reviewedAt: _field<String>(json, 'reviewedAt', path),
+      exam: json['curriculum'] == null
+          ? null
+          : ExamInfo.fromJson(json['curriculum'], '$path.curriculum'),
       domains: _list(json, 'domains', path, Domain.fromJson),
+      topicIds: _list(json, 'topics', path, _string),
+      sourceAllowlist:
+          _list(json, 'sourceAllowlist', path, AllowedSource.fromJson),
+      attributions: _list(json, 'attributions', path, Notice.fromJson),
+      trademarks: _list(json, 'trademarks', path, Notice.fromJson),
     );
   }
 }
@@ -324,12 +440,16 @@ class Topic {
     required this.sections,
     required this.flashcards,
     required this.questions,
+    this.prerequisites = const [],
   });
 
   final String id;
   final String title;
   final String summary;
   final int order;
+
+  /// Topic ids recommended before this one.
+  final List<String> prerequisites;
 
   /// The first entry is the primary domain, used for grouping and for the
   /// practice-test per-domain breakdown.
@@ -375,6 +495,9 @@ class Topic {
       sections: _list(json, 'sections', file, NoteSection.fromJson),
       flashcards: _list(json, 'flashcards', file, Flashcard.parser(id)),
       questions: _list(json, 'questions', file, Question.parser(id)),
+      prerequisites: json['prerequisites'] == null
+          ? const []
+          : _list(json, 'prerequisites', file, _string),
     );
   }
 }
@@ -424,55 +547,41 @@ class PracticeTestDef {
   }
 }
 
-class ContentManifest {
-  const ContentManifest({
-    required this.contentVersion,
-    required this.reviewedAt,
-    required this.topicIds,
-  });
-
-  final int contentVersion;
-  final String reviewedAt;
-  final List<String> topicIds;
-
-  factory ContentManifest.fromJson(dynamic raw) {
-    const path = 'manifest.json';
-    final json = _map(raw, path);
-    return ContentManifest(
-      contentVersion: _field<int>(json, 'contentVersion', path),
-      reviewedAt: _field<String>(json, 'reviewedAt', path),
-      topicIds: _list(json, 'topics', path, _string),
-    );
-  }
-}
-
-/// Everything the app knows about its study content, with lookups.
+/// One subject's content (Kubernetes, Linux, …) with lookups.
 class ContentBundle {
   ContentBundle({
-    required this.manifest,
-    required this.curriculum,
-    required this.topics,
+    required this.subject,
+    required List<Topic> topics,
     required this.practiceTests,
-  })  : _topicsById = {for (final t in topics) t.id: t},
-        _domainsById = {for (final d in curriculum.domains) d.id: d},
+  })  : topics = [
+          // Recommended study order from subject.json.
+          for (final id in subject.topicIds)
+            topics.firstWhere((t) => t.id == id),
+        ],
+        _topicsById = {for (final t in topics) t.id: t},
+        _domainsById = {for (final d in subject.domains) d.id: d},
         _sourceTitles = {
           for (final t in topics)
             for (final s in t.sections) s.sourceUrl: s.sourceTitle,
         };
 
-  final ContentManifest manifest;
-  final Curriculum curriculum;
+  final SubjectInfo subject;
+
+  /// In recommended study order.
   final List<Topic> topics;
   final List<PracticeTestDef> practiceTests;
   final Map<String, Topic> _topicsById;
   final Map<String, Domain> _domainsById;
   final Map<String, String> _sourceTitles;
 
-  /// Page title for a source URL, taken from the note sections citing it.
-  String? sourceTitle(String url) => _sourceTitles[url];
+  List<Domain> get domains => subject.domains;
+  ExamInfo? get exam => subject.exam;
 
   Topic? topic(String id) => _topicsById[id];
   Domain? domain(String id) => _domainsById[id];
+
+  /// Page title for a source URL, taken from the note sections citing it.
+  String? sourceTitle(String url) => _sourceTitles[url];
 
   PracticeTestDef? practiceTest(String id) {
     for (final t in practiceTests) {
@@ -481,9 +590,9 @@ class ContentBundle {
     return null;
   }
 
-  /// Domains in display order: Foundations first, then exam domains by weight.
+  /// Domains in display order: non-exam domains first, then by exam weight.
   List<Domain> get domainsInDisplayOrder {
-    final list = [...curriculum.domains];
+    final list = [...domains];
     list.sort((a, b) {
       if (a.isExamDomain != b.isExamDomain) return a.isExamDomain ? 1 : -1;
       return (b.weightPercent ?? 0).compareTo(a.weightPercent ?? 0);
@@ -491,19 +600,49 @@ class ContentBundle {
     return list;
   }
 
-  /// Topics whose primary domain is [domainId], in their declared order.
+  /// Topics whose primary domain is [domainId], in study order.
   List<Topic> topicsForDomain(String domainId) =>
-      topics.where((t) => t.primaryDomainId == domainId).toList()
-        ..sort((a, b) => a.order.compareTo(b.order));
+      topics.where((t) => t.primaryDomainId == domainId).toList();
 
   Iterable<Question> get allQuestions => topics.expand((t) => t.questions);
+  Iterable<Flashcard> get allFlashcards => topics.expand((t) => t.flashcards);
 
-  String? competencyText(String competencyId) {
-    for (final d in curriculum.domains) {
+  Question? question(String id) {
+    for (final q in allQuestions) {
+      if (q.id == id) return q;
+    }
+    return null;
+  }
+
+  Competency? competency(String competencyId) {
+    for (final d in domains) {
       for (final c in d.competencies) {
-        if (c.id == competencyId) return c.text;
+        if (c.id == competencyId) return c;
       }
     }
     return null;
   }
+
+  String? competencyText(String competencyId) =>
+      competency(competencyId)?.text;
+
+  /// Domain owning [competencyId].
+  Domain? domainOfCompetency(String competencyId) {
+    for (final d in domains) {
+      if (d.competencies.any((c) => c.id == competencyId)) return d;
+    }
+    return null;
+  }
+}
+
+/// All shipped subjects, in catalog order.
+class Catalog {
+  Catalog(this.subjects) : assert(subjects.isNotEmpty);
+
+  final List<ContentBundle> subjects;
+
+  ContentBundle subject(String? id) => subjects.firstWhere(
+        (s) => s.subject.id == id,
+        orElse: () => subjects.first,
+      );
 }

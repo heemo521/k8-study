@@ -1,0 +1,703 @@
+{
+  "id": "storage-classes",
+  "title": "StorageClasses & Dynamic Provisioning",
+  "summary": "Let PVCs create their own PVs: StorageClass fields, binding modes, the default class and volume expansion.",
+  "order": 3,
+  "domainIds": [
+    "storage"
+  ],
+  "competencyIds": [
+    "st-storage-classes"
+  ],
+  "prerequisites": [
+    "persistent-volumes"
+  ],
+  "estMinutes": 15,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "storage-classes-what",
+      "heading": "What a StorageClass is",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "sourceTitle": "Storage Classes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A StorageClass describes a **class** of storage an admin offers, such as a quality-of-service level or backup policy. Kubernetes doesn't care what the classes mean. Users pick one **by name**, so the name matters."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\n  name: <class-name>\n  annotations:\n    storageclass.kubernetes.io/is-default-class: \"false\"\nprovisioner: <provisioner-name>\nreclaimPolicy: Retain          # default is Delete\nallowVolumeExpansion: true\nmountOptions:\n  - <option>\nvolumeBindingMode: WaitForFirstConsumer\nparameters:\n  <key>: \"<value>\"            # provider-specific"
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "`provisioner`, `parameters` and `reclaimPolicy` are used when a PV of this class has to be **dynamically provisioned** for a PVC."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-fields",
+      "heading": "The fields that matter",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "sourceTitle": "Storage Classes",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Field",
+            "What to know"
+          ],
+          "rows": [
+            [
+              "provisioner",
+              "**Required.** Which volume plugin provisions PVs. Internal ones are prefixed `kubernetes.io`; external provisioners (e.g. for NFS) are separate programs."
+            ],
+            [
+              "parameters",
+              "Provider-specific. Omitted ones get a default. At most **512** parameters, **256 KiB** in total."
+            ],
+            [
+              "reclaimPolicy",
+              "`Delete` or `Retain`; **defaults to Delete**. Manually created PVs keep whatever policy they were given."
+            ],
+            [
+              "allowVolumeExpansion",
+              "`true` lets users grow a PV by editing its PVC. You can only **grow**, never shrink."
+            ],
+            [
+              "mountOptions",
+              "Copied to dynamically provisioned PVs. Not validated; if the plugin doesn't support them, provisioning fails."
+            ],
+            [
+              "volumeBindingMode",
+              "`Immediate` (default when unset) or `WaitForFirstConsumer`"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "`kubernetes.io/no-provisioner` marks a class that can't provision automatically, as with `local` volumes. The class still exists to delay binding."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-binding",
+      "heading": "volumeBindingMode: Immediate vs WaitForFirstConsumer",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "sourceTitle": "Storage Classes",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "**Immediate**: binding and provisioning happen as soon as the PVC is created, without knowing where the Pod will run. With topology-constrained storage (not reachable from every node) this can leave Pods **unschedulable**.",
+            "**WaitForFirstConsumer**: waits until a Pod using the PVC is created, then picks or provisions a PV that fits the Pod's scheduling constraints (resource requests, node selectors, affinity/anti-affinity, taints and tolerations).",
+            "WaitForFirstConsumer is supported for dynamic provisioning by CSI drivers that support it, and for pre-created `local` PVs.",
+            "`allowedTopologies` can still restrict provisioning to given zones if needed."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "With WaitForFirstConsumer, **don't** set `nodeName` in the Pod: it bypasses the scheduler and the PVC stays **Pending**. Use a `nodeSelector` on `kubernetes.io/hostname` instead."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-dynamic",
+      "heading": "How dynamic provisioning works",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/",
+      "sourceTitle": "Dynamic Volume Provisioning",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Without it, admins must create storage at the provider and then a PV for it. With it, storage is created **on demand** when a user creates a PVC."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The admin creates one or more StorageClasses (API group `storage.k8s.io`), each naming a provisioner and its parameters.",
+            "The user sets `storageClassName` on the PVC to the class name. The old `volume.beta.kubernetes.io/storage-class` annotation is deprecated.",
+            "The provisioner creates the volume and a PV, which is bound to the claim. In the docs' example, deleting the claim **destroys the volume** (the default Delete policy).",
+            "To provision **every** claim that names no class: mark one StorageClass as default **and** enable the `DefaultStorageClass` admission controller on the API server. It fills in `storageClassName` on new PVCs."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: <pvc-name>\nspec:\n  accessModes:\n  - ReadWriteOnce\n  storageClassName: <class-name>\n  resources:\n    requests:\n      storage: <size>"
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-defaultrules",
+      "heading": "Default class rules",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "sourceTitle": "Storage Classes",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "A PVC with **no** `storageClassName` gets the default StorageClass.",
+            "If several classes are marked default, the **most recently created** one is used. Aim for only one; multiple defaults exist to allow seamless migration.",
+            "A cluster may have no default. A PVC created then keeps its class unset, and is updated **retroactively** when a default appears.",
+            "A PVC with `storageClassName: \"\"` is **not** updated; it keeps binding only to PVs with no class."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-changedefault",
+      "heading": "Changing the default StorageClass",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/",
+      "sourceTitle": "Change the default StorageClass",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Your installer may create a default class that doesn't suit you (too expensive, for example). Deleting it may not work, because an addon manager can re-create it. Change the annotation instead."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get storageclass          # the default shows \"(default)\"\n\n# 1. un-default the current one\nkubectl patch storageclass <old> -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"false\"}}}'\n\n# 2. make another the default\nkubectl patch storageclass <new> -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"true\"}}}'"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Only the value `true` makes a class default. Any other value, or no annotation, counts as false.",
+            "A PVC with `volumeName` stays pending if the static PV's `storageClassName` doesn't match the PVC's class."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Memorize the annotation `storageclass.kubernetes.io/is-default-class` and the `kubectl patch storageclass` form above. Check the result with `kubectl get storageclass`."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-expand",
+      "heading": "Expanding a PVC",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "sourceTitle": "Persistent Volumes",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Only possible when the PVC's StorageClass has `allowVolumeExpansion: true`. Supported for `csi` (the CSI driver must support it), plus deprecated `flexVolume` and `portworxVolume`.",
+            "To expand, **edit the PVC** and request a larger size. The existing volume is resized; **no new PV** is created.",
+            "File systems can only be resized if they are **XFS, Ext3 or Ext4**. The resize happens when a Pod uses the PVC in ReadWrite mode.",
+            "An in-use PVC is expanded without recreating the Pod. A PVC no Pod uses won't finish expanding until a Pod uses it.",
+            "If the requested size is too big for the backend, the resize is retried until someone acts, for example by requesting a smaller size."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Don't edit the **PV's** capacity by hand. If you then set the PVC to the same size, the control plane assumes the volume was already resized and no resize happens."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "storage-classes-fc-01",
+      "front": "Which three StorageClass fields are used when dynamically provisioning a PV?",
+      "back": "provisioner, parameters, reclaimPolicy.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "storage-classes-fc-02",
+      "front": "Default `reclaimPolicy` of a StorageClass?",
+      "back": "Delete (the alternative is Retain).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "storage-classes-fc-03",
+      "front": "Default `volumeBindingMode`?",
+      "back": "Immediate (when the field is unset).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "storage-classes-fc-04",
+      "front": "What does WaitForFirstConsumer do?",
+      "back": "Delays binding/provisioning until a Pod using the PVC is created, so the PV fits the Pod's scheduling constraints.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "storage-classes-fc-05",
+      "front": "Why avoid `nodeName` with WaitForFirstConsumer?",
+      "back": "It bypasses the scheduler, so the PVC stays Pending. Use a nodeSelector on kubernetes.io/hostname.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "storage-classes-fc-06",
+      "front": "What provisioner value means \"no automatic provisioning\"?",
+      "back": "`kubernetes.io/no-provisioner` (used for local volumes).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "storage-classes-fc-07",
+      "front": "Annotation that marks the default StorageClass?",
+      "back": "`storageclass.kubernetes.io/is-default-class: \"true\"`",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/"
+    },
+    {
+      "id": "storage-classes-fc-08",
+      "front": "Two things needed so claims with no class get dynamically provisioned?",
+      "back": "A StorageClass marked default, and the DefaultStorageClass admission controller enabled on the API server.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/"
+    },
+    {
+      "id": "storage-classes-fc-09",
+      "front": "Several StorageClasses are marked default. Which one does a new PVC get?",
+      "back": "The most recently created default.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "storage-classes-fc-10",
+      "front": "PVC `storageClassName: \"\"` vs unset?",
+      "back": "\"\": only PVs with no class, never updated to the default. Unset: gets the default (even retroactively).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "storage-classes-fc-11",
+      "front": "How do you grow a dynamically provisioned volume?",
+      "back": "Class needs allowVolumeExpansion: true; edit the PVC to a larger size. The volume is resized; no new PV is created.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "storage-classes-fc-12",
+      "front": "Can you shrink a PVC via volume expansion?",
+      "back": "No — expansion only grows volumes.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+    },
+    {
+      "id": "storage-classes-fc-13",
+      "front": "Which file systems support resize?",
+      "back": "XFS, Ext3, Ext4.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "storage-classes-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "st-storage-classes",
+      "stem": "A PVC sets `storageClassName: fast`. What does that value have to match?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The name of a StorageClass created by the administrator",
+          "correct": true,
+          "explanation": "The class is chosen by name."
+        },
+        {
+          "id": "b",
+          "text": "The provisioner name",
+          "correct": false,
+          "explanation": "The PVC names the class; the class names the provisioner."
+        },
+        {
+          "id": "c",
+          "text": "A label on a PV",
+          "correct": false,
+          "explanation": "Labels are matched with a selector, not storageClassName."
+        },
+        {
+          "id": "d",
+          "text": "The namespace of the PVC",
+          "correct": false,
+          "explanation": "Unrelated."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-02",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "st-storage-classes",
+      "stem": "A StorageClass doesn't set `reclaimPolicy`. What policy do its dynamically provisioned PVs get?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Delete",
+          "correct": true,
+          "explanation": "The field defaults to Delete."
+        },
+        {
+          "id": "b",
+          "text": "Retain",
+          "correct": false,
+          "explanation": "Only if set explicitly."
+        },
+        {
+          "id": "c",
+          "text": "Recycle",
+          "correct": false,
+          "explanation": "Not a StorageClass option."
+        },
+        {
+          "id": "d",
+          "text": "None",
+          "correct": false,
+          "explanation": "There's a default."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-storage-classes",
+      "stem": "In a multi-zone cluster, a zonal disk is provisioned as soon as the PVC is created, and the Pod later can't be scheduled. Which setting avoids this?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "`volumeBindingMode: WaitForFirstConsumer`",
+          "correct": true,
+          "explanation": "Provisioning then follows the Pod's scheduling constraints."
+        },
+        {
+          "id": "b",
+          "text": "`volumeBindingMode: Immediate`",
+          "correct": false,
+          "explanation": "That's the default that caused the problem."
+        },
+        {
+          "id": "c",
+          "text": "`allowVolumeExpansion: true`",
+          "correct": false,
+          "explanation": "Controls resizing, not placement."
+        },
+        {
+          "id": "d",
+          "text": "`reclaimPolicy: Retain`",
+          "correct": false,
+          "explanation": "Controls what happens after the PVC is deleted."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-04",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "st-storage-classes",
+      "stem": "A Pod uses a PVC whose class has WaitForFirstConsumer, and sets `nodeName` in its spec. The PVC stays Pending. Why?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "nodeName bypasses the scheduler, so binding never happens; use a nodeSelector on kubernetes.io/hostname",
+          "correct": true,
+          "explanation": "Stated in the docs' note."
+        },
+        {
+          "id": "b",
+          "text": "WaitForFirstConsumer needs `allowedTopologies`",
+          "correct": false,
+          "explanation": "allowedTopologies is optional."
+        },
+        {
+          "id": "c",
+          "text": "The class must be the default",
+          "correct": false,
+          "explanation": "Being default doesn't matter here."
+        },
+        {
+          "id": "d",
+          "text": "The reclaim policy must be Retain",
+          "correct": false,
+          "explanation": "Reclaim policy doesn't affect binding."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-05",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "st-storage-classes",
+      "stem": "Which are needed so that PVCs with no storageClassName get dynamically provisioned? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/",
+      "options": [
+        {
+          "id": "a",
+          "text": "One StorageClass annotated as default",
+          "correct": true,
+          "explanation": "Mark it with storageclass.kubernetes.io/is-default-class."
+        },
+        {
+          "id": "b",
+          "text": "The DefaultStorageClass admission controller enabled on the API server",
+          "correct": true,
+          "explanation": "It adds storageClassName to new PVCs."
+        },
+        {
+          "id": "c",
+          "text": "allowVolumeExpansion: true on the class",
+          "correct": false,
+          "explanation": "Only relevant to resizing."
+        },
+        {
+          "id": "d",
+          "text": "A PV pre-created for every PVC",
+          "correct": false,
+          "explanation": "That's static provisioning — the opposite."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-storage-classes",
+      "stem": "Which command makes the StorageClass `gold` the default?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl patch storageclass gold -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"true\"}}}'",
+          "correct": true,
+          "explanation": "This is the documented command."
+        },
+        {
+          "id": "b",
+          "text": "kubectl label storageclass gold default=true",
+          "correct": false,
+          "explanation": "Defaulting uses an annotation with a specific key, not a label."
+        },
+        {
+          "id": "c",
+          "text": "kubectl get storageclass gold",
+          "correct": false,
+          "explanation": "That only displays it."
+        },
+        {
+          "id": "d",
+          "text": "kubectl patch pvc gold -p '{\"spec\":{\"storageClassName\":\"gold\"}}'",
+          "correct": false,
+          "explanation": "That edits a PVC, not the default class."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-07",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "st-storage-classes",
+      "stem": "True or false: If two StorageClasses are both marked default, creating a PVC without storageClassName fails.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Kubernetes uses the most recently created default."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct — multiple defaults are allowed to ease migration, though one is recommended."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-storage-classes",
+      "stem": "Why might deleting the pre-installed default StorageClass not be a good way to disable it?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/",
+      "options": [
+        {
+          "id": "a",
+          "text": "An addon manager may re-create it automatically",
+          "correct": true,
+          "explanation": "The task page warns about this; patch the annotation instead."
+        },
+        {
+          "id": "b",
+          "text": "StorageClasses can't be deleted",
+          "correct": false,
+          "explanation": "They can; the problem is re-creation."
+        },
+        {
+          "id": "c",
+          "text": "All PVs of the class are deleted too",
+          "correct": false,
+          "explanation": "Not stated."
+        },
+        {
+          "id": "d",
+          "text": "kubectl refuses to delete the default class",
+          "correct": false,
+          "explanation": "No such rule."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-09",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "st-storage-classes",
+      "stem": "A PVC has `storageClassName: \"\"`. An admin then adds a default StorageClass. What happens to the PVC?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Nothing: it keeps requesting PVs with no class",
+          "correct": true,
+          "explanation": "Only PVCs with the field unset are updated retroactively."
+        },
+        {
+          "id": "b",
+          "text": "It is updated to the new default",
+          "correct": false,
+          "explanation": "That only happens when storageClassName is unset."
+        },
+        {
+          "id": "c",
+          "text": "It is deleted",
+          "correct": false,
+          "explanation": "No."
+        },
+        {
+          "id": "d",
+          "text": "It is dynamically provisioned immediately",
+          "correct": false,
+          "explanation": "An empty class opts out of dynamic provisioning."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-storage-classes",
+      "stem": "A user edits a PVC to request more storage, but nothing happens and the class doesn't allow it. Which StorageClass field is missing?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "allowVolumeExpansion: true",
+          "correct": true,
+          "explanation": "Expansion requires it."
+        },
+        {
+          "id": "b",
+          "text": "volumeBindingMode: Immediate",
+          "correct": false,
+          "explanation": "Binding mode doesn't affect resizing."
+        },
+        {
+          "id": "c",
+          "text": "reclaimPolicy: Retain",
+          "correct": false,
+          "explanation": "Unrelated to resizing."
+        },
+        {
+          "id": "d",
+          "text": "mountOptions",
+          "correct": false,
+          "explanation": "Unrelated."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-11",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "st-storage-classes",
+      "stem": "True or false: Expanding a PVC creates a new, larger PersistentVolume and copies the data.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "No new PV is created; the existing volume is resized."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-12",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "st-storage-classes",
+      "stem": "Which statements about volume expansion are true? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "You can grow a volume but not shrink it",
+          "correct": true,
+          "explanation": "Stated on the Storage Classes page."
+        },
+        {
+          "id": "b",
+          "text": "It's enabled per class with allowVolumeExpansion",
+          "correct": true,
+          "explanation": "The underlying StorageClass must allow it."
+        },
+        {
+          "id": "c",
+          "text": "It works for every volume type",
+          "correct": false,
+          "explanation": "Only listed types (e.g. CSI) support it."
+        },
+        {
+          "id": "d",
+          "text": "It requires volumeBindingMode: WaitForFirstConsumer",
+          "correct": false,
+          "explanation": "Binding mode is unrelated."
+        }
+      ]
+    },
+    {
+      "id": "storage-classes-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-storage-classes",
+      "stem": "You need a StorageClass for pre-created `local` PVs. Which settings match the docs?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "provisioner: kubernetes.io/no-provisioner with volumeBindingMode: WaitForFirstConsumer",
+          "correct": true,
+          "explanation": "Local volumes have no dynamic provisioning, but binding should wait for the Pod."
+        },
+        {
+          "id": "b",
+          "text": "A real provisioner with volumeBindingMode: Immediate",
+          "correct": false,
+          "explanation": "Local volumes don't support dynamic provisioning, and Immediate ignores Pod placement."
+        },
+        {
+          "id": "c",
+          "text": "No StorageClass is ever needed for local volumes",
+          "correct": false,
+          "explanation": "The docs say a class should still be created to delay binding."
+        },
+        {
+          "id": "d",
+          "text": "reclaimPolicy: Recycle",
+          "correct": false,
+          "explanation": "Not a StorageClass reclaim policy."
+        }
+      ]
+    }
+  ]
+}

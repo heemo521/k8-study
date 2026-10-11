@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../content/models.dart';
 import '../engine/clock.dart';
 import '../engine/flashcards.dart';
+import '../progress/insights.dart';
 import '../progress/progress_store.dart';
 import '../widgets/inline_text.dart';
 import '../widgets/not_found.dart';
@@ -15,10 +16,11 @@ import '../widgets/page_body.dart';
 import '../widgets/source_link.dart';
 
 /// S4 — spaced-repetition review. Space flips; 1 = Again, 2 = Got it.
+/// With no [topicId] it reviews every due card in the subject.
 class FlashcardsScreen extends StatefulWidget {
-  const FlashcardsScreen({super.key, required this.topicId});
+  const FlashcardsScreen({super.key, this.topicId});
 
-  final String topicId;
+  final String? topicId;
 
   @override
   State<FlashcardsScreen> createState() => _FlashcardsScreenState();
@@ -29,11 +31,23 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   bool _flipped = false;
   final _focus = FocusNode();
 
-  Topic? get _topic => context.read<ContentBundle>().topic(widget.topicId);
+  Topic? get _topic => widget.topicId == null
+      ? null
+      : context.read<ContentBundle>().topic(widget.topicId!);
+
+  bool get _allDue => widget.topicId == null;
+
+  String get _exitPath => _allDue ? '/progress' : '/topic/${widget.topicId}';
 
   @override
   void initState() {
     super.initState();
+    final topic = _topic;
+    if (topic != null) {
+      context
+          .read<ProgressStore>()
+          .markTopicVisited(context.read<ContentBundle>().subject.id, topic.id);
+    }
     _startSession(practice: false);
   }
 
@@ -45,11 +59,14 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   void _startSession({required bool practice}) {
     final topic = _topic;
-    if (topic == null) return;
+    final content = context.read<ContentBundle>();
+    if (topic == null && !_allDue) return;
+    final pool = topic?.flashcards ??
+        dueCards(content, context.read<ProgressStore>(), context.read<Clock>().now());
     final cards = practice
-        ? ([...topic.flashcards]..shuffle(context.read<Random>()))
+        ? ([...pool]..shuffle(context.read<Random>()))
         : buildSession(
-            cards: topic.flashcards,
+            cards: pool,
             states: context.read<ProgressStore>().cardStates,
             now: context.read<Clock>().now(),
             random: context.read<Random>(),
@@ -97,8 +114,11 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   @override
   Widget build(BuildContext context) {
     final topic = _topic;
-    if (topic == null) return const NotFoundView(message: 'Topic not found.');
+    if (topic == null && !_allDue) {
+      return const NotFoundView(message: 'Topic not found.');
+    }
     final session = _session!;
+    final content = context.read<ContentBundle>();
 
     return Focus(
       focusNode: _focus,
@@ -106,8 +126,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
       onKeyEvent: _onKey,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('${topic.title} · Cards'),
-          leading: BackButton(onPressed: () => context.go('/topic/${topic.id}')),
+          title: Text(topic == null ? 'Due flashcards' : '${topic.title} · Cards'),
+          leading: BackButton(onPressed: () => context.go(_exitPath)),
         ),
         body: PageWidth(
           child: Padding(
@@ -115,17 +135,24 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             child: session.length == 0
                 ? _CaughtUp(
                     topic: topic,
-                    onPracticeAnyway: () => _startSession(practice: true),
+                    onPracticeAnyway: topic == null
+                        ? null
+                        : () => _startSession(practice: true),
                   )
                 : session.isDone
                     ? _Summary(
                         session: session,
                         onAgain: () =>
                             _startSession(practice: session.practiceMode),
-                        onQuiz: () => context.go('/topic/${topic.id}/quiz'),
+                        nextLabel: topic == null ? 'Back to Progress' : 'Next: Quiz',
+                        onNext: () => context.go(
+                            topic == null ? '/progress' : '/topic/${topic.id}/quiz'),
                       )
                     : _CardView(
                         session: session,
+                        topicTitle: topic == null
+                            ? content.topic(session.current.topicId)?.title
+                            : null,
                         flipped: _flipped,
                         onFlip: _flip,
                         onAnswer: _answer,
@@ -140,12 +167,16 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 class _CardView extends StatelessWidget {
   const _CardView({
     required this.session,
+    required this.topicTitle,
     required this.flipped,
     required this.onFlip,
     required this.onAnswer,
   });
 
   final FlashcardSession session;
+
+  /// Shown in cross-topic sessions.
+  final String? topicTitle;
   final bool flipped;
   final VoidCallback onFlip;
   final ValueChanged<bool> onAnswer;
@@ -165,7 +196,8 @@ class _CardView extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           '${session.remaining} left'
-          '${session.practiceMode ? ' · practice (schedule unchanged)' : ''}',
+          '${session.practiceMode ? ' · practice (schedule unchanged)' : ''}'
+          '${topicTitle == null ? '' : ' · $topicTitle'}',
           style: textTheme.labelMedium,
         ),
         const SizedBox(height: 12),
@@ -239,12 +271,14 @@ class _Summary extends StatelessWidget {
   const _Summary({
     required this.session,
     required this.onAgain,
-    required this.onQuiz,
+    required this.nextLabel,
+    required this.onNext,
   });
 
   final FlashcardSession session;
   final VoidCallback onAgain;
-  final VoidCallback onQuiz;
+  final String nextLabel;
+  final VoidCallback onNext;
 
   @override
   Widget build(BuildContext context) {
@@ -263,9 +297,9 @@ class _Summary extends StatelessWidget {
         const SizedBox(height: 8),
         FilledButton.icon(
           key: const ValueKey('next-quiz'),
-          onPressed: onQuiz,
+          onPressed: onNext,
           icon: const Icon(Icons.arrow_forward),
-          label: const Text('Next: Quiz'),
+          label: Text(nextLabel),
         ),
       ],
     );
@@ -275,14 +309,16 @@ class _Summary extends StatelessWidget {
 class _CaughtUp extends StatelessWidget {
   const _CaughtUp({required this.topic, required this.onPracticeAnyway});
 
-  final Topic topic;
-  final VoidCallback onPracticeAnyway;
+  final Topic? topic;
+  final VoidCallback? onPracticeAnyway;
 
   @override
   Widget build(BuildContext context) {
     final progress = context.read<ProgressStore>();
     final now = context.read<Clock>().now();
-    final next = nextDueDate(topic.flashcards, progress.cardStates, now);
+    final cards = topic?.flashcards ??
+        context.read<ContentBundle>().allFlashcards.toList();
+    final next = nextDueDate(cards, progress.cardStates, now);
     final days = next?.difference(dateOnly(now)).inDays;
     final textTheme = Theme.of(context).textTheme;
     return Column(
@@ -299,14 +335,17 @@ class _CaughtUp extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
-        OutlinedButton(
-          onPressed: onPracticeAnyway,
-          child: const Text('Practice anyway'),
-        ),
-        const SizedBox(height: 8),
+        if (onPracticeAnyway != null) ...[
+          OutlinedButton(
+            onPressed: onPracticeAnyway,
+            child: const Text('Practice anyway'),
+          ),
+          const SizedBox(height: 8),
+        ],
         FilledButton(
-          onPressed: () => context.go('/topic/${topic.id}/quiz'),
-          child: const Text('Next: Quiz'),
+          onPressed: () => context.go(
+              topic == null ? '/progress' : '/topic/${topic!.id}/quiz'),
+          child: Text(topic == null ? 'Back to Progress' : 'Next: Quiz'),
         ),
       ],
     );

@@ -42,7 +42,8 @@ void main() {
     final topic = h.content.topic(topicId)!;
 
     // S1 → S2
-    expect(find.text('0 of 6 topics complete'), findsOneWidget);
+    expect(find.text('0 of ${h.content.topics.length} topics complete'),
+        findsOneWidget);
     await tapKey(tester, 'topic-card-$topicId');
     expect(find.text(topic.title), findsWidgets);
 
