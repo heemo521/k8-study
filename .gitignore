@@ -1,0 +1,11 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+.idea/
+*.iml
+
+# Ad unit IDs and other secrets
+.env
+*.env
