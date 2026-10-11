@@ -630,6 +630,12 @@ assets/content/subjects/<id>/topics/*.json
 - The About page and source allow-lists are driven by `subject.json`.
 - A subject switcher appears in the Learn app bar once there are two or more
   subjects.
+- A second subject, **Docker**, ships to prove this path end to end. It was
+  created with `tool/new_subject.py`.
+  - 4 topics: overview, images, containers, storage.
+  - Sources are docs.docker.com (Apache-2.0, credited on About).
+  - Widget and browser tests switch subjects and confirm progress stays
+    separate.
 - Progress is keyed by item id. Ids must be unique across subjects; a test
   checks this.
 

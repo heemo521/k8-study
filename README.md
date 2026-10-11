@@ -4,7 +4,9 @@ Mobile-friendly, interactive Kubernetes study guide, built to be better than the
 ad-spammy tutorial apps out there. It has 33 topics covering all five CKA domains
 (432 flashcards, 451 questions), quizzes, CKA-domain practice tests, and progress
 tracking: it shows where you are and which competencies are your weakest.
-The content model is multi-subject, so Linux, Docker and others can be added as data. It ships as an installable PWA and goes native only
+The content model is multi-subject: a **Docker** subject (4 topics, from the
+Apache-2.0 Docker docs) ships alongside Kubernetes, and others such as Linux can be
+added as data with `python3 tool/new_subject.py`. It ships as an installable PWA and goes native only
 when the web version earns it.
 
 The full specification is in [`spec/SPEC.md`](spec/SPEC.md). Screens, data model,
