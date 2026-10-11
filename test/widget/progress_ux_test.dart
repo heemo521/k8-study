@@ -242,4 +242,23 @@ void main() {
     final cards = h.content.topic('namespaces')!.flashcards;
     expect(cards.where((c) => h.progress.cardState(c.id) != null).length, 1);
   });
+
+  testWidgets('practice keyboard: digit answers, arrows move, F flags', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester, size: const Size(1024, 900));
+    await pumpApp(tester, initialLocation: '/practice/mixed/run');
+    expect(find.text('Q 1/25'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.pumpAndSettle();
+    expect(find.text('Flagged for review'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(find.text('Q 2/25'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('Q 1/25'), findsOneWidget);
+    expect(find.text('Flagged for review'), findsOneWidget);
+  });
 }

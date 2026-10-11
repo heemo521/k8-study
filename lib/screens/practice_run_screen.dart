@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +15,7 @@ import '../engine/quiz.dart';
 import '../progress/progress_store.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
+import '../widgets/key_handler.dart';
 import '../widgets/question_view.dart';
 
 /// S8 — timed test with deferred feedback, flags and a question grid.
@@ -78,6 +80,49 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
   PresentedQuestion get _current => _attempt!.questions[_index];
 
   void _goTo(int i) => setState(() => _index = i);
+
+  /// Desktop shortcuts: 1–5 pick an option, ←/→ move, F flags.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    final attempt = _attempt;
+    if (event is! KeyDownEvent || attempt == null || _finishing) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final total = attempt.questions.length;
+    const digits = [
+      LogicalKeyboardKey.digit1,
+      LogicalKeyboardKey.digit2,
+      LogicalKeyboardKey.digit3,
+      LogicalKeyboardKey.digit4,
+      LogicalKeyboardKey.digit5,
+    ];
+    final i = digits.indexOf(key);
+    final current = _current;
+    final id = current.question.id;
+    if (i >= 0 && i < current.options.length) {
+      setState(
+        () => attempt.answer(
+          id,
+          QuestionView.toggle(
+            current,
+            attempt.answers[id] ?? const {},
+            current.options[i].id,
+          ),
+        ),
+      );
+    } else if (key == LogicalKeyboardKey.arrowRight && _index + 1 < total) {
+      _goTo(_index + 1);
+    } else if (key == LogicalKeyboardKey.arrowLeft && _index > 0) {
+      _goTo(_index - 1);
+    } else if (key == LogicalKeyboardKey.keyF) {
+      setState(
+        () => _flagged.contains(id) ? _flagged.remove(id) : _flagged.add(id),
+      );
+    } else {
+      return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
 
   Future<void> _confirmFinish() async {
     final unanswered = _attempt!.questions
@@ -247,87 +292,92 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _confirmLeave();
       },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: CloseButton(onPressed: _confirmLeave),
-          title: Text(
-            'Q ${_index + 1}/$total',
-            key: const ValueKey('practice-position'),
-          ),
-          actions: [
-            if (remaining != null)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    _fmt(remaining),
-                    key: const ValueKey('practice-timer'),
-                    semanticsLabel: 'Time left ${_fmt(remaining)}',
-                    style: Theme.of(context).textTheme.titleMedium,
+      child: KeyHandler(
+        onKey: _onKey,
+        child: Scaffold(
+          appBar: AppBar(
+            leading: CloseButton(onPressed: _confirmLeave),
+            title: Text(
+              'Q ${_index + 1}/$total',
+              key: const ValueKey('practice-position'),
+            ),
+            actions: [
+              if (remaining != null)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      _fmt(remaining),
+                      key: const ValueKey('practice-timer'),
+                      semanticsLabel: 'Time left ${_fmt(remaining)}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
                 ),
-              ),
-            IconButton(
-              tooltip: 'All questions',
-              icon: const Icon(Icons.grid_view),
-              onPressed: _showGrid,
-            ),
-          ],
-        ),
-        body: PageList(
-          children: [
-            QuestionView(
-              key: ValueKey(id),
-              presented: _current,
-              selected: attempt.answers[id] ?? const {},
-              revealed: false,
-              onChanged: (s) => setState(() => attempt.answer(id, s)),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                key: const ValueKey('flag'),
-                onPressed: () => setState(
-                  () => flagged ? _flagged.remove(id) : _flagged.add(id),
-                ),
-                icon: Icon(flagged ? Icons.flag : Icons.outlined_flag),
-                label: Text(flagged ? 'Flagged for review' : 'Flag for review'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _index == 0 ? null : () => _goTo(_index - 1),
-                    child: const Text('Previous'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _index + 1 < total
-                      ? FilledButton(
-                          key: const ValueKey('practice-next'),
-                          onPressed: () => _goTo(_index + 1),
-                          child: const Text('Next'),
-                        )
-                      : FilledButton(
-                          key: const ValueKey('practice-finish'),
-                          onPressed: _confirmFinish,
-                          child: const Text('Finish'),
-                        ),
-                ),
-              ],
-            ),
-            if (_index + 1 < total) ...[
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: _confirmFinish,
-                child: const Text('Finish test'),
+              IconButton(
+                tooltip: 'All questions',
+                icon: const Icon(Icons.grid_view),
+                onPressed: _showGrid,
               ),
             ],
-          ],
+          ),
+          body: PageList(
+            children: [
+              QuestionView(
+                key: ValueKey(id),
+                presented: _current,
+                selected: attempt.answers[id] ?? const {},
+                revealed: false,
+                onChanged: (s) => setState(() => attempt.answer(id, s)),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('flag'),
+                  onPressed: () => setState(
+                    () => flagged ? _flagged.remove(id) : _flagged.add(id),
+                  ),
+                  icon: Icon(flagged ? Icons.flag : Icons.outlined_flag),
+                  label: Text(
+                    flagged ? 'Flagged for review' : 'Flag for review',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _index == 0 ? null : () => _goTo(_index - 1),
+                      child: const Text('Previous'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _index + 1 < total
+                        ? FilledButton(
+                            key: const ValueKey('practice-next'),
+                            onPressed: () => _goTo(_index + 1),
+                            child: const Text('Next'),
+                          )
+                        : FilledButton(
+                            key: const ValueKey('practice-finish'),
+                            onPressed: _confirmFinish,
+                            child: const Text('Finish'),
+                          ),
+                  ),
+                ],
+              ),
+              if (_index + 1 < total) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _confirmFinish,
+                  child: const Text('Finish test'),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
