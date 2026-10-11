@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +14,7 @@ import '../progress/insights.dart';
 import '../progress/progress_store.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
+import '../widgets/key_handler.dart';
 import '../widgets/question_view.dart';
 
 /// S5 — 10-question quiz with instant feedback. Draws from one topic, or from
@@ -85,6 +87,42 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   PresentedQuestion get _current => _attempt!.questions[_index];
+
+  /// Desktop shortcuts: 1–5 pick an option, Enter submits / continues.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent || _attempt == null) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final digits = [
+      LogicalKeyboardKey.digit1,
+      LogicalKeyboardKey.digit2,
+      LogicalKeyboardKey.digit3,
+      LogicalKeyboardKey.digit4,
+      LogicalKeyboardKey.digit5,
+    ];
+    final i = digits.indexOf(key);
+    if (i >= 0 && !_revealed && i < _current.options.length) {
+      setState(
+        () => _selected = QuestionView.toggle(
+          _current,
+          _selected,
+          _current.options[i].id,
+        ),
+      );
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      if (!_revealed && _selected.isNotEmpty) {
+        _submit();
+      } else if (_revealed) {
+        _next();
+      }
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
 
   void _submit() {
     _attempt!.answer(_current.question.id, _selected);
@@ -175,71 +213,74 @@ class _QuizScreenState extends State<QuizScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _confirmLeave();
       },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: CloseButton(onPressed: _confirmLeave),
-          title: Text(_title, overflow: TextOverflow.ellipsis),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(34),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Column(
-                children: [
-                  LinearProgressIndicator(
-                    value: (_index + (_revealed ? 1 : 0)) / total,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text(
-                        'Q ${_index + 1}/$total',
-                        key: const ValueKey('quiz-position'),
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Score $score/$answered',
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                    ],
-                  ),
-                ],
+      child: KeyHandler(
+        onKey: _onKey,
+        child: Scaffold(
+          appBar: AppBar(
+            leading: CloseButton(onPressed: _confirmLeave),
+            title: Text(_title, overflow: TextOverflow.ellipsis),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(34),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Column(
+                  children: [
+                    LinearProgressIndicator(
+                      value: (_index + (_revealed ? 1 : 0)) / total,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text(
+                          'Q ${_index + 1}/$total',
+                          key: const ValueKey('quiz-position'),
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Score $score/$answered',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        body: PageList(
-          children: [
-            if (topicTitle != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'From: $topicTitle',
-                  style: Theme.of(context).textTheme.labelMedium,
+          body: PageList(
+            children: [
+              if (topicTitle != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'From: $topicTitle',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
                 ),
+              QuestionView(
+                key: ValueKey(_current.question.id),
+                presented: _current,
+                selected: _selected,
+                revealed: _revealed,
+                onChanged: (s) => setState(() => _selected = s),
               ),
-            QuestionView(
-              key: ValueKey(_current.question.id),
-              presented: _current,
-              selected: _selected,
-              revealed: _revealed,
-              onChanged: (s) => setState(() => _selected = s),
-            ),
-            const SizedBox(height: 16),
-            if (!_revealed)
-              FilledButton(
-                key: const ValueKey('submit'),
-                onPressed: _selected.isEmpty ? null : _submit,
-                child: const Text('Submit'),
-              )
-            else
-              FilledButton(
-                key: const ValueKey('next'),
-                onPressed: _next,
-                child: Text(_index + 1 < total ? 'Next' : 'See results'),
-              ),
-          ],
+              const SizedBox(height: 16),
+              if (!_revealed)
+                FilledButton(
+                  key: const ValueKey('submit'),
+                  onPressed: _selected.isEmpty ? null : _submit,
+                  child: const Text('Submit'),
+                )
+              else
+                FilledButton(
+                  key: const ValueKey('next'),
+                  onPressed: _next,
+                  child: Text(_index + 1 < total ? 'Next' : 'See results'),
+                ),
+            ],
+          ),
         ),
       ),
     );

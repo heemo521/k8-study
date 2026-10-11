@@ -25,15 +25,22 @@ class QuestionView extends StatelessWidget {
 
   bool get _multi => presented.question.type == QuestionType.multi;
 
+  /// Selection after choosing option [id]: toggles for multi-select,
+  /// replaces for single choice. Shared with keyboard shortcuts.
+  static Set<String> toggle(
+    PresentedQuestion presented,
+    Set<String> selected,
+    String id,
+  ) {
+    if (presented.question.type != QuestionType.multi) return {id};
+    final next = {...selected};
+    if (!next.remove(id)) next.add(id);
+    return next;
+  }
+
   void _tap(String id) {
     if (revealed || onChanged == null) return;
-    if (_multi) {
-      final next = {...selected};
-      if (!next.remove(id)) next.add(id);
-      onChanged!(next);
-    } else {
-      onChanged!({id});
-    }
+    onChanged!(toggle(presented, selected, id));
   }
 
   @override
@@ -44,10 +51,14 @@ class QuestionView extends StatelessWidget {
       children: [
         InlineText(q.stem, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
-        for (final o in presented.options)
+        for (final (i, o) in presented.options.indexed)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _OptionTile(
+              // Keyboard hint on wide (desktop) layouts only.
+              shortcut: MediaQuery.sizeOf(context).width >= 600 && !revealed
+                  ? '${i + 1}'
+                  : null,
               option: o,
               multi: _multi,
               selected: selected.contains(o.id),
@@ -63,6 +74,7 @@ class QuestionView extends StatelessWidget {
 
 class _OptionTile extends StatelessWidget {
   const _OptionTile({
+    required this.shortcut,
     required this.option,
     required this.multi,
     required this.selected,
@@ -70,6 +82,7 @@ class _OptionTile extends StatelessWidget {
     required this.onTap,
   });
 
+  final String? shortcut;
   final AnswerOption option;
   final bool multi;
   final bool selected;
@@ -125,6 +138,14 @@ class _OptionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(icon, size: 22, color: border),
+                  if (shortcut != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, top: 2),
+                      child: Text(
+                        shortcut!,
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(

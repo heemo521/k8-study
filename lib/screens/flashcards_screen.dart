@@ -11,6 +11,7 @@ import '../engine/flashcards.dart';
 import '../progress/insights.dart';
 import '../progress/progress_store.dart';
 import '../widgets/inline_text.dart';
+import '../widgets/key_handler.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
 import '../widgets/source_link.dart';
@@ -29,7 +30,6 @@ class FlashcardsScreen extends StatefulWidget {
 class _FlashcardsScreenState extends State<FlashcardsScreen> {
   FlashcardSession? _session;
   bool _flipped = false;
-  final _focus = FocusNode();
 
   Topic? get _topic => widget.topicId == null
       ? null
@@ -54,7 +54,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   @override
   void dispose() {
-    _focus.dispose();
     super.dispose();
   }
 
@@ -126,10 +125,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     final session = _session!;
     final content = context.read<ContentBundle>();
 
-    return Focus(
-      focusNode: _focus,
-      autofocus: true,
-      onKeyEvent: _onKey,
+    return KeyHandler(
+      onKey: _onKey,
       child: Scaffold(
         appBar: AppBar(
           title: Text(

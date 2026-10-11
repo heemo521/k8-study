@@ -1,5 +1,6 @@
 // "Where am I" and "where are my gaps": continue card, gap analysis, review
 // quizzes, due-card review, search, and the subject switcher.
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:k8_study/content/models.dart';
 import 'package:k8_study/engine/flashcards.dart';
@@ -207,5 +208,38 @@ void main() {
     expect(card, findsNothing);
     await tapKey(tester, 'domain-foundations');
     expect(card, findsOneWidget);
+  });
+
+  testWidgets('quiz keyboard: digit selects, Enter submits and advances', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester, size: const Size(1024, 900));
+    await pumpApp(tester, initialLocation: '/topic/namespaces/quiz');
+    expect(find.text('1'), findsWidgets, reason: 'shortcut hints on desktop');
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('next')),
+      findsOneWidget,
+      reason: 'Enter submitted the answer',
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.text('Q 2/10'), findsOneWidget);
+  });
+
+  testWidgets('flashcard keyboard: Space flips, 2 = got it', (tester) async {
+    await setPhoneViewport(tester, size: const Size(1024, 900));
+    final h = await pumpApp(tester, initialLocation: '/topic/namespaces/cards');
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(find.text('ANSWER'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+    await tester.pumpAndSettle();
+    expect(find.text('PROMPT'), findsOneWidget);
+    final cards = h.content.topic('namespaces')!.flashcards;
+    expect(cards.where((c) => h.progress.cardState(c.id) != null).length, 1);
   });
 }
