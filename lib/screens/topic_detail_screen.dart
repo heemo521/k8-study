@@ -121,7 +121,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           ],
           if (topic.competencyIds.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text('CKA competencies', style: textTheme.titleSmall),
+            Text(
+              content.exam == null
+                  ? 'Skills covered'
+                  : '${content.exam!.name} competencies',
+              style: textTheme.titleSmall,
+            ),
             const SizedBox(height: 4),
             for (final c in topic.competencyIds)
               Padding(

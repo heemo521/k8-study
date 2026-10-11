@@ -212,7 +212,7 @@ class _DomainSectionState extends State<_DomainSection> {
     final textTheme = Theme.of(context).textTheme;
     final complete = topics.where(progress.topicComplete).length;
     final weight = domain.weightPercent == null
-        ? (domain.isExamDomain ? '' : 'Prerequisites')
+        ? (domain.isExamDomain || content.exam == null ? '' : 'Prerequisites')
         : '${domain.weightPercent}% of ${content.exam?.name ?? 'exam'}';
 
     return Padding(

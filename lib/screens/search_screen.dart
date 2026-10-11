@@ -61,8 +61,7 @@ class _SearchScreenState extends State<SearchScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 24),
               child: Text(
-                'Search topics, notes and flashcards — try “taint”, '
-                '“etcd snapshot” or “NodePort”.',
+                'Search topics, notes and flashcards by keyword, command or flag.',
                 style: textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),

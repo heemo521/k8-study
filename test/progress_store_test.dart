@@ -127,4 +127,24 @@ void main() {
       expect(reloaded.adCapState.completionsSinceAd, 1);
     });
   });
+
+  test('backup round-trips and rejects foreign data', () async {
+    final a = await store();
+    a.markSectionRead('t', 'x');
+    a.recordQuiz('t', 85, {'q1'});
+    final backup = a.exportJson();
+
+    final b = await store();
+    expect(b.readSections('t'), isEmpty);
+    await b.importJson(backup);
+    expect(b.readSections('t'), {'x'});
+    expect(b.quizStats('t')!.bestPct, 85);
+
+    await expectLater(
+      b.importJson('{"app":"other","data":{}}'),
+      throwsFormatException,
+    );
+    await expectLater(b.importJson('not json'), throwsFormatException);
+    expect(b.readSections('t'), {'x'}, reason: 'failed import changes nothing');
+  });
 }

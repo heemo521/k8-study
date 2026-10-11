@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
@@ -216,13 +217,90 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Progress is stored only on this device. '
-            'Export/import is planned for a later version.',
+            'Progress is stored only on this device. Back it up to move it '
+            'to another browser or device.',
             style: textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                key: const ValueKey('export-progress'),
+                icon: const Icon(Icons.upload_outlined),
+                label: const Text('Copy backup'),
+                onPressed: () async {
+                  await Clipboard.setData(
+                    ClipboardData(text: progress.exportJson()),
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Backup copied. Paste it somewhere safe.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('import-progress'),
+                icon: const Icon(Icons.download_outlined),
+                label: const Text('Restore backup'),
+                onPressed: () => _restore(context, progress),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _restore(BuildContext context, ProgressStore progress) async {
+    final controller = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Restore backup'),
+        content: TextField(
+          key: const ValueKey('backup-field'),
+          controller: controller,
+          maxLines: 6,
+          decoration: const InputDecoration(
+            hintText: 'Paste a backup copied from K8 Study',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            key: const ValueKey('confirm-restore'),
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Replace my progress'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (text == null || text.trim().isEmpty || !context.mounted) return;
+    try {
+      await progress.importJson(text.trim());
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Progress restored.')));
+      }
+    } on FormatException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Restore failed: ${e.message}')));
+      }
+    }
   }
 
   Future<void> _confirmReset(

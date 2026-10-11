@@ -442,6 +442,55 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     notifyListeners();
   }
 
+  // ---- backup ----------------------------------------------------------------
+
+  static const _backupKeys = [
+    StorageKeys.notes,
+    StorageKeys.cards,
+    StorageKeys.quiz,
+    StorageKeys.practice,
+    StorageKeys.answers,
+    StorageKeys.recent,
+    StorageKeys.settings,
+  ];
+
+  /// All progress as a JSON document (for copy/paste backup).
+  String exportJson() => jsonEncode({
+    'app': 'k8-study',
+    'schema': schemaVersion,
+    'exportedAt': clock.now().toIso8601String(),
+    'data': {
+      for (final k in _backupKeys)
+        if (_prefs.getString(k) != null) k: jsonDecode(_prefs.getString(k)!),
+    },
+  });
+
+  /// Replaces all progress with a backup from [exportJson]. Throws
+  /// [FormatException] if it isn't a K8 Study backup; nothing changes then.
+  Future<void> importJson(String text) async {
+    final Object? doc;
+    try {
+      doc = jsonDecode(text);
+    } on FormatException {
+      throw const FormatException('Not valid JSON.');
+    }
+    if (doc is! Map<String, dynamic> ||
+        doc['app'] != 'k8-study' ||
+        doc['data'] is! Map<String, dynamic>) {
+      throw const FormatException('This is not a K8 Study backup.');
+    }
+    if ((doc['schema'] as int? ?? 0) > schemaVersion) {
+      throw const FormatException('Backup is from a newer app version.');
+    }
+    final data = doc['data'] as Map<String, dynamic>;
+    for (final k in _backupKeys) {
+      await _prefs.remove(k);
+      if (data[k] != null) await _prefs.setString(k, jsonEncode(data[k]));
+    }
+    _load();
+    notifyListeners();
+  }
+
   // ---- reset ---------------------------------------------------------------
 
   /// Clears all progress. Settings are kept.

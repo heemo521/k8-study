@@ -36,24 +36,26 @@ void main() {
     expect(s.startsWith('…'), isTrue);
   });
 
-  test('nextAction: start, resume, then move forward past completed topics',
-      () async {
-    final p = await fresh();
-    expect(nextAction(content, p)!.topic, content.topics.first);
-    expect(nextAction(content, p)!.step, TopicStep.notes);
+  test(
+    'nextAction: start, resume, then move forward past completed topics',
+    () async {
+      final p = await fresh();
+      expect(nextAction(content, p)!.topic, content.topics.first);
+      expect(nextAction(content, p)!.step, TopicStep.notes);
 
-    final t = content.topics[4];
-    p.markTopicVisited(content.subject.id, t.id);
-    expect(nextAction(content, p)!.topic, t);
-    expect(nextAction(content, p)!.resuming, isTrue);
+      final t = content.topics[4];
+      p.markTopicVisited(content.subject.id, t.id);
+      expect(nextAction(content, p)!.topic, t);
+      expect(nextAction(content, p)!.resuming, isTrue);
 
-    // Complete it: the next suggestion is the following topic, not topic 1.
-    for (final s in t.sections) {
-      p.markSectionRead(t.id, s.id);
-    }
-    p.recordQuiz(t.id, 100, {});
-    expect(nextAction(content, p)!.topic, content.topics[5]);
-  });
+      // Complete it: the next suggestion is the following topic, not topic 1.
+      for (final s in t.sections) {
+        p.markSectionRead(t.id, s.id);
+      }
+      p.recordQuiz(t.id, 100, {});
+      expect(nextAction(content, p)!.topic, content.topics[5]);
+    },
+  );
 
   test('competency gaps: answered-wrong competency ranks first', () async {
     final p = await fresh();
@@ -64,15 +66,20 @@ void main() {
     expect(gaps.first.accuracy, 0);
     expect(gaps.first.isGap, isTrue);
     expect(missedQuestions(content, p).single.id, q.id);
-    expect(reviewPool(content, p, kind: 'competency', id: q.competencyId),
-        contains(q));
+    expect(
+      reviewPool(content, p, kind: 'competency', id: q.competencyId),
+      contains(q),
+    );
   });
 
   test('domain readiness covers every domain with topics', () async {
     final p = await fresh();
     final r = domainReadiness(content, p).where((r) => r.hasContent);
-    expect(r.length, content.domains.length,
-        reason: 'all five CKA domains plus foundations have topics');
+    expect(
+      r.length,
+      content.domains.length,
+      reason: 'all five CKA domains plus foundations have topics',
+    );
     expect(r.every((d) => d.accuracy == null), isTrue);
   });
 }

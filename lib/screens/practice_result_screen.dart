@@ -61,29 +61,38 @@ class PracticeResultScreen extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          Text('By CKA domain', style: textTheme.titleMedium),
+          Text(
+            content.exam == null
+                ? 'By area'
+                : 'By ${content.exam!.name} domain',
+            style: textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           for (final e in result.breakdown.entries)
-            Padding(
+            InkWell(
               key: ValueKey('breakdown-${e.key}'),
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    '${content.domain(e.key)?.title ?? e.key}: '
-                    '${e.value.correct}/${e.value.total} (${e.value.percent}%)',
-                    style: textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  LinearProgressIndicator(
-                    value: e.value.total == 0
-                        ? 0
-                        : e.value.correct / e.value.total,
-                    minHeight: 8,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ],
+              onTap: () =>
+                  context.go('/progress/review?kind=domain&id=${e.key}'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      '${content.domain(e.key)?.title ?? e.key}: '
+                      '${e.value.correct}/${e.value.total} (${e.value.percent}%)',
+                      style: textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    LinearProgressIndicator(
+                      value: e.value.total == 0
+                          ? 0
+                          : e.value.correct / e.value.total,
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ],
+                ),
               ),
             ),
           if (weak.isNotEmpty) ...[
