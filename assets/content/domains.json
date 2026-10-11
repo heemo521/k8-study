@@ -1,0 +1,81 @@
+{
+  "source": "https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/",
+  "examK8sVersion": "1.35",
+  "checkedAt": "2026-10-11",
+  "domains": [
+    {
+      "id": "foundations",
+      "title": "Foundations",
+      "weightPercent": null,
+      "isExamDomain": false,
+      "competencies": []
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "weightPercent": 30,
+      "isExamDomain": true,
+      "competencies": [
+        { "id": "ts-clusters-nodes", "text": "Troubleshoot clusters and nodes" },
+        { "id": "ts-components", "text": "Troubleshoot cluster components" },
+        { "id": "ts-monitor", "text": "Monitor cluster and application resource usage" },
+        { "id": "ts-output-streams", "text": "Manage and evaluate container output streams" },
+        { "id": "ts-networking", "text": "Troubleshoot services and networking" }
+      ]
+    },
+    {
+      "id": "cluster-arch",
+      "title": "Cluster Architecture, Installation & Configuration",
+      "weightPercent": 25,
+      "isExamDomain": true,
+      "competencies": [
+        { "id": "ca-rbac", "text": "Manage role based access control (RBAC)" },
+        { "id": "ca-infra-prep", "text": "Prepare underlying infrastructure for installing a Kubernetes cluster" },
+        { "id": "ca-kubeadm", "text": "Create and manage Kubernetes clusters using kubeadm" },
+        { "id": "ca-lifecycle", "text": "Manage the lifecycle of Kubernetes clusters" },
+        { "id": "ca-ha", "text": "Implement and configure a highly-available control plane" },
+        { "id": "ca-helm-kustomize", "text": "Use Helm and Kustomize to install cluster components" },
+        { "id": "ca-extension", "text": "Understand extension interfaces (CNI, CSI, CRI, etc.)" },
+        { "id": "ca-crds", "text": "Understand CRDs, install and configure operators" }
+      ]
+    },
+    {
+      "id": "services-networking",
+      "title": "Services & Networking",
+      "weightPercent": 20,
+      "isExamDomain": true,
+      "competencies": [
+        { "id": "sn-pod-connectivity", "text": "Understand connectivity between Pods" },
+        { "id": "sn-netpol", "text": "Define and enforce Network Policies" },
+        { "id": "sn-service-types", "text": "Use ClusterIP, NodePort, LoadBalancer service types and endpoints" },
+        { "id": "sn-gateway", "text": "Use the Gateway API to manage Ingress traffic" },
+        { "id": "sn-ingress", "text": "Know how to use Ingress controllers and Ingress resources" },
+        { "id": "sn-coredns", "text": "Understand and use CoreDNS" }
+      ]
+    },
+    {
+      "id": "workloads-scheduling",
+      "title": "Workloads & Scheduling",
+      "weightPercent": 15,
+      "isExamDomain": true,
+      "competencies": [
+        { "id": "ws-rollouts", "text": "Understand application deployments and how to perform rolling update and rollbacks" },
+        { "id": "ws-config", "text": "Use ConfigMaps and Secrets to configure applications" },
+        { "id": "ws-autoscaling", "text": "Configure workload autoscaling" },
+        { "id": "ws-self-healing", "text": "Understand the primitives used to create robust, self-healing, application deployments" },
+        { "id": "ws-admission-scheduling", "text": "Configure Pod admission and scheduling (limits, node affinity, etc.)" }
+      ]
+    },
+    {
+      "id": "storage",
+      "title": "Storage",
+      "weightPercent": 10,
+      "isExamDomain": true,
+      "competencies": [
+        { "id": "st-storage-classes", "text": "Implement storage classes and dynamic volume provisioning" },
+        { "id": "st-volume-types", "text": "Configure volume types, access modes and reclaim policies" },
+        { "id": "st-pv-pvc", "text": "Manage persistent volumes and persistent volume claims" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,618 @@
+{
+  "id": "managed-k8s",
+  "title": "Managed Kubernetes (EKS / GKE / AKS)",
+  "summary": "Build it yourself or hand it off: what managed offerings take over, and what stays yours.",
+  "order": 2,
+  "domainIds": [
+    "cluster-arch"
+  ],
+  "competencyIds": [
+    "ca-infra-prep"
+  ],
+  "estMinutes": 10,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "managed-k8s-production",
+      "heading": "What production asks of a cluster",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "sourceTitle": "Production environment",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A single-machine learning cluster has a single point of failure. A production cluster has to plan for:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Availability**: separate the control plane from worker nodes, replicate control plane components, load-balance traffic to the API server, and keep enough worker nodes available.",
+            "**Scale**: plan for growing or seasonal demand on both the control plane and the workers, and for scaling down unused capacity.",
+            "**Security and access**: shared clusters need RBAC and other mechanisms, plus limits on what users and workloads can consume."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-handoff",
+      "heading": "What you can hand off",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "sourceTitle": "Production environment",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Before building production yourself, the docs suggest considering **Turnkey Cloud Solutions** providers or other Kubernetes partners. The options are:"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Option",
+            "Provider takes care of"
+          ],
+          "rows": [
+            [
+              "Serverless",
+              "Running workloads without you managing a cluster at all; billed for CPU, memory and disk requests"
+            ],
+            [
+              "Managed control plane",
+              "Scale and availability of the control plane, plus patches and upgrades"
+            ],
+            [
+              "Managed worker nodes",
+              "Keeping your configured node pools available and ready for upgrades"
+            ],
+            [
+              "Integration",
+              "Connecting Kubernetes to storage, registries, auth and dev tools"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Even with a managed control plane, you still have to decide how to manage your worker nodes."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-diy",
+      "heading": "If you build it yourself",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "sourceTitle": "Production environment",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Choose deployment tools, such as **kubeadm**, kops or kubespray.",
+            "Manage the certificates that secure control plane communication.",
+            "Put a load balancer in front of the API server instances.",
+            "Separate etcd if needed, and **back it up regularly**.",
+            "Run multiple control plane systems. If they run under an init service such as systemd, run each service on at least three machines.",
+            "Consider spreading the cluster across multiple zones."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "The CKA curriculum lists \"Create and manage Kubernetes clusters using kubeadm\". Managed offerings give real-world context, but study the kubeadm topic for hands-on setup."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-eks",
+      "heading": "Example: Amazon EKS",
+      "sourceUrl": "https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html",
+      "sourceTitle": "What is Amazon EKS? (AWS docs)",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Amazon Elastic Kubernetes Service (EKS) is AWS's managed Kubernetes service.",
+            "**EKS standard**: AWS manages the Kubernetes control plane.",
+            "**EKS Auto Mode**: EKS also manages the nodes (the data plane).",
+            "Access control combines Kubernetes features with AWS IAM."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-gke",
+      "heading": "Example: Google GKE",
+      "sourceUrl": "https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview",
+      "sourceTitle": "GKE overview (Google Cloud docs)",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Google Kubernetes Engine (GKE) is Google Cloud's managed implementation of Kubernetes. Nodes are Compute Engine VMs.",
+            "**Autopilot mode**: Google Cloud manages both the nodes and the control plane, and you pay for the compute resources your running Pods request.",
+            "**Standard mode**: you pay for all resources on your nodes, regardless of Pod requests."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-aks",
+      "heading": "Example: Azure AKS",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/aks/what-is-aks",
+      "sourceTitle": "What is Azure Kubernetes Service? (Microsoft docs)",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Azure Kubernetes Service (AKS) is Azure's managed Kubernetes service.",
+            "When you create a cluster, Azure creates and configures the control plane at no cost. You pay for the nodes that run your applications.",
+            "**AKS Automatic**: Azure handles node management, scaling, security, monitoring and upgrades.",
+            "**AKS Standard**: you control cluster configuration and manage node pools yourself."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Vendor features and pricing change often. Check the linked vendor page before relying on any detail here."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "managed-k8s-fc-01",
+      "front": "What does a \"managed control plane\" offering take care of?",
+      "back": "Scale and availability of the control plane, plus patches and upgrades.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/"
+    },
+    {
+      "id": "managed-k8s-fc-02",
+      "front": "What is the \"serverless\" option for running Kubernetes workloads?",
+      "back": "Run workloads on third-party equipment without managing a cluster at all; you pay for CPU, memory and disk requests.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/"
+    },
+    {
+      "id": "managed-k8s-fc-03",
+      "front": "Managed control plane: do you still think about worker nodes?",
+      "back": "Yes. You still have to decide how to manage your worker nodes.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/"
+    },
+    {
+      "id": "managed-k8s-fc-04",
+      "front": "Name three tools for deploying a self-managed control plane.",
+      "back": "kubeadm, kops, kubespray.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/"
+    },
+    {
+      "id": "managed-k8s-fc-05",
+      "front": "Why back up etcd regularly?",
+      "back": "It stores the cluster configuration data. Backups let you repair the database if needed.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/"
+    },
+    {
+      "id": "managed-k8s-fc-06",
+      "front": "How many machines per control plane service if they run under systemd?",
+      "back": "At least three.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/"
+    },
+    {
+      "id": "managed-k8s-fc-07",
+      "front": "EKS standard vs EKS Auto Mode?",
+      "back": "Standard: AWS manages the control plane. Auto Mode: EKS also manages the nodes.",
+      "sourceUrl": "https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html"
+    },
+    {
+      "id": "managed-k8s-fc-08",
+      "front": "GKE Autopilot: what do you pay for?",
+      "back": "The compute resources your running Pods request.",
+      "sourceUrl": "https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview"
+    },
+    {
+      "id": "managed-k8s-fc-09",
+      "front": "GKE Standard: what do you pay for?",
+      "back": "All resources on your nodes, regardless of Pod requests.",
+      "sourceUrl": "https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview"
+    },
+    {
+      "id": "managed-k8s-fc-10",
+      "front": "AKS: what does the control plane cost?",
+      "back": "Azure creates and configures it at no cost; you pay for the nodes that run your apps.",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/aks/what-is-aks"
+    },
+    {
+      "id": "managed-k8s-fc-11",
+      "front": "AKS Automatic vs AKS Standard?",
+      "back": "Automatic: Azure manages nodes, scaling, security, monitoring and upgrades. Standard: you manage configuration and node pools.",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/aks/what-is-aks"
+    }
+  ],
+  "questions": [
+    {
+      "id": "managed-k8s-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-infra-prep",
+      "stem": "With a \"managed control plane\" offering, what does the provider handle?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Scale and availability of the control plane, including patches and upgrades",
+          "correct": true,
+          "explanation": "That's the definition in the production environment docs."
+        },
+        {
+          "id": "b",
+          "text": "Writing your application's Deployments",
+          "correct": false,
+          "explanation": "Your workloads are still yours."
+        },
+        {
+          "id": "c",
+          "text": "Nothing; you still run etcd yourself",
+          "correct": false,
+          "explanation": "The control plane, etcd included, is the provider's job in this option."
+        },
+        {
+          "id": "d",
+          "text": "Only container image builds",
+          "correct": false,
+          "explanation": "Image builds are unrelated to control plane management."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-infra-prep",
+      "stem": "Which option lets you run workloads without managing a cluster at all?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Serverless",
+          "correct": true,
+          "explanation": "Serverless runs workloads on third-party equipment, billed for CPU, memory and disk requests."
+        },
+        {
+          "id": "b",
+          "text": "Managed worker nodes",
+          "correct": false,
+          "explanation": "You still have a cluster; the provider only keeps node pools ready."
+        },
+        {
+          "id": "c",
+          "text": "kubeadm",
+          "correct": false,
+          "explanation": "kubeadm builds a cluster you manage yourself."
+        },
+        {
+          "id": "d",
+          "text": "Integration",
+          "correct": false,
+          "explanation": "Integration connects Kubernetes to other services."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "True or false: If a cloud provider manages your control plane, you no longer need to think about worker nodes.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "The docs say you still need to consider how to manage your worker nodes."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Node management remains a decision either way."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "Which steps does the production guide list for a highly available control plane? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Put a load balancer in front of the API server",
+          "correct": true,
+          "explanation": "Distribute API requests across apiserver instances on different nodes."
+        },
+        {
+          "id": "b",
+          "text": "Regularly back up etcd",
+          "correct": true,
+          "explanation": "etcd holds cluster configuration data."
+        },
+        {
+          "id": "c",
+          "text": "Run multiple control plane systems",
+          "correct": true,
+          "explanation": "The control plane should not be limited to one machine."
+        },
+        {
+          "id": "d",
+          "text": "Run all components on a single large machine",
+          "correct": false,
+          "explanation": "A single machine isn't highly available."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "Control plane services run under systemd. What is the minimum number of machines each should run on for high availability?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "3",
+          "correct": true,
+          "explanation": "The guide says each service should run on at least three machines."
+        },
+        {
+          "id": "b",
+          "text": "1",
+          "correct": false,
+          "explanation": "One machine is a single point of failure."
+        },
+        {
+          "id": "c",
+          "text": "2",
+          "correct": false,
+          "explanation": "The guide says at least three."
+        },
+        {
+          "id": "d",
+          "text": "5",
+          "correct": false,
+          "explanation": "More is allowed, but the stated minimum is three."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-06",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Which of these is a tool for deploying a self-managed control plane?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubeadm",
+          "correct": true,
+          "explanation": "kubeadm, kops and kubespray are listed as deployment tools."
+        },
+        {
+          "id": "b",
+          "text": "kube-proxy",
+          "correct": false,
+          "explanation": "kube-proxy is a node component, not a deployment tool."
+        },
+        {
+          "id": "c",
+          "text": "etcd",
+          "correct": false,
+          "explanation": "etcd is a control plane component."
+        },
+        {
+          "id": "d",
+          "text": "CoreDNS",
+          "correct": false,
+          "explanation": "CoreDNS provides cluster DNS."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "In Amazon EKS, which mode also has EKS manage the nodes?",
+      "sourceUrl": "https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html",
+      "options": [
+        {
+          "id": "a",
+          "text": "EKS Auto Mode",
+          "correct": true,
+          "explanation": "Auto Mode extends EKS's management to the nodes (data plane)."
+        },
+        {
+          "id": "b",
+          "text": "EKS standard",
+          "correct": false,
+          "explanation": "In standard, AWS manages the control plane."
+        },
+        {
+          "id": "c",
+          "text": "EKS Autopilot",
+          "correct": false,
+          "explanation": "Autopilot is a GKE mode name."
+        },
+        {
+          "id": "d",
+          "text": "EKS Automatic",
+          "correct": false,
+          "explanation": "Automatic is an AKS mode name."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "In GKE Autopilot mode, what are you billed for?",
+      "sourceUrl": "https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview",
+      "options": [
+        {
+          "id": "a",
+          "text": "The compute resources your running Pods request",
+          "correct": true,
+          "explanation": "Autopilot bills on Pod requests."
+        },
+        {
+          "id": "b",
+          "text": "All resources on your nodes regardless of Pod requests",
+          "correct": false,
+          "explanation": "That describes GKE Standard mode."
+        },
+        {
+          "id": "c",
+          "text": "Only control plane uptime",
+          "correct": false,
+          "explanation": "Not how the overview describes Autopilot billing."
+        },
+        {
+          "id": "d",
+          "text": "A flat per-cluster fee only",
+          "correct": false,
+          "explanation": "Not how the overview describes Autopilot billing."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "In AKS, what does Azure charge for the control plane it creates?",
+      "sourceUrl": "https://learn.microsoft.com/en-us/azure/aks/what-is-aks",
+      "options": [
+        {
+          "id": "a",
+          "text": "Nothing. You pay for the nodes running your apps",
+          "correct": true,
+          "explanation": "Azure creates and configures the control plane at no cost."
+        },
+        {
+          "id": "b",
+          "text": "Per API request",
+          "correct": false,
+          "explanation": "Not described in the AKS overview."
+        },
+        {
+          "id": "c",
+          "text": "The same as for one worker node",
+          "correct": false,
+          "explanation": "Not described in the AKS overview."
+        },
+        {
+          "id": "d",
+          "text": "You must run the control plane yourself",
+          "correct": false,
+          "explanation": "Azure manages the AKS control plane."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-infra-prep",
+      "stem": "You configure node pools, and the provider keeps those nodes available and ready for upgrades. Which option is this?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Managed worker nodes",
+          "correct": true,
+          "explanation": "That's how the production guide describes managed worker nodes."
+        },
+        {
+          "id": "b",
+          "text": "Managed control plane",
+          "correct": false,
+          "explanation": "That covers the control plane, not your node pools."
+        },
+        {
+          "id": "c",
+          "text": "Serverless",
+          "correct": false,
+          "explanation": "With serverless you don't manage a cluster or node pools at all."
+        },
+        {
+          "id": "d",
+          "text": "Integration",
+          "correct": false,
+          "explanation": "Integration connects Kubernetes with storage, registries, auth and dev tools."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-infra-prep",
+      "stem": "Your team wants a production cluster but doesn't want to own control plane upgrades. Which option fits best?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A managed control plane offering",
+          "correct": true,
+          "explanation": "The provider handles control plane scale, availability, patches and upgrades."
+        },
+        {
+          "id": "b",
+          "text": "minikube",
+          "correct": false,
+          "explanation": "minikube is for learning and development."
+        },
+        {
+          "id": "c",
+          "text": "A single-node kubeadm cluster",
+          "correct": false,
+          "explanation": "You'd own every upgrade, and a single node isn't production-grade."
+        },
+        {
+          "id": "d",
+          "text": "kind",
+          "correct": false,
+          "explanation": "kind is a local learning tool."
+        }
+      ]
+    },
+    {
+      "id": "managed-k8s-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-infra-prep",
+      "stem": "Why does the production guide suggest spreading a cluster across multiple zones?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "So the cluster can keep working if one zone becomes unavailable",
+          "correct": true,
+          "explanation": "Multi-zone spread improves the chance the cluster survives a zone outage."
+        },
+        {
+          "id": "b",
+          "text": "Because etcd requires it",
+          "correct": false,
+          "explanation": "Not stated as a requirement."
+        },
+        {
+          "id": "c",
+          "text": "To reduce the number of nodes needed",
+          "correct": false,
+          "explanation": "Not the stated reason."
+        },
+        {
+          "id": "d",
+          "text": "Because kubeadm only supports multi-zone clusters",
+          "correct": false,
+          "explanation": "kubeadm works on a single machine too."
+        }
+      ]
+    }
+  ]
+}

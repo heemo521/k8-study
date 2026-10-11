@@ -1,0 +1,882 @@
+{
+  "id": "kubeadm",
+  "title": "Cluster Setup with kubeadm",
+  "summary": "Prepare hosts, install a runtime and packages, init the control plane, add a Pod network, join nodes.",
+  "order": 3,
+  "domainIds": [
+    "cluster-arch"
+  ],
+  "competencyIds": [
+    "ca-infra-prep",
+    "ca-kubeadm",
+    "ca-lifecycle",
+    "ca-extension"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "kubeadm-what",
+      "heading": "What kubeadm does (and doesn't)",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
+      "sourceTitle": "Installing kubeadm",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "kubeadm is the command that **bootstraps** a cluster. It works alongside two other packages you install yourself."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Install on **all** machines: `kubeadm` (bootstraps the cluster), `kubelet` (runs Pods and containers on every machine) and `kubectl` (talks to the cluster).",
+            "kubeadm does **not** install or manage kubelet or kubectl for you. Keep their versions matched to the control plane.",
+            "The kubelet may be one minor version behind the API server, but it must never be newer."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-hosts",
+      "heading": "Prepare the hosts",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
+      "sourceTitle": "Installing kubeadm",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "A compatible Linux host (Debian- or Red Hat-based, or without a package manager).",
+            "**2 GB or more RAM** per machine.",
+            "**2 CPUs or more** on control plane machines.",
+            "Full network connectivity between all machines.",
+            "A **unique hostname, MAC address and product_uuid** on every node.",
+            "The required ports must be open."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "ip link                                   # MAC addresses\nsudo cat /sys/class/dmi/id/product_uuid   # product_uuid\nnc 127.0.0.1 6443 -zv -w 2               # is a port open?"
+        },
+        {
+          "type": "p",
+          "text": "**Swap:** by default the kubelet fails to start if it detects swap. Either disable swap, or set `failSwapOn: false` in the kubelet configuration so it tolerates swap."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "sudo swapoff -a   # temporary; also remove swap from /etc/fstab (or equivalent) to persist"
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-runtime",
+      "heading": "Container runtime & node networking",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/",
+      "sourceTitle": "Container Runtimes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Each node needs a runtime that conforms to the **CRI** (Container Runtime Interface). If you don't specify one, kubeadm looks for known socket endpoints. If it finds none, or more than one, it throws an error and asks you to choose with `--cri-socket`."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Runtime",
+            "Linux socket"
+          ],
+          "rows": [
+            [
+              "containerd",
+              "unix:///var/run/containerd/containerd.sock"
+            ],
+            [
+              "CRI-O",
+              "unix:///var/run/crio/crio.sock"
+            ],
+            [
+              "Docker Engine (cri-dockerd)",
+              "unix:///var/run/cri-dockerd.sock"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Docker Engine doesn't implement the CRI, so it needs **cri-dockerd**. The built-in dockershim was removed in v1.24.",
+            "Linux doesn't route IPv4 packets between interfaces by default. Enable it with `net.ipv4.ip_forward = 1` in `/etc/sysctl.d/k8s.conf` followed by `sudo sysctl --system`.",
+            "There are two cgroup drivers: **cgroupfs** (the kubelet's default) and **systemd**. The kubelet and the runtime **must use the same driver**.",
+            "When systemd is the init system, or with cgroup v2, use the systemd driver: set `cgroupDriver: systemd` in the KubeletConfiguration."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-packages",
+      "heading": "Install the packages",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
+      "sourceTitle": "Installing kubeadm",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Packages come from **pkgs.k8s.io**, which has one repository per Kubernetes minor version. The legacy `apt.kubernetes.io` and `yum.kubernetes.io` repositories have been deprecated and frozen since September 13, 2023."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "# Debian-based, after adding the pkgs.k8s.io repo for your minor version\nsudo apt-get update\nsudo apt-get install -y kubelet kubeadm kubectl\nsudo apt-mark hold kubelet kubeadm kubectl\nsudo systemctl enable --now kubelet   # optional"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`apt-mark hold` (or the yum/dnf `exclude` setting) keeps these packages out of normal system upgrades. Kubernetes upgrades need a special procedure.",
+            "Until `kubeadm init` or `kubeadm join` runs, the kubelet restarts every few seconds in a crashloop. This is **expected**."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-init",
+      "heading": "Initialise the control plane",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "sourceTitle": "Creating a cluster with kubeadm",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "kubeadm builds a **minimum viable cluster** that follows best practices and can pass the Kubernetes Conformance tests. It also supports lifecycle tasks such as bootstrap tokens and cluster upgrades."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubeadm init <args>"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Flag",
+            "Use it when"
+          ],
+          "rows": [
+            [
+              "--control-plane-endpoint",
+              "You may later go HA. Sets a shared endpoint (DNS name or load-balancer IP)"
+            ],
+            [
+              "--pod-network-cidr",
+              "Your Pod network add-on requires a specific CIDR"
+            ],
+            [
+              "--cri-socket",
+              "No runtime, or more than one runtime, is auto-detected"
+            ],
+            [
+              "--apiserver-advertise-address",
+              "To set this node's advertised API server address"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "kubeadm cannot turn a single control plane cluster created **without** `--control-plane-endpoint` into an HA cluster."
+        },
+        {
+          "type": "p",
+          "text": "`kubeadm init` runs pre-flight checks, then installs the control plane components. Afterwards, set up kubectl as a regular user:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "mkdir -p $HOME/.kube\nsudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config\nsudo chown $(id -u):$(id -g) $HOME/.kube/config\n\n# or, as root:\nexport KUBECONFIG=/etc/kubernetes/admin.conf"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Record the `kubeadm join` command that `kubeadm init` prints. The token in it is secret: anyone with it can add authenticated nodes.",
+            "Don't share `admin.conf`. `super-admin.conf` is in the `system:masters` group, which bypasses authorization, so move it somewhere safe."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-network",
+      "heading": "Install a Pod network add-on",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "sourceTitle": "Creating a cluster with kubeadm",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "You **must** deploy a CNI-based Pod network add-on so Pods can talk to each other. **CoreDNS will not start** until a network is installed."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl apply -f <add-on.yaml>\nkubectl get pods --all-namespaces   # wait for CoreDNS: Running"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "You can install only **one** Pod network per cluster.",
+            "The Pod network must not overlap any host network. If it does, pick another CIDR and pass it with `--pod-network-cidr`.",
+            "kubeadm sets up RBAC by default, so make sure the network plugin supports RBAC.",
+            "Join worker nodes only once CoreDNS is Running."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-join",
+      "heading": "Join nodes and day-2 basics",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "sourceTitle": "Creating a cluster with kubeadm",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubeadm join <control-plane-host>:<control-plane-port> --token <token> \\\n  --discovery-token-ca-cert-hash sha256:<hash>"
+        },
+        {
+          "type": "p",
+          "text": "By default, control plane nodes carry the taint `node-role.kubernetes.io/control-plane:NoSchedule`, so Pods are not scheduled there. To allow Pods on them (for example on a single-machine cluster):"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl taint nodes --all node-role.kubernetes.io/control-plane-"
+        },
+        {
+          "type": "p",
+          "text": "To remove a node cleanly:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl drain <node-name> --delete-emptydir-data --force --ignore-daemonsets\nkubeadm reset          # on that node; does NOT clean iptables or IPVS rules\nkubectl delete node <node-name>"
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-skew",
+      "heading": "Version skew & limitations",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "sourceTitle": "Creating a cluster with kubeadm",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "kubeadm vs…",
+            "Allowed"
+          ],
+          "rows": [
+            [
+              "Control plane version",
+              "Same as kubeadm, or one minor version older"
+            ],
+            [
+              "kubelet",
+              "Same as kubeadm, or up to three minor versions older"
+            ],
+            [
+              "kubeadm join on new nodes",
+              "Same version as the kubeadm last used for init/upgrade"
+            ],
+            [
+              "kubeadm upgrade",
+              "Same minor version, or one minor newer, than the kubeadm managing the node"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "A single control-plane node means a single etcd. If that node fails, you may lose data. Back up etcd regularly; kubeadm puts its data directory at `/var/lib/etcd`."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "kubeadm-fc-01",
+      "front": "Which three packages go on every machine in a kubeadm cluster?",
+      "back": "kubeadm, kubelet, kubectl.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-02",
+      "front": "Minimum RAM and CPU for kubeadm machines?",
+      "back": "2 GB+ RAM per machine; 2+ CPUs on control plane machines.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-03",
+      "front": "Which three things must be unique on every node?",
+      "back": "Hostname, MAC address, product_uuid.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-04",
+      "front": "Default kubelet behaviour when swap is on?",
+      "back": "It fails to start. Disable swap, or set failSwapOn: false to tolerate it.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-05",
+      "front": "What does Docker Engine need in order to work with Kubernetes?",
+      "back": "cri-dockerd, because Docker Engine doesn't implement the CRI.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-06",
+      "front": "containerd's default Linux CRI socket?",
+      "back": "unix:///var/run/containerd/containerd.sock",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-07",
+      "front": "Which sysctl enables IPv4 packet forwarding?",
+      "back": "net.ipv4.ip_forward = 1",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/"
+    },
+    {
+      "id": "kubeadm-fc-08",
+      "front": "Name the two cgroup drivers. Which is the kubelet's default?",
+      "back": "cgroupfs and systemd. cgroupfs is the kubelet default. The kubelet and the runtime must match.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/"
+    },
+    {
+      "id": "kubeadm-fc-09",
+      "front": "Why `apt-mark hold kubelet kubeadm kubectl`?",
+      "back": "To exclude them from normal system upgrades. Kubernetes upgrades need a special procedure.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-10",
+      "front": "Which `kubeadm init` flag do you need for a future HA upgrade?",
+      "back": "--control-plane-endpoint. You can't convert a cluster to HA later without it.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-11",
+      "front": "Make kubectl work as root right after `kubeadm init`?",
+      "back": "export KUBECONFIG=/etc/kubernetes/admin.conf",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-12",
+      "front": "What won't start until a Pod network add-on is installed?",
+      "back": "CoreDNS (cluster DNS).",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-13",
+      "front": "How many Pod networks can a cluster have?",
+      "back": "One.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-14",
+      "front": "Allow Pods on control plane nodes?",
+      "back": "kubectl taint nodes --all node-role.kubernetes.io/control-plane-",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-15",
+      "front": "kubeadm vs kubelet version skew?",
+      "back": "The kubelet can be the same version as kubeadm, or up to three minor versions older.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/"
+    },
+    {
+      "id": "kubeadm-fc-16",
+      "front": "Where does kubeadm put the etcd data directory?",
+      "back": "/var/lib/etcd on the control-plane node.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "kubeadm-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-kubeadm",
+      "stem": "Which statement about kubeadm and the kubelet is correct?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubeadm does not install or manage the kubelet; you install it yourself",
+          "correct": true,
+          "explanation": "The install guide says kubeadm will not install or manage kubelet or kubectl."
+        },
+        {
+          "id": "b",
+          "text": "kubeadm downloads the matching kubelet during init",
+          "correct": false,
+          "explanation": "You install kubelet yourself on all machines."
+        },
+        {
+          "id": "c",
+          "text": "The kubelet is only needed on the control plane",
+          "correct": false,
+          "explanation": "The kubelet runs on all machines in the cluster."
+        },
+        {
+          "id": "d",
+          "text": "kubectl replaces the kubelet on worker nodes",
+          "correct": false,
+          "explanation": "kubectl is a CLI; the kubelet is the node agent."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-infra-prep",
+      "stem": "The kubelet won't start on a freshly prepared node, and the node has swap enabled. What should you do?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Disable swap (sudo swapoff -a and persist it), or configure failSwapOn: false",
+          "correct": true,
+          "explanation": "By default the kubelet fails to start when swap is detected."
+        },
+        {
+          "id": "b",
+          "text": "Add more swap",
+          "correct": false,
+          "explanation": "Swap detection is the reason the kubelet refuses to start."
+        },
+        {
+          "id": "c",
+          "text": "Reinstall kubectl",
+          "correct": false,
+          "explanation": "kubectl is the CLI and unrelated to kubelet startup."
+        },
+        {
+          "id": "d",
+          "text": "Set --pod-network-cidr",
+          "correct": false,
+          "explanation": "That's for Pod networking, not swap."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-03",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-infra-prep",
+      "stem": "Which must be unique on every node for kubeadm to work reliably? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Hostname",
+          "correct": true,
+          "explanation": "Listed as a prerequisite."
+        },
+        {
+          "id": "b",
+          "text": "MAC address",
+          "correct": true,
+          "explanation": "Listed. Some VMs may have identical values."
+        },
+        {
+          "id": "c",
+          "text": "product_uuid",
+          "correct": true,
+          "explanation": "Listed; check /sys/class/dmi/id/product_uuid."
+        },
+        {
+          "id": "d",
+          "text": "Kernel version",
+          "correct": false,
+          "explanation": "Kernel versions need to be supported, not unique."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-extension",
+      "stem": "You want to use Docker Engine as the runtime for a new cluster. What else is required?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "cri-dockerd, because Docker Engine doesn't implement the CRI",
+          "correct": true,
+          "explanation": "An additional cri-dockerd service is required."
+        },
+        {
+          "id": "b",
+          "text": "Nothing; dockershim is built into the kubelet",
+          "correct": false,
+          "explanation": "dockershim was removed from the kubelet in v1.24."
+        },
+        {
+          "id": "c",
+          "text": "containerd must be uninstalled",
+          "correct": false,
+          "explanation": "Not a documented requirement."
+        },
+        {
+          "id": "d",
+          "text": "A CNI plugin named docker",
+          "correct": false,
+          "explanation": "CNI is about Pod networking, not the runtime interface."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-05",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ca-infra-prep",
+      "stem": "The node uses systemd as its init system. Which cgroup driver setup is recommended?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "systemd for both the kubelet and the container runtime",
+          "correct": true,
+          "explanation": "Use the systemd driver for both when systemd is the init system; they must match."
+        },
+        {
+          "id": "b",
+          "text": "cgroupfs for the kubelet, systemd for the runtime",
+          "correct": false,
+          "explanation": "The kubelet and runtime must use the same driver."
+        },
+        {
+          "id": "c",
+          "text": "cgroupfs for both",
+          "correct": false,
+          "explanation": "Not recommended with systemd init, because systemd expects a single cgroup manager."
+        },
+        {
+          "id": "d",
+          "text": "No cgroup driver is needed",
+          "correct": false,
+          "explanation": "Both components need a cgroup driver to enforce resources."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-infra-prep",
+      "stem": "Which setting enables IPv4 packet forwarding on a Linux node?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/container-runtimes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "net.ipv4.ip_forward = 1",
+          "correct": true,
+          "explanation": "Put it in /etc/sysctl.d/k8s.conf and apply with sudo sysctl --system."
+        },
+        {
+          "id": "b",
+          "text": "failSwapOn: false",
+          "correct": false,
+          "explanation": "That's a kubelet swap setting."
+        },
+        {
+          "id": "c",
+          "text": "cgroupDriver: systemd",
+          "correct": false,
+          "explanation": "That's a KubeletConfiguration cgroup setting."
+        },
+        {
+          "id": "d",
+          "text": "--pod-network-cidr",
+          "correct": false,
+          "explanation": "That's a kubeadm init flag."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-07",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ca-kubeadm",
+      "stem": "True or false: After installing the packages, the kubelet restarting every few seconds before `kubeadm init` means something is broken.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "The crashloop is expected while the kubelet waits for kubeadm to tell it what to do."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "It's normal until init/join runs."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "You might convert this single control plane cluster to HA later. Which `kubeadm init` flag must you set now?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "--control-plane-endpoint",
+          "correct": true,
+          "explanation": "Converting a cluster created without it to HA is not supported by kubeadm."
+        },
+        {
+          "id": "b",
+          "text": "--apiserver-advertise-address",
+          "correct": false,
+          "explanation": "That sets this node's own advertised address, not a shared endpoint."
+        },
+        {
+          "id": "c",
+          "text": "--cri-socket",
+          "correct": false,
+          "explanation": "That selects the container runtime."
+        },
+        {
+          "id": "d",
+          "text": "--pod-network-cidr",
+          "correct": false,
+          "explanation": "That's for the Pod network add-on."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-kubeadm",
+      "stem": "Two container runtimes are installed on a node and `kubeadm init` errors out. What should you do?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Pass --cri-socket to select the runtime",
+          "correct": true,
+          "explanation": "When more than one runtime is detected, specify which one with --cri-socket."
+        },
+        {
+          "id": "b",
+          "text": "Pass --control-plane-endpoint",
+          "correct": false,
+          "explanation": "That's for a shared control plane endpoint."
+        },
+        {
+          "id": "c",
+          "text": "Disable swap",
+          "correct": false,
+          "explanation": "Unrelated to runtime detection."
+        },
+        {
+          "id": "d",
+          "text": "Install a third runtime",
+          "correct": false,
+          "explanation": "More runtimes make detection more ambiguous, not less."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-components",
+      "stem": "After `kubeadm init`, the CoreDNS Pods stay Pending. What's the most likely missing step?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "No Pod network add-on has been installed",
+          "correct": true,
+          "explanation": "Cluster DNS (CoreDNS) will not start up before a network is installed."
+        },
+        {
+          "id": "b",
+          "text": "The kubelet is not on the control plane",
+          "correct": false,
+          "explanation": "The kubelet runs on all machines in a kubeadm cluster, the control plane included."
+        },
+        {
+          "id": "c",
+          "text": "No worker nodes have joined yet",
+          "correct": false,
+          "explanation": "The docs say to join nodes after CoreDNS is running."
+        },
+        {
+          "id": "d",
+          "text": "admin.conf hasn't been copied",
+          "correct": false,
+          "explanation": "That affects kubectl access, not CoreDNS scheduling."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-11",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ca-extension",
+      "stem": "True or false: You can install two different Pod network add-ons in the same cluster.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "You can install only one Pod network per cluster."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "One Pod network per cluster."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-kubeadm",
+      "stem": "On a single-machine kubeadm cluster your Pods stay Pending. Which command lets them schedule on the control plane node?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl taint nodes --all node-role.kubernetes.io/control-plane-",
+          "correct": true,
+          "explanation": "This removes the control-plane NoSchedule taint."
+        },
+        {
+          "id": "b",
+          "text": "kubectl cordon <node>",
+          "correct": false,
+          "explanation": "cordon makes a node unschedulable, the opposite of what you want."
+        },
+        {
+          "id": "c",
+          "text": "kubeadm reset",
+          "correct": false,
+          "explanation": "reset tears down what kubeadm installed."
+        },
+        {
+          "id": "d",
+          "text": "kubectl label nodes --all node.kubernetes.io/exclude-from-external-load-balancers-",
+          "correct": false,
+          "explanation": "That label controls load-balancer backends, not scheduling."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-13",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ca-lifecycle",
+      "stem": "Which steps does the guide give for removing a worker node cleanly? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl drain <node> --delete-emptydir-data --force --ignore-daemonsets",
+          "correct": true,
+          "explanation": "Drain the node first."
+        },
+        {
+          "id": "b",
+          "text": "kubeadm reset on the node",
+          "correct": true,
+          "explanation": "Reset the state kubeadm installed."
+        },
+        {
+          "id": "c",
+          "text": "kubectl delete node <node>",
+          "correct": true,
+          "explanation": "Then remove the Node object."
+        },
+        {
+          "id": "d",
+          "text": "kubeadm init on the node",
+          "correct": false,
+          "explanation": "init creates a control plane; it doesn't remove a node."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-14",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ca-lifecycle",
+      "stem": "kubeadm is at version 1.37. Which kubelet versions are allowed on the host?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "1.37, 1.36, 1.35 or 1.34",
+          "correct": true,
+          "explanation": "The kubelet can be the same as kubeadm or up to three versions older."
+        },
+        {
+          "id": "b",
+          "text": "Only 1.37",
+          "correct": false,
+          "explanation": "Some skew is allowed."
+        },
+        {
+          "id": "c",
+          "text": "1.37 or 1.38",
+          "correct": false,
+          "explanation": "The kubelet may not be newer than kubeadm."
+        },
+        {
+          "id": "d",
+          "text": "1.37 or 1.36 only",
+          "correct": false,
+          "explanation": "That is the rule for the control plane version, not the kubelet."
+        }
+      ]
+    },
+    {
+      "id": "kubeadm-q-15",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-lifecycle",
+      "stem": "After `kubeadm reset` on a node, iptables rules from Kubernetes are still present. Is that expected?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Yes. kubeadm reset doesn't clean up iptables or IPVS tables; you do that manually",
+          "correct": true,
+          "explanation": "The docs say the reset process does not reset iptables rules or IPVS tables."
+        },
+        {
+          "id": "b",
+          "text": "No. reset should have flushed them",
+          "correct": false,
+          "explanation": "It is documented not to."
+        },
+        {
+          "id": "c",
+          "text": "No. Run kubeadm init to clear them",
+          "correct": false,
+          "explanation": "init does not clean up iptables."
+        },
+        {
+          "id": "d",
+          "text": "Yes, and they are required for the node to rejoin",
+          "correct": false,
+          "explanation": "The docs offer commands to flush them manually if you want to."
+        }
+      ]
+    }
+  ]
+}

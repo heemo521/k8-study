@@ -1,0 +1,646 @@
+{
+  "id": "minikube",
+  "title": "Local Clusters with minikube",
+  "summary": "Pick a practice environment, start minikube, deploy and expose an app, and use addons.",
+  "order": 3,
+  "domainIds": [
+    "foundations"
+  ],
+  "competencyIds": [],
+  "estMinutes": 12,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "minikube-options",
+      "heading": "Where to practise",
+      "sourceUrl": "https://kubernetes.io/docs/setup/learning-environment/",
+      "sourceTitle": "Learning environment",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "First install **kubectl**, the command-line tool for talking to a cluster. Then choose a place to experiment:"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Option",
+            "What it is"
+          ],
+          "rows": [
+            [
+              "kind",
+              "Kubernetes IN Docker: runs cluster nodes as Docker containers"
+            ],
+            [
+              "minikube",
+              "Runs a local cluster on Linux, macOS or Windows"
+            ],
+            [
+              "Online playground",
+              "Runs in the browser with nothing to install"
+            ],
+            [
+              "kubeadm",
+              "Production-like clusters on multiple machines. Advanced"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Start with kind, minikube or a playground. A kubeadm cluster is significantly more complex to set up."
+        }
+      ]
+    },
+    {
+      "id": "minikube-requirements",
+      "heading": "What minikube needs",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/",
+      "sourceTitle": "minikube start",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "2 CPUs or more",
+            "2 GB of free memory",
+            "20 GB of free disk space",
+            "An internet connection",
+            "A container or VM manager, for example Docker, Podman, QEMU, KVM, Hyper-V, VirtualBox or VMware"
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "minikube is for learning and development. For production clusters, see the Kubernetes production environment docs."
+        }
+      ]
+    },
+    {
+      "id": "minikube-start",
+      "heading": "Start and check the cluster",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
+      "sourceTitle": "Hello Minikube",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "minikube start\nminikube status\nkubectl get po -A"
+        },
+        {
+          "type": "p",
+          "text": "`minikube start` creates a **single-node** cluster. That one node is both the control plane and a worker. Production clusters usually keep control plane nodes separate."
+        },
+        {
+          "type": "p",
+          "text": "`minikube status` should show host, kubelet and apiserver as **Running**, and kubeconfig as **Configured**."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "# no kubectl installed? minikube can fetch a matching one\nminikube kubectl -- get po -A\n\n# open the Kubernetes Dashboard (add --url to just print the URL)\nminikube dashboard"
+        }
+      ]
+    },
+    {
+      "id": "minikube-deploy",
+      "heading": "Deploy and expose an app",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
+      "sourceTitle": "Hello Minikube",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl create deployment hello-node --image=<image>\nkubectl get deployments\nkubectl get pods\nkubectl get events\nkubectl logs <pod-name>"
+        },
+        {
+          "type": "p",
+          "text": "By default a Pod is only reachable on its internal cluster IP. To reach it from outside, expose it as a **Service**:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl expose deployment hello-node --type=LoadBalancer --port=8080\nkubectl get services\nminikube service hello-node"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "On cloud providers, a LoadBalancer Service gets an external IP. On minikube, use `minikube service <name>` to open it.",
+            "`minikube tunnel` gives LoadBalancer Services a routable IP. Run it in a separate window.",
+            "`kubectl port-forward service/<name> <local-port>:<service-port>` is another way to reach a Service."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "minikube-addons",
+      "heading": "Addons",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
+      "sourceTitle": "Hello Minikube",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "minikube addons list\nminikube addons enable metrics-server\nkubectl get pod,svc -n kube-system\nkubectl top pods\nminikube addons disable metrics-server"
+        },
+        {
+          "type": "p",
+          "text": "`kubectl top pods` needs the metrics-server addon. If you see `error: Metrics API not available`, wait a moment and try again."
+        }
+      ]
+    },
+    {
+      "id": "minikube-manage",
+      "heading": "Manage and clean up",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/",
+      "sourceTitle": "minikube start",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Command",
+            "Effect"
+          ],
+          "rows": [
+            [
+              "minikube pause / unpause",
+              "Pause Kubernetes without affecting deployed apps, then resume"
+            ],
+            [
+              "minikube stop",
+              "Halt the cluster"
+            ],
+            [
+              "minikube delete",
+              "Delete the cluster (local VM/container)"
+            ],
+            [
+              "minikube delete --all",
+              "Delete all minikube clusters"
+            ],
+            [
+              "minikube start -p <name>",
+              "Start an additional, separately named cluster"
+            ],
+            [
+              "minikube config set memory <MB>",
+              "Change the default memory limit (requires a restart)"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Clean up the tutorial objects with `kubectl delete service hello-node` and `kubectl delete deployment hello-node`."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "minikube-fc-01",
+      "front": "What does kind stand for?",
+      "back": "Kubernetes IN Docker. It runs cluster nodes as Docker containers.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/learning-environment/"
+    },
+    {
+      "id": "minikube-fc-02",
+      "front": "How many nodes does a plain `minikube start` create?",
+      "back": "One. It acts as both control plane and worker.",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/"
+    },
+    {
+      "id": "minikube-fc-03",
+      "front": "minikube's minimum CPU, memory and disk?",
+      "back": "2+ CPUs, 2 GB free memory, 20 GB free disk.",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/"
+    },
+    {
+      "id": "minikube-fc-04",
+      "front": "What should a healthy `minikube status` show?",
+      "back": "host, kubelet and apiserver: Running; kubeconfig: Configured.",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/"
+    },
+    {
+      "id": "minikube-fc-05",
+      "front": "Run kubectl without installing it separately?",
+      "back": "`minikube kubectl -- <args>` downloads and runs a matching kubectl.",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/"
+    },
+    {
+      "id": "minikube-fc-06",
+      "front": "Get the Dashboard URL without opening a browser?",
+      "back": "`minikube dashboard --url`",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/"
+    },
+    {
+      "id": "minikube-fc-07",
+      "front": "Open a LoadBalancer Service on minikube?",
+      "back": "`minikube service <name>`",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/"
+    },
+    {
+      "id": "minikube-fc-08",
+      "front": "What does `minikube tunnel` do?",
+      "back": "Creates a routable IP for LoadBalancer Services. Run it in a separate window.",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/"
+    },
+    {
+      "id": "minikube-fc-09",
+      "front": "Which addon does `kubectl top pods` need on minikube?",
+      "back": "metrics-server (`minikube addons enable metrics-server`).",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/"
+    },
+    {
+      "id": "minikube-fc-10",
+      "front": "Pause vs stop in minikube?",
+      "back": "pause: pauses Kubernetes without impacting deployed apps. stop: halts the cluster.",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/"
+    },
+    {
+      "id": "minikube-fc-11",
+      "front": "Delete every minikube cluster at once?",
+      "back": "`minikube delete --all`",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/"
+    },
+    {
+      "id": "minikube-fc-12",
+      "front": "Is minikube meant for production?",
+      "back": "No. It is for learning and development.",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "minikube-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "After a plain `minikube start`, what does the cluster look like?",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
+      "options": [
+        {
+          "id": "a",
+          "text": "One node that is both control plane and worker",
+          "correct": true,
+          "explanation": "minikube start creates a single-node cluster where that node plays both roles."
+        },
+        {
+          "id": "b",
+          "text": "Three control plane nodes and one worker",
+          "correct": false,
+          "explanation": "That's an HA layout, not minikube's default."
+        },
+        {
+          "id": "c",
+          "text": "One control plane node with workers added automatically",
+          "correct": false,
+          "explanation": "No extra nodes are added by default."
+        },
+        {
+          "id": "d",
+          "text": "Worker nodes only, with a managed control plane",
+          "correct": false,
+          "explanation": "minikube runs the control plane locally."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-02",
+      "type": "multi",
+      "difficulty": 1,
+      "stem": "Which are minikube's stated minimum requirements? Select 2.",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/",
+      "options": [
+        {
+          "id": "a",
+          "text": "2 CPUs or more",
+          "correct": true,
+          "explanation": "Listed under \"What you'll need\"."
+        },
+        {
+          "id": "b",
+          "text": "20 GB of free disk space",
+          "correct": true,
+          "explanation": "Listed under \"What you'll need\"."
+        },
+        {
+          "id": "c",
+          "text": "16 GB of free memory",
+          "correct": false,
+          "explanation": "The stated minimum is 2 GB of free memory."
+        },
+        {
+          "id": "d",
+          "text": "A cloud provider account",
+          "correct": false,
+          "explanation": "minikube runs locally; it needs a container or VM manager, not a cloud account."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "You exposed a Deployment with `--type=LoadBalancer` on minikube. What is the documented way to open it in a browser?",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
+      "options": [
+        {
+          "id": "a",
+          "text": "minikube service <name>",
+          "correct": true,
+          "explanation": "On minikube, the LoadBalancer type is reachable through the minikube service command."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get services",
+          "correct": false,
+          "explanation": "Lists Services and their IPs, but doesn't open the app."
+        },
+        {
+          "id": "c",
+          "text": "Wait for the cloud provider to assign an external IP",
+          "correct": false,
+          "explanation": "That's what happens on cloud providers, not on plain minikube."
+        },
+        {
+          "id": "d",
+          "text": "minikube dashboard",
+          "correct": false,
+          "explanation": "Opens the Kubernetes Dashboard UI, not your Service."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "`kubectl top pods` on minikube prints `error: Metrics API not available`. What's the documented fix?",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Enable the metrics-server addon, then wait and retry",
+          "correct": true,
+          "explanation": "The tutorial enables metrics-server and says to wait and try again if you see that message."
+        },
+        {
+          "id": "b",
+          "text": "Run minikube delete",
+          "correct": false,
+          "explanation": "Deleting the cluster doesn't add metrics support."
+        },
+        {
+          "id": "c",
+          "text": "Install kube-proxy",
+          "correct": false,
+          "explanation": "kube-proxy handles Service networking, not metrics."
+        },
+        {
+          "id": "d",
+          "text": "Switch to the kube-public namespace",
+          "correct": false,
+          "explanation": "Namespaces aren't the issue here."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-05",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Which command lists minikube's built-in addons and whether each is enabled?",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
+      "options": [
+        {
+          "id": "a",
+          "text": "minikube addons list",
+          "correct": true,
+          "explanation": "This lists the supported addons and their status."
+        },
+        {
+          "id": "b",
+          "text": "minikube status",
+          "correct": false,
+          "explanation": "Reports host, kubelet and apiserver state, not addons."
+        },
+        {
+          "id": "c",
+          "text": "kubectl get pods -n kube-system",
+          "correct": false,
+          "explanation": "Shows system Pods, not the list of available addons."
+        },
+        {
+          "id": "d",
+          "text": "kubectl api-resources",
+          "correct": false,
+          "explanation": "That lists API resource types."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-06",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "True or false: minikube is intended for running production clusters.",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "minikube's docs say it is for learning and development."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "For production, see the Kubernetes production environment docs."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "Your laptop has no kubectl installed. How can you still query the minikube cluster?",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/",
+      "options": [
+        {
+          "id": "a",
+          "text": "minikube kubectl -- get po -A",
+          "correct": true,
+          "explanation": "minikube can download the appropriate kubectl version and run it."
+        },
+        {
+          "id": "b",
+          "text": "minikube status",
+          "correct": false,
+          "explanation": "Shows component state, not Pods."
+        },
+        {
+          "id": "c",
+          "text": "minikube addons list",
+          "correct": false,
+          "explanation": "Lists addons, not Pods."
+        },
+        {
+          "id": "d",
+          "text": "It isn't possible without kubectl",
+          "correct": false,
+          "explanation": "minikube can provide kubectl for you."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "What is \"kind\"?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/learning-environment/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A tool that runs Kubernetes clusters using Docker containers as nodes",
+          "correct": true,
+          "explanation": "kind = Kubernetes IN Docker."
+        },
+        {
+          "id": "b",
+          "text": "A managed cloud Kubernetes service",
+          "correct": false,
+          "explanation": "kind runs locally."
+        },
+        {
+          "id": "c",
+          "text": "A kubectl plugin for namespaces",
+          "correct": false,
+          "explanation": "Not what kind is."
+        },
+        {
+          "id": "d",
+          "text": "A container runtime that replaces containerd",
+          "correct": false,
+          "explanation": "kind is a cluster tool, not a runtime."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "Which command gives LoadBalancer Services on minikube a routable IP?",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/",
+      "options": [
+        {
+          "id": "a",
+          "text": "minikube tunnel",
+          "correct": true,
+          "explanation": "Run it in another window; the EXTERNAL-IP column then shows the routable IP."
+        },
+        {
+          "id": "b",
+          "text": "minikube pause",
+          "correct": false,
+          "explanation": "pause suspends Kubernetes."
+        },
+        {
+          "id": "c",
+          "text": "kubectl cordon",
+          "correct": false,
+          "explanation": "cordon marks a node unschedulable."
+        },
+        {
+          "id": "d",
+          "text": "minikube addons enable metrics-server",
+          "correct": false,
+          "explanation": "That enables metrics, not networking."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "You want a second, separate minikube cluster alongside the first. What do you use?",
+      "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/",
+      "options": [
+        {
+          "id": "a",
+          "text": "minikube start -p <name>",
+          "correct": true,
+          "explanation": "The -p flag starts a separately named cluster."
+        },
+        {
+          "id": "b",
+          "text": "minikube start",
+          "correct": false,
+          "explanation": "Without -p it starts (or reuses) the default cluster."
+        },
+        {
+          "id": "c",
+          "text": "minikube config set memory <MB>",
+          "correct": false,
+          "explanation": "Changes the default memory limit; it doesn't create a cluster."
+        },
+        {
+          "id": "d",
+          "text": "minikube unpause",
+          "correct": false,
+          "explanation": "unpause resumes a paused instance."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-11",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "True or false: By default, a new Pod is reachable from outside the cluster without a Service.",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "By default the Pod is only accessible by its internal IP within the cluster."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Expose it as a Service to make it reachable from outside."
+        }
+      ]
+    },
+    {
+      "id": "minikube-q-12",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which commands remove the hello-node tutorial objects? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl delete service hello-node",
+          "correct": true,
+          "explanation": "Removes the Service created by kubectl expose."
+        },
+        {
+          "id": "b",
+          "text": "kubectl delete deployment hello-node",
+          "correct": true,
+          "explanation": "Removes the Deployment and its Pods."
+        },
+        {
+          "id": "c",
+          "text": "minikube addons disable hello-node",
+          "correct": false,
+          "explanation": "hello-node is not an addon."
+        },
+        {
+          "id": "d",
+          "text": "kubectl cordon hello-node",
+          "correct": false,
+          "explanation": "cordon applies to nodes, not Deployments."
+        }
+      ]
+    }
+  ]
+}

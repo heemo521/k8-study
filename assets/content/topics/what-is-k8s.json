@@ -1,0 +1,243 @@
+{
+  "id": "what-is-k8s",
+  "title": "What is Kubernetes?",
+  "summary": "What Kubernetes does, what it deliberately leaves out, and why containers led to it.",
+  "order": 1,
+  "domainIds": ["foundations"],
+  "competencyIds": [],
+  "estMinutes": 8,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "what-is-k8s-definition",
+      "heading": "The one-line definition",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "sourceTitle": "Overview",
+      "blocks": [
+        { "type": "p", "text": "Kubernetes is an open source platform for running and managing **containerized workloads and services**. It is portable and extensible, and it supports both **declarative configuration** and automation." },
+        { "type": "bullets", "items": [
+          "The name comes from Greek for helmsman or pilot.",
+          "**K8s** is shorthand: there are eight letters between the \"K\" and the \"s\".",
+          "Google open sourced the project in 2014, building on its experience running production workloads at scale."
+        ] },
+        { "type": "callout", "kind": "key", "text": "Declarative means you describe the state you want, and Kubernetes works to make the cluster match it." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-features",
+      "heading": "What it gives you",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "sourceTitle": "Overview",
+      "blocks": [
+        { "type": "p", "text": "In production something has to restart a crashed container, spread traffic and roll out new versions. Kubernetes provides a framework for running distributed systems resiliently." },
+        { "type": "table", "header": ["Feature", "In short"], "rows": [
+          ["Service discovery & load balancing", "Expose containers by DNS name or IP and spread traffic across them"],
+          ["Storage orchestration", "Mount storage of your choice: local, cloud provider, and more"],
+          ["Automated rollouts & rollbacks", "Move actual state toward desired state at a controlled rate"],
+          ["Automatic bin packing", "Place containers on nodes based on the CPU and memory they need"],
+          ["Self-healing", "Restart or replace failed containers; kill ones failing your health check"],
+          ["Secret & config management", "Update secrets and config without rebuilding images"],
+          ["Batch execution", "Run batch and CI workloads, replacing failed containers if desired"],
+          ["Horizontal scaling", "Scale by command, UI, or automatically based on CPU usage"],
+          ["IPv4/IPv6 dual-stack", "Allocate both address families to Pods and Services"],
+          ["Extensibility", "Add features without changing upstream source code"]
+        ] }
+      ]
+    },
+    {
+      "id": "what-is-k8s-not",
+      "heading": "What Kubernetes is not",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "sourceTitle": "Overview",
+      "blocks": [
+        { "type": "p", "text": "Kubernetes is **not a traditional, all-inclusive PaaS**. It works at the container level and gives you building blocks; the defaults it does ship are optional and pluggable." },
+        { "type": "bullets", "items": [
+          "It does not limit which kinds of applications you can run. If it runs in a container, it should run on Kubernetes.",
+          "It does not deploy source code or build your application. CI/CD is your choice.",
+          "It does not provide application-level services such as databases, message buses or caches as built-ins.",
+          "It does not dictate logging, monitoring or alerting solutions.",
+          "It does not provide or require a configuration language. It exposes a declarative API.",
+          "It does not provide full machine configuration, maintenance or management systems."
+        ] },
+        { "type": "callout", "kind": "key", "text": "Kubernetes is not a step-by-step workflow engine (\"do A, then B, then C\"). It is a set of independent control processes that keep driving the current state toward the desired state." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-eras",
+      "heading": "From servers to VMs to containers",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "sourceTitle": "Overview",
+      "blocks": [
+        { "type": "table", "header": ["Era", "How apps ran", "Main drawback / gain"], "rows": [
+          ["Traditional", "Directly on physical servers", "No resource boundaries; one app could starve others"],
+          ["Virtualized", "Several VMs per physical server, each with its own OS", "Isolation and better utilization, but each VM is a full machine"],
+          ["Container", "Containers share the host OS", "Lightweight and portable across clouds and OS distributions"]
+        ] },
+        { "type": "p", "text": "A container still has its own filesystem and its own share of CPU, memory and process space. Because it is decoupled from the infrastructure, the same image runs on a laptop and in the cloud." },
+        { "type": "bullets", "items": [
+          "Image immutability makes rollbacks quick and reliable.",
+          "Images are built at build/release time, not deploy time, which separates Dev and Ops concerns.",
+          "Apps are broken into smaller, independent pieces instead of one monolith on one big machine."
+        ] }
+      ]
+    },
+    {
+      "id": "what-is-k8s-glance",
+      "heading": "A cluster at a glance",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/components/",
+      "sourceTitle": "Kubernetes Components",
+      "blocks": [
+        { "type": "p", "text": "A Kubernetes cluster is a **control plane** plus **one or more worker nodes**. The control plane manages the overall state of the cluster; node components keep Pods running." },
+        { "type": "bullets", "items": [
+          "Control plane: `kube-apiserver`, `etcd`, `kube-scheduler`, `kube-controller-manager`, and optionally `cloud-controller-manager`.",
+          "Every node: `kubelet`, a container runtime, and optionally `kube-proxy`.",
+          "Addons extend the cluster, for example cluster DNS, the Dashboard web UI, resource monitoring and cluster-level logging."
+        ] },
+        { "type": "callout", "kind": "exam", "text": "The Cluster Architecture topic covers each component in detail. Know which ones run on the control plane and which run on every node." }
+      ]
+    }
+  ],
+  "flashcards": [
+    { "id": "what-is-k8s-fc-01", "front": "What does \"K8s\" abbreviate, and why the 8?", "back": "Kubernetes. There are eight letters between the \"K\" and the \"s\".", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" },
+    { "id": "what-is-k8s-fc-02", "front": "What does the Greek root of \"Kubernetes\" mean?", "back": "Helmsman or pilot.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" },
+    { "id": "what-is-k8s-fc-03", "front": "Which company open sourced Kubernetes, and when?", "back": "Google, in 2014.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" },
+    { "id": "what-is-k8s-fc-04", "front": "Kubernetes manages what kind of workloads?", "back": "Containerized workloads and services.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" },
+    { "id": "what-is-k8s-fc-05", "front": "What does \"self-healing\" mean in Kubernetes?", "back": "It restarts or replaces failed containers, kills containers that fail your health check, and doesn't advertise them to clients until they're ready.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" },
+    { "id": "what-is-k8s-fc-06", "front": "What is automatic bin packing?", "back": "You tell Kubernetes how much CPU and memory each container needs, and it fits containers onto nodes to make the best use of resources.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" },
+    { "id": "what-is-k8s-fc-07", "front": "Does Kubernetes build your application from source?", "back": "No. Building and deploying source code (CI/CD) is outside Kubernetes.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" },
+    { "id": "what-is-k8s-fc-08", "front": "Why does the Kubernetes overview say it is \"not a mere orchestration system\"?", "back": "Instead of executing a fixed workflow (A, then B, then C), independent control processes continuously drive the current state toward the desired state.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" },
+    { "id": "what-is-k8s-fc-09", "front": "Key difference between a VM and a container?", "back": "Each VM runs a full OS on virtualized hardware; containers share the host OS, so they are lighter.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" },
+    { "id": "what-is-k8s-fc-10", "front": "What are the two halves of every Kubernetes cluster?", "back": "A control plane and one or more worker nodes.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/components/" },
+    { "id": "what-is-k8s-fc-11", "front": "Name the three node components.", "back": "kubelet, a container runtime, and kube-proxy (optional).", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/components/" },
+    { "id": "what-is-k8s-fc-12", "front": "How can you update secrets and app config in Kubernetes without rebuilding images?", "back": "Use its secret and configuration management. You can deploy and update them without rebuilding container images.", "sourceUrl": "https://kubernetes.io/docs/concepts/overview/" }
+  ],
+  "questions": [
+    {
+      "id": "what-is-k8s-q-01", "type": "single", "difficulty": 1,
+      "stem": "Which statement best describes Kubernetes?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "a", "text": "A portable, extensible, open source platform for managing containerized workloads and services", "correct": true, "explanation": "This matches the official overview: it manages containerized workloads and supports declarative configuration and automation." },
+        { "id": "b", "text": "A container image build system", "correct": false, "explanation": "Kubernetes does not build your application or deploy source code; that is left to your CI/CD tooling." },
+        { "id": "c", "text": "An all-inclusive Platform as a Service with a built-in database", "correct": false, "explanation": "The docs say it is not a traditional all-inclusive PaaS and does not provide databases as built-in services." },
+        { "id": "d", "text": "A virtual machine hypervisor", "correct": false, "explanation": "Kubernetes operates at the container level, not the hardware/VM level." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-02", "type": "single", "difficulty": 1,
+      "stem": "Where does the abbreviation \"K8s\" come from?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "a", "text": "Eight letters between the \"K\" and the \"s\"", "correct": true, "explanation": "K-ubernete-s: the 8 replaces the eight letters in the middle." },
+        { "id": "b", "text": "Version 8 was the first public release", "correct": false, "explanation": "The abbreviation is about letter count, not a version number." },
+        { "id": "c", "text": "It runs on 8 nodes by default", "correct": false, "explanation": "There is no such default; a learning cluster can have a single node." },
+        { "id": "d", "text": "Eight core components", "correct": false, "explanation": "The name abbreviation has nothing to do with component count." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-03", "type": "multi", "difficulty": 2,
+      "stem": "Which of these does Kubernetes provide? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "a", "text": "Service discovery and load balancing", "correct": true, "explanation": "Listed feature: expose containers by DNS name or IP and load balance traffic." },
+        { "id": "b", "text": "Automated rollouts and rollbacks", "correct": true, "explanation": "Listed feature: change actual state to desired state at a controlled rate." },
+        { "id": "c", "text": "Self-healing", "correct": true, "explanation": "Listed feature: restarts, replaces and kills unhealthy containers." },
+        { "id": "d", "text": "A mandated configuration language", "correct": false, "explanation": "Kubernetes explicitly does not provide or mandate a configuration language; it offers a declarative API." },
+        { "id": "e", "text": "Building container images from source", "correct": false, "explanation": "Kubernetes does not build your application." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-04", "type": "truefalse", "difficulty": 1,
+      "stem": "True or false: Kubernetes dictates which logging and monitoring solution you must use.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "t", "text": "True", "correct": false, "explanation": "The overview says Kubernetes does not dictate logging, monitoring or alerting solutions." },
+        { "id": "f", "text": "False", "correct": true, "explanation": "Correct. It provides some integrations and mechanisms to export metrics, but the choice is yours." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-05", "type": "single", "difficulty": 2,
+      "stem": "Why does the overview say Kubernetes \"eliminates the need for orchestration\"?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "a", "text": "Independent control processes continuously drive current state toward the desired state", "correct": true, "explanation": "Rather than running a fixed A→B→C workflow, control loops keep reconciling toward what you declared." },
+        { "id": "b", "text": "It runs a single central workflow engine", "correct": false, "explanation": "The docs say centralized control is not required." },
+        { "id": "c", "text": "It only runs one container per node", "correct": false, "explanation": "Unrelated, and not true: bin packing places many containers per node." },
+        { "id": "d", "text": "It hands orchestration to the cloud provider", "correct": false, "explanation": "Kubernetes runs on-premises and in clouds alike; this is not the reason." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-06", "type": "single", "difficulty": 1,
+      "stem": "What distinguishes containers from virtual machines, according to the overview?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "a", "text": "Containers share the operating system among applications", "correct": true, "explanation": "Relaxed isolation that shares the OS is what makes containers lightweight." },
+        { "id": "b", "text": "Containers each run their own full operating system", "correct": false, "explanation": "That describes VMs." },
+        { "id": "c", "text": "Containers have no filesystem of their own", "correct": false, "explanation": "A container has its own filesystem, share of CPU, memory and process space." },
+        { "id": "d", "text": "Containers can only run on physical servers", "correct": false, "explanation": "Containers are portable across clouds and OS distributions." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-07", "type": "single", "difficulty": 2,
+      "stem": "What problem of the traditional deployment era did virtualization address?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "a", "text": "No resource boundaries between applications on the same physical server", "correct": true, "explanation": "One app could take most resources; VMs isolate apps and improve utilization." },
+        { "id": "b", "text": "Container images were too large", "correct": false, "explanation": "Containers came after virtualization in the timeline." },
+        { "id": "c", "text": "Lack of a declarative API", "correct": false, "explanation": "Not the problem described for that era." },
+        { "id": "d", "text": "Too many Kubernetes clusters", "correct": false, "explanation": "Kubernetes did not exist in the traditional era." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-08", "type": "truefalse", "difficulty": 1,
+      "stem": "True or false: Kubernetes can scale an application automatically based on CPU usage.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "t", "text": "True", "correct": true, "explanation": "Horizontal scaling can be done by command, UI, or automatically based on CPU usage." },
+        { "id": "f", "text": "False", "correct": false, "explanation": "Automatic horizontal scaling based on CPU usage is a listed feature." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-09", "type": "single", "difficulty": 1,
+      "stem": "A Kubernetes cluster consists of:",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/components/",
+      "options": [
+        { "id": "a", "text": "A control plane and one or more worker nodes", "correct": true, "explanation": "That is the definition on the Components page." },
+        { "id": "b", "text": "Only worker nodes that elect a leader", "correct": false, "explanation": "There is always a control plane managing cluster state." },
+        { "id": "c", "text": "Exactly three control plane machines", "correct": false, "explanation": "A minimal cluster can run everything on a single machine." },
+        { "id": "d", "text": "An etcd database and a load balancer only", "correct": false, "explanation": "etcd is one control plane component; there are several more, plus nodes." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-10", "type": "multi", "difficulty": 2,
+      "stem": "Which are things Kubernetes does NOT provide as built-in services? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "a", "text": "Databases such as MySQL", "correct": true, "explanation": "Application-level services like databases are not built in, though they can run on Kubernetes." },
+        { "id": "b", "text": "Message buses", "correct": true, "explanation": "Middleware such as message buses is not built in." },
+        { "id": "c", "text": "Restarting failed containers", "correct": false, "explanation": "That is self-healing, a core feature." },
+        { "id": "d", "text": "Load balancing traffic to containers", "correct": false, "explanation": "Load balancing is a core feature." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-11", "type": "single", "difficulty": 2,
+      "stem": "Which benefit of containers comes from image immutability?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "a", "text": "Quick and efficient rollbacks", "correct": true, "explanation": "The overview links reliable, frequent deployment with quick rollbacks to image immutability." },
+        { "id": "b", "text": "Hardware virtualization", "correct": false, "explanation": "That is what VMs do, not container images." },
+        { "id": "c", "text": "A built-in database", "correct": false, "explanation": "Not related to immutability and not a Kubernetes built-in." },
+        { "id": "d", "text": "Automatic source code compilation", "correct": false, "explanation": "Images are built at build/release time by your tooling." }
+      ]
+    },
+    {
+      "id": "what-is-k8s-q-12", "type": "truefalse", "difficulty": 1,
+      "stem": "True or false: Kubernetes lets you add features to a cluster without changing upstream source code.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
+      "options": [
+        { "id": "t", "text": "True", "correct": true, "explanation": "\"Designed for extensibility\" is one of the listed features." },
+        { "id": "f", "text": "False", "correct": false, "explanation": "Extensibility without upstream changes is an explicit design goal." }
+      ]
+    }
+  ]
+}

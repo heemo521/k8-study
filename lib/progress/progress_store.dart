@@ -1,0 +1,336 @@
+/// Local progress persistence (spec §6). One key per concern, JSON values.
+/// Corrupt data in a key resets that key; it never stops the app starting.
+library;
+
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../ads/frequency_cap.dart';
+import '../content/models.dart';
+import '../engine/clock.dart';
+import '../engine/flashcards.dart';
+import '../engine/practice.dart';
+import '../engine/quiz.dart';
+
+const schemaVersion = 1;
+const maxPracticeHistory = 50;
+
+abstract final class StorageKeys {
+  static const schema = 'k8s.schema';
+  static const notes = 'k8s.notes';
+  static const cards = 'k8s.cards';
+  static const quiz = 'k8s.quiz';
+  static const practice = 'k8s.practice';
+  static const ads = 'k8s.ads';
+  static const settings = 'k8s.settings';
+}
+
+class QuizStats {
+  const QuizStats({
+    required this.attempts,
+    required this.bestPct,
+    required this.lastPct,
+    required this.lastAt,
+    required this.missed,
+  });
+
+  final int attempts;
+  final int bestPct;
+  final int lastPct;
+  final DateTime lastAt;
+
+  /// Questions missed in the most recent run, prioritised in the next draw.
+  final List<String> missed;
+
+  Map<String, dynamic> toJson() => {
+        'attempts': attempts,
+        'bestPct': bestPct,
+        'lastPct': lastPct,
+        'lastAt': lastAt.toIso8601String(),
+        'missed': missed,
+      };
+
+  static QuizStats fromJson(Map<String, dynamic> j) => QuizStats(
+        attempts: j['attempts'] as int,
+        bestPct: j['bestPct'] as int,
+        lastPct: j['lastPct'] as int,
+        lastAt: DateTime.parse(j['lastAt'] as String),
+        missed: [for (final m in (j['missed'] as List? ?? const [])) m as String],
+      );
+}
+
+class PracticeRecord {
+  const PracticeRecord({
+    required this.testId,
+    required this.pct,
+    required this.perDomain,
+    required this.durationSec,
+    required this.at,
+  });
+
+  final String testId;
+  final int pct;
+  final Map<String, DomainScore> perDomain;
+  final int durationSec;
+  final DateTime at;
+
+  Map<String, dynamic> toJson() => {
+        'testId': testId,
+        'pct': pct,
+        'perDomain': {
+          for (final e in perDomain.entries) e.key: e.value.toJson(),
+        },
+        'durationSec': durationSec,
+        'at': at.toIso8601String(),
+      };
+
+  static PracticeRecord fromJson(Map<String, dynamic> j) => PracticeRecord(
+        testId: j['testId'] as String,
+        pct: j['pct'] as int,
+        perDomain: {
+          for (final e in (j['perDomain'] as Map<String, dynamic>).entries)
+            e.key: DomainScore(
+              (e.value as Map<String, dynamic>)['correct'] as int,
+              (e.value as Map<String, dynamic>)['total'] as int,
+            ),
+        },
+        durationSec: j['durationSec'] as int,
+        at: DateTime.parse(j['at'] as String),
+      );
+}
+
+class ProgressStore extends ChangeNotifier implements AdCapStore {
+  ProgressStore(this._prefs, {this.clock = const SystemClock()}) {
+    _load();
+  }
+
+  final SharedPreferences _prefs;
+  final Clock clock;
+
+  Map<String, Set<String>> _notes = {};
+  Map<String, CardState> _cards = {};
+  Map<String, QuizStats> _quiz = {};
+  List<PracticeRecord> _practice = [];
+  AdCapState _ads = AdCapState.initial;
+  bool _practiceTimerOn = true;
+
+  // ---- loading -------------------------------------------------------------
+
+  T _read<T>(String key, T fallback, T Function(dynamic json) parse) {
+    final raw = _prefs.getString(key);
+    if (raw == null) return fallback;
+    try {
+      return parse(jsonDecode(raw));
+    } catch (e) {
+      debugPrint('ProgressStore: resetting corrupt "$key": $e');
+      _prefs.remove(key);
+      return fallback;
+    }
+  }
+
+  void _load() {
+    final stored = _prefs.getInt(StorageKeys.schema);
+    if (stored != schemaVersion) _migrate(stored);
+
+    _notes = _read(StorageKeys.notes, {}, (j) => {
+          for (final e in (j as Map<String, dynamic>).entries)
+            e.key: {for (final s in e.value as List) s as String},
+        });
+    _cards = _read(StorageKeys.cards, {}, (j) => {
+          for (final e in (j as Map<String, dynamic>).entries)
+            e.key: CardState.fromJson(e.value as Map<String, dynamic>),
+        });
+    _quiz = _read(StorageKeys.quiz, {}, (j) => {
+          for (final e in (j as Map<String, dynamic>).entries)
+            e.key: QuizStats.fromJson(e.value as Map<String, dynamic>),
+        });
+    _practice = _read(StorageKeys.practice, [], (j) => [
+          for (final r in j as List) PracticeRecord.fromJson(r as Map<String, dynamic>),
+        ]);
+    _ads = _read(StorageKeys.ads, AdCapState.initial,
+        (j) => AdCapState.fromJson(j as Map<String, dynamic>));
+    _practiceTimerOn = _read(StorageKeys.settings, true,
+        (j) => (j as Map<String, dynamic>)['practiceTimerOn'] as bool? ?? true);
+  }
+
+  /// Schema migrations. v1 is the first schema, so an unknown or missing
+  /// version just gets stamped; future versions transform data here.
+  void _migrate(int? from) {
+    _prefs.setInt(StorageKeys.schema, schemaVersion);
+  }
+
+  void _write(String key, Object json) => _prefs.setString(key, jsonEncode(json));
+
+  // ---- notes ---------------------------------------------------------------
+
+  Set<String> readSections(String topicId) => _notes[topicId] ?? const {};
+
+  void markSectionRead(String topicId, String sectionId) {
+    final set = _notes.putIfAbsent(topicId, () => {});
+    if (!set.add(sectionId)) return;
+    _write(StorageKeys.notes, {
+      for (final e in _notes.entries) e.key: e.value.toList(),
+    });
+    notifyListeners();
+  }
+
+  /// Read count, ignoring ids that no longer exist in the content.
+  int readCount(Topic topic) {
+    final read = readSections(topic.id);
+    return topic.sections.where((s) => read.contains(s.id)).length;
+  }
+
+  bool notesComplete(Topic topic) => readCount(topic) == topic.sections.length;
+
+  // ---- flashcards ----------------------------------------------------------
+
+  Map<String, CardState> get cardStates => Map.unmodifiable(_cards);
+
+  CardState? cardState(String cardId) => _cards[cardId];
+
+  void setCardState(String cardId, CardState state) {
+    _cards[cardId] = state;
+    _write(StorageKeys.cards, {
+      for (final e in _cards.entries) e.key: e.value.toJson(),
+    });
+    notifyListeners();
+  }
+
+  int masteredCount(Iterable<Flashcard> cards) =>
+      cards.where((c) => _cards[c.id]?.mastered ?? false).length;
+
+  // ---- quizzes -------------------------------------------------------------
+
+  QuizStats? quizStats(String topicId) => _quiz[topicId];
+
+  void _saveQuiz() => _write(StorageKeys.quiz, {
+        for (final e in _quiz.entries) e.key: e.value.toJson(),
+      });
+
+  /// A full quiz attempt finished: counts toward attempts and best score.
+  void recordQuiz(String topicId, int pct, Set<String> missed) {
+    final prev = _quiz[topicId];
+    _quiz[topicId] = QuizStats(
+      attempts: (prev?.attempts ?? 0) + 1,
+      bestPct: prev == null ? pct : (pct > prev.bestPct ? pct : prev.bestPct),
+      lastPct: pct,
+      lastAt: clock.now(),
+      missed: missed.toList(),
+    );
+    _saveQuiz();
+    notifyListeners();
+  }
+
+  /// A "retry missed" run finished: only updates the missed set.
+  void recordRetryMissed(String topicId, Set<String> stillMissed) {
+    final prev = _quiz[topicId];
+    if (prev == null) return;
+    _quiz[topicId] = QuizStats(
+      attempts: prev.attempts,
+      bestPct: prev.bestPct,
+      lastPct: prev.lastPct,
+      lastAt: prev.lastAt,
+      missed: stillMissed.toList(),
+    );
+    _saveQuiz();
+    notifyListeners();
+  }
+
+  bool quizPassed(String topicId) =>
+      (_quiz[topicId]?.bestPct ?? 0) >= masteryPercent;
+
+  // ---- topic status --------------------------------------------------------
+
+  /// Complete = all sections read and quiz best ≥ mastery threshold.
+  bool topicComplete(Topic topic) =>
+      notesComplete(topic) && quizPassed(topic.id);
+
+  bool topicStarted(Topic topic) =>
+      readCount(topic) > 0 ||
+      _quiz.containsKey(topic.id) ||
+      topic.flashcards.any((c) => _cards.containsKey(c.id));
+
+  /// 0..1 progress used by rings: notes (50%) + quiz mastery (50%).
+  double topicProgress(Topic topic) {
+    final notes = topic.sections.isEmpty
+        ? 1.0
+        : readCount(topic) / topic.sections.length;
+    final best = (_quiz[topic.id]?.bestPct ?? 0) / masteryPercent;
+    return (notes * 0.5 + (best > 1 ? 1 : best) * 0.5).clamp(0, 1).toDouble();
+  }
+
+  DateTime? lastActivity(Topic topic) {
+    DateTime? latest;
+    void consider(DateTime? t) {
+      if (t != null && (latest == null || t.isAfter(latest!))) latest = t;
+    }
+
+    consider(_quiz[topic.id]?.lastAt);
+    for (final c in topic.flashcards) {
+      consider(_cards[c.id]?.lastReviewedAt);
+    }
+    return latest;
+  }
+
+  // ---- practice ------------------------------------------------------------
+
+  List<PracticeRecord> get practiceHistory => List.unmodifiable(_practice);
+
+  int? bestPracticePct(String testId) {
+    int? best;
+    for (final r in _practice) {
+      if (r.testId == testId && (best == null || r.pct > best)) best = r.pct;
+    }
+    return best;
+  }
+
+  void recordPractice(PracticeRecord record) {
+    _practice = [record, ..._practice].take(maxPracticeHistory).toList();
+    _write(StorageKeys.practice, [for (final r in _practice) r.toJson()]);
+    notifyListeners();
+  }
+
+  // ---- ads frequency cap ---------------------------------------------------
+
+  @override
+  AdCapState get adCapState => _ads;
+
+  @override
+  set adCapState(AdCapState value) {
+    _ads = value;
+    _write(StorageKeys.ads, value.toJson());
+  }
+
+  // ---- settings ------------------------------------------------------------
+
+  bool get practiceTimerOn => _practiceTimerOn;
+
+  set practiceTimerOn(bool value) {
+    _practiceTimerOn = value;
+    _write(StorageKeys.settings, {'practiceTimerOn': value});
+    notifyListeners();
+  }
+
+  // ---- reset ---------------------------------------------------------------
+
+  /// Clears all progress. Settings are kept.
+  Future<void> resetProgress() async {
+    for (final key in [
+      StorageKeys.notes,
+      StorageKeys.cards,
+      StorageKeys.quiz,
+      StorageKeys.practice,
+      StorageKeys.ads,
+    ]) {
+      await _prefs.remove(key);
+    }
+    _notes = {};
+    _cards = {};
+    _quiz = {};
+    _practice = [];
+    _ads = AdCapState.initial;
+    notifyListeners();
+  }
+}

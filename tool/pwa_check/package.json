@@ -1,0 +1,11 @@
+{
+  "name": "k8-study-pwa-check",
+  "private": true,
+  "description": "Headless Chromium checks for the built PWA (spec §11.3-11.5).",
+  "scripts": {
+    "check": "node check.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

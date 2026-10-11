@@ -1,6 +1,6 @@
 # K8 Study — Specification (v1)
 
-Status: **DRAFT — awaiting review.** No app code is written until this is approved.
+Status: **APPROVED 2026-10-11** (decisions in §12).
 
 ## 1. Product summary
 
@@ -45,7 +45,7 @@ Consequences:
 - The app never states a CKA passing score (§7.4).
 - Content is reviewed against current docs, and each topic records the date
   it was checked (§5.2).
-- The managed-offerings topic needs a sourcing decision (§12, Q1).
+- The managed-offerings topic needs a sourcing decision (§12.1).
 
 ## 3. Information architecture & screens
 
@@ -230,9 +230,9 @@ Competency strings are stored verbatim in `domains.json`, so topics can cite the
 | `what-is-k8s` | What is Kubernetes? | foundations | /docs/concepts/overview/ |
 | `architecture` | Cluster Architecture | cluster-arch; troubleshooting → "Troubleshoot cluster components" (concept level only) | /docs/concepts/architecture/, /docs/concepts/overview/components/, /docs/concepts/architecture/nodes/, /docs/concepts/architecture/control-plane-node-communication/ |
 | `namespaces` | Namespaces | foundations (cross-cutting; used in every domain) | /docs/concepts/overview/working-with-objects/namespaces/, /docs/tasks/administer-cluster/namespaces/ |
-| `minikube` | Local Clusters with minikube | foundations | /docs/tutorials/hello-minikube/, /docs/setup/learning-environment/, /docs/tasks/tools/, minikube.sigs.k8s.io/docs/start/ (see Q2) |
-| `managed-k8s` | Managed Kubernetes (EKS / GKE / AKS) | cluster-arch → "Prepare underlying infrastructure for installing a Kubernetes cluster" | /docs/setup/production-environment/, /docs/setup/production-environment/turnkey-solutions/; vendor pages per Q1 |
-| `kubeadm` | Cluster Setup with kubeadm | cluster-arch → "Prepare underlying infrastructure…", "Create and manage Kubernetes clusters using kubeadm" | /docs/setup/production-environment/tools/kubeadm/install-kubeadm/, …/create-cluster-kubeadm/, /docs/setup/production-environment/container-runtimes/ |
+| `minikube` | Local Clusters with minikube | foundations | /docs/tutorials/hello-minikube/, /docs/setup/learning-environment/, /docs/tasks/tools/, minikube.sigs.k8s.io/docs/start/ |
+| `managed-k8s` | Managed Kubernetes (EKS / GKE / AKS) | cluster-arch → "Prepare underlying infrastructure for installing a Kubernetes cluster" | /docs/setup/production-environment/, /docs/setup/production-environment/turnkey-solutions/; vendor overview pages (§12.1) |
+| `kubeadm` | Cluster Setup with kubeadm | cluster-arch → "Prepare underlying infrastructure…", "Create and manage Kubernetes clusters using kubeadm" | /docs/setup/production-environment/tools/kubeadm/install-kubeadm/, …/create-cluster-kubeadm/, /docs/setup/production-environment/container-runtimes/, /docs/reference/networking/ports-and-protocols/ |
 
 All `/docs/...` paths are on `https://kubernetes.io`. All of them were confirmed
 to return HTTP 200 on 2026-10-11.
@@ -316,10 +316,11 @@ assets/content/
 { "tests": [ {
     "id": "mixed",
     "title": "Mixed — all topics",
+    "description": "Questions from every topic, foundations included.",
     "questionCount": 25,
     "timeLimitMinutes": 35,
-    "filter": { "domainIds": null },       // null = all exam + foundations questions
-    "weighting": "domain"                  // "domain" = by CKA weight among domains that have questions; "uniform"
+    "filter": { "domainIds": null },       // null = every question in the bank
+    "weighting": "uniform"                 // "uniform", or "domain" = by CKA weight among domains that have questions
 } ] }
 ```
 
@@ -329,8 +330,8 @@ assets/content/
    globally (they are prefixed with the topic id).
 2. Every section, flashcard, and question has a `sourceUrl` on the allowlist:
    - `https://kubernetes.io/docs/...`;
-   - `https://minikube.sigs.k8s.io/docs/...` (only if Q2 is approved);
-   - vendor documentation hosts for `managed-k8s` (only if Q1 is approved).
+   - `https://minikube.sigs.k8s.io/docs/...`;
+   - the vendor documentation hosts in §12.1, only for the `managed-k8s` topic.
 3. `single`/`truefalse`: exactly 1 correct. `multi`: 2 or more correct, and
    the stem contains "Select N", where N is the correct count. `truefalse`
    has exactly the options "True" and "False".
@@ -380,7 +381,7 @@ tested parser. Anything else renders literally.
 | `k8s.schema` | `1` |
 | `k8s.notes` | `{ topicId: [readSectionIds] }` |
 | `k8s.cards` | `{ cardId: { box: 1-5, dueAt: ISO date, lastReviewedAt } }` |
-| `k8s.quiz` | `{ topicId: { attempts, bestPct, lastPct, lastAt } }` |
+| `k8s.quiz` | `{ topicId: { attempts, bestPct, lastPct, lastAt, missed: [questionIds] } }` |
 | `k8s.practice` | `[ { testId, pct, perDomain: {domainId: {correct,total}}, durationSec, at } ]` (max 50, oldest dropped) |
 | `k8s.ads` | `{ quizzesSinceInterstitial, lastInterstitialAt }` |
 | `k8s.settings` | `{ practiceTimerOn }` |
@@ -448,11 +449,18 @@ All engine code is pure Dart, with no Flutter imports. It takes injected
   `start_url` "./", `scope` "./", `display` "standalone", `theme_color`,
   `background_color`, and icons at 192, 512, and 512-maskable. The app icon
   is original artwork, not the Kubernetes logo, to respect the trademark.
-- **Service worker:** recent Flutter releases have deprecated the generated
-  `flutter_service_worker.js`, so the app ships its own `web/sw.js`. It uses
-  a precache list generated after `flutter build web` by
-  `tool/gen_precache.dart`. That list covers every file in `build/web`,
-  including all content JSON and CanvasKit.
+- **Service worker:** Flutter 3.47 still emits the generated
+  `flutter_service_worker.js` but has deprecated it (`--pwa-strategy` is
+  gone). The app therefore ships its own `web/sw.js`, plus a
+  `web/flutter_bootstrap.js` template that doesn't register Flutter's worker.
+  `tool/gen_precache.dart` runs after `flutter build web` to fill in the
+  precache list and build hash.
+  - The precache list covers the app shell, all assets (content JSON, fonts,
+    shaders), icons, and the two CanvasKit variants a dart2js build can load:
+    about 15 MB.
+  - It skips debug `*.symbols`, the Wasm-only renderers (skwasm, wimp,
+    webparagraph) and licence `NOTICES`. Any skipped file is cached on first
+    use.
   - install: precache everything, versioned by a build hash;
   - fetch: cache-first for precached assets, network-first for `index.html`;
   - activate: delete old caches.
@@ -462,9 +470,13 @@ All engine code is pure Dart, with no Flutter imports. It takes injected
   locally (`--no-web-resources-cdn`) so offline works and nothing loads from a CDN.
 - `index.html`: viewport meta, theme-color meta, and a manifest link.
 - A pinned Flutter version is recorded in `.flutter-version` and README.
-- Installability is verified in Chromium: the manifest parses, the SW is
-  controlling the page, and `beforeinstallprompt` fires (headless check
-  script in `tool/`, Playwright with the pre-installed Chromium).
+- Installability is verified in headless Chromium by `tool/pwa_check/check.cjs`
+  (Playwright), which checks three things:
+  - the manifest parses (CDP `Page.getAppManifest`);
+  - the SW is controlling the page;
+  - `Page.getInstallabilityErrors` is empty. This is the same signal Chrome
+    uses before it fires `beforeinstallprompt`, which does not fire reliably
+    in headless mode.
 
 ## 9. Ads
 
@@ -479,7 +491,7 @@ abstract interface class AdsService {
   /// Returns a fixed-height slot widget, or SizedBox.shrink() when disabled.
   Widget banner(AdPlacement placement);
   /// Shows an interstitial if enabled and the frequency cap allows. Completes when dismissed.
-  Future<void> maybeShowInterstitial(AdPlacement placement);
+  Future<void> maybeShowInterstitial(BuildContext context, AdPlacement placement);
 }
 ```
 
@@ -526,7 +538,7 @@ lib/
   progress/                 # repository over shared_preferences
   ads/ads_service.dart      # interface
   ads/impl/                 # noop, placeholder, admob stub
-  screens/                  # one folder per screen S1–S11
+  screens/                  # one file per screen S1–S11 (+ home_shell.dart)
   widgets/                  # note blocks, question card, progress ring, ad slot frame
 assets/content/             # §5
 web/                        # index.html, manifest.json, sw.js, icons
@@ -536,7 +548,9 @@ spec/SPEC.md
 ```
 
 Dependencies (minimal): `go_router`, `shared_preferences`, `url_launcher`,
-and `provider` for DI and state. Dev dependencies: `flutter_test`,
+`provider` for DI and state, and `material_ui`. As of Flutter 3.47, Material
+widgets are published as the standalone `material_ui` package, and
+`go_router` already depends on it. Dev dependencies: `flutter_test`,
 `flutter_lints`. Each new dependency needs a reason in the PR.
 
 ## 11. Done criteria (v1)
@@ -553,7 +567,7 @@ Each item must be demonstrated in the implementation PR, with command output or 
    by `dart run tool/gen_precache.dart`.
 3. Served locally, the headless Chromium check at **390×844** passes:
    - the manifest is valid and the SW is controlling the page;
-   - `beforeinstallprompt` fires (installable);
+   - Chromium reports no installability errors (installable);
    - with the network offline, a reload still renders S1 and any topic's notes;
    - no horizontal scroll on any screen at 390px or 360px.
 4. An end-to-end run at 390×844 (Playwright script, screenshots in the PR)
@@ -569,20 +583,16 @@ Each item must be demonstrated in the implementation PR, with command output or 
 8. All 6 v1 topics meet §5.2 and §5.4, and the PR includes the source-check list.
 9. The repo contains no real ad IDs (`grep -r "ca-pub-" lib web` → only `ca-pub-0000000000000000`).
 
-## 12. Open questions for review
+## 12. Review decisions (approved 2026-10-11)
 
-1. **Managed offerings sourcing (EKS/GKE/AKS).** kubernetes.io only covers
-   managed Kubernetes generically. Options:
-   - (a) Recommended: generic concepts sourced from kubernetes.io, plus a
-     short "Examples" section that names EKS/GKE/AKS as facts and links each
-     vendor's own docs (AWS/Google/Microsoft). Vendor-sourced items are
-     allowlisted for this topic only and are written as plain factual statements.
-   - (b) kubernetes.io only, with no vendor specifics.
-2. **minikube source.** May notes cite `minikube.sigs.k8s.io/docs` (© The
-   Kubernetes Authors, a Kubernetes SIG project) in addition to
-   kubernetes.io's Hello Minikube tutorial? Recommended: yes, with attribution on About.
-3. **Docs version.** Should content link the unversioned (latest, v1.37) docs
-   with a `reviewedAt` date (recommended, simplest), or pin to the exam
-   version's archived docs (`v1-35.docs.kubernetes.io`)?
-4. **Ads flag default.** Off by default in every build (recommended), or on in debug builds?
-5. **Hosting.** Not in scope (no publishing). Confirm that hash URLs are acceptable, so any static host works later.
+All recommendations accepted:
+
+1. **Managed offerings:** generic concepts sourced from kubernetes.io, plus a short
+   "Examples" section naming EKS/GKE/AKS as plain facts, each linking that vendor's
+   own docs. Allowlisted vendor hosts (for `managed-k8s` only):
+   `docs.aws.amazon.com/eks/`, `cloud.google.com/kubernetes-engine/docs/`,
+   `learn.microsoft.com/en-us/azure/aks/`.
+2. **minikube:** `minikube.sigs.k8s.io/docs/` is an allowed source, credited on About.
+3. **Docs version:** link the unversioned (latest) docs and record `reviewedAt`.
+4. **Ads flag:** `ADS_ENABLED` defaults to false in every build.
+5. **URLs:** hash URL strategy.
