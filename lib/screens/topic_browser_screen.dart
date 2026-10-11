@@ -124,9 +124,12 @@ class _ContinueCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             if (total == 0)
-              Text('No topics yet for this subject.',
-                  style: textTheme.titleMedium
-                      ?.copyWith(color: scheme.onPrimaryContainer))
+              Text(
+                'No topics yet for this subject.',
+                style: textTheme.titleMedium?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
+              )
             else if (next == null) ...[
               Text(
                 'Every topic is complete',

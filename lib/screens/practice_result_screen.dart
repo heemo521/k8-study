@@ -104,13 +104,20 @@ class PracticeResultScreen extends StatelessWidget {
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
-              FilledButton(
+              if (attempt.missedIds.isNotEmpty)
+                FilledButton.icon(
+                  key: const ValueKey('review-missed-after-test'),
+                  onPressed: () => context.go('/progress/review?kind=missed'),
+                  icon: const Icon(Icons.replay),
+                  label: const Text('Review missed'),
+                ),
+              OutlinedButton(
                 onPressed: () => context.go('/practice/$testId/run'),
                 child: const Text('Retake'),
               ),
-              OutlinedButton(
-                onPressed: () => context.go('/practice'),
-                child: const Text('Back to Practice'),
+              TextButton(
+                onPressed: () => context.go('/progress'),
+                child: const Text('See my gaps'),
               ),
             ],
           ),

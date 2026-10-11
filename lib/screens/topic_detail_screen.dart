@@ -57,6 +57,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final read = progress.readCount(topic);
     final notesDone = progress.notesComplete(topic);
     final due = fc.dueCount(topic.flashcards, progress.cardStates, now);
+    final fresh = topic.flashcards
+        .where((c) => progress.cardState(c.id) == null)
+        .length;
     final cardsStarted = topic.flashcards.any(
       (c) => progress.cardState(c.id) != null,
     );
@@ -142,9 +145,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
             key: const ValueKey('step-cards'),
             icon: Icons.style_outlined,
             title: '2. Flashcards',
-            status:
-                '$due due · ${topic.flashcards.length} total · '
-                '${progress.masteredCount(topic.flashcards)} mastered',
+            status: [
+              if (fresh > 0) '$fresh new',
+              if (due - fresh > 0) '${due - fresh} due',
+              if (due == 0) 'nothing due',
+              '${progress.masteredCount(topic.flashcards)}/${topic.flashcards.length} mastered',
+            ].join(' · '),
             done: cardsStarted && due == 0,
             onTap: () => context.go('$base/cards'),
           ),
