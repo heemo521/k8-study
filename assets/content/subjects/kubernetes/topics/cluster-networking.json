@@ -71,7 +71,7 @@
         },
         {
           "type": "p",
-          "text": "Giving each Pod its own IP avoids the pain of coordinating host ports between many apps sharing the same machines."
+          "text": "Apps sharing machines would otherwise have to coordinate ports, which is very hard at scale, and dynamic port allocation complicates everything. Kubernetes avoids both by taking a different approach: the network model."
         }
       ]
     },

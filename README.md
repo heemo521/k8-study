@@ -1,8 +1,10 @@
 # k8-study
 
 Mobile-friendly, interactive Kubernetes study guide, built to be better than the
-ad-spammy tutorial apps out there. It has study notes, flashcards, quizzes, and
-CKA-domain-mapped practice tests. It ships as an installable PWA and goes native only
+ad-spammy tutorial apps out there. It has 33 topics covering all five CKA domains
+(432 flashcards, 451 questions), quizzes, CKA-domain practice tests, and progress
+tracking: it shows where you are and which competencies are your weakest.
+The content model is multi-subject, so Linux, Docker and others can be added as data. It ships as an installable PWA and goes native only
 when the web version earns it.
 
 The full specification is in [`spec/SPEC.md`](spec/SPEC.md). Screens, data model,
@@ -56,16 +58,19 @@ CI (`.github/workflows/ci.yml`) runs all of the above on every PR.
 lib/
   content/     models (strict JSON parsing), loader, inline markup
   engine/      flashcards (Leitner), quiz, practice — pure Dart
-  progress/    local persistence
+  progress/    local persistence + insights (next action, readiness, gaps)
   ads/         AdsService interface, frequency cap, impl/ (noop, placeholder, admob stub)
   screens/     S1–S11 from the spec
   widgets/     note blocks, question view, source links …
-assets/content/  hand-written study content (JSON)
+assets/content/  catalog.json + subjects/<id>/ (subject.json, topics/, practice_tests.json)
 tool/            gen_precache.dart, pwa_check/, source_report.py, make_icons.py
-docs/            SOURCES.md (source-check list), screenshots/
+docs/            ADDING_CONTENT.md, SOURCES.md (source-check list), screenshots/
 ```
 
 ## Content
+
+New topics or subjects: see [`docs/ADDING_CONTENT.md`](docs/ADDING_CONTENT.md),
+and validate with `python3 tool/validate_content.py`.
 
 Study notes are hand-written from the official Kubernetes documentation
 (https://kubernetes.io/docs/), which is licensed

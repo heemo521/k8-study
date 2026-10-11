@@ -197,4 +197,15 @@ void main() {
       expect(find.text('Basics'), findsOneWidget);
     },
   );
+
+  testWidgets('domain sections collapse and expand', (tester) async {
+    await setPhoneViewport(tester);
+    await pumpApp(tester);
+    final card = find.byKey(const ValueKey('topic-card-what-is-k8s'));
+    expect(card, findsOneWidget);
+    await tapKey(tester, 'domain-foundations');
+    expect(card, findsNothing);
+    await tapKey(tester, 'domain-foundations');
+    expect(card, findsOneWidget);
+  });
 }

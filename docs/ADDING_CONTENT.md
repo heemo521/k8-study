@@ -82,6 +82,10 @@ section cites exactly one page. Block types:
 
 ## Add a subject (e.g. Linux, Docker)
 
+Quick start: `python3 tool/new_subject.py docker "Docker" --source https://docs.docker.com/`
+scaffolds the files below and registers the subject in `catalog.json` and
+`pubspec.yaml`. Then fill in the TODOs.
+
 1. Create `subjects/<subjectId>/subject.json`:
 
 ```jsonc

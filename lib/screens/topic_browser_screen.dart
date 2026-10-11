@@ -123,7 +123,11 @@ class _ContinueCard extends StatelessWidget {
               semanticsLabel: 'Overall progress',
             ),
             const SizedBox(height: 14),
-            if (next == null) ...[
+            if (total == 0)
+              Text('No topics yet for this subject.',
+                  style: textTheme.titleMedium
+                      ?.copyWith(color: scheme.onPrimaryContainer))
+            else if (next == null) ...[
               Text(
                 'Every topic is complete',
                 style: textTheme.titleLarge?.copyWith(
@@ -174,7 +178,9 @@ class _ContinueCard extends StatelessWidget {
   }
 }
 
-class _DomainSection extends StatelessWidget {
+/// A domain heading with progress; tap to collapse. Fully completed domains
+/// start collapsed so the list stays focused on what's left.
+class _DomainSection extends StatefulWidget {
   const _DomainSection({
     required this.content,
     required this.domain,
@@ -186,7 +192,19 @@ class _DomainSection extends StatelessWidget {
   final List<Topic> topics;
 
   @override
+  State<_DomainSection> createState() => _DomainSectionState();
+}
+
+class _DomainSectionState extends State<_DomainSection> {
+  late bool _expanded =
+      !(widget.topics.isNotEmpty &&
+          widget.topics.every(context.read<ProgressStore>().topicComplete));
+
+  @override
   Widget build(BuildContext context) {
+    final content = widget.content;
+    final domain = widget.domain;
+    final topics = widget.topics;
     final progress = context.watch<ProgressStore>();
     final textTheme = Theme.of(context).textTheme;
     final complete = topics.where(progress.topicComplete).length;
@@ -199,24 +217,47 @@ class _DomainSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Semantics(
-            header: true,
-            child: Text(domain.title, style: textTheme.titleMedium),
-          ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  [
-                    if (weight.isNotEmpty) weight,
-                    if (topics.isNotEmpty)
-                      '$complete/${topics.length} complete',
-                  ].join(' · '),
-                  style: textTheme.bodySmall,
-                ),
+          InkWell(
+            key: ValueKey('domain-${domain.id}'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: topics.isEmpty
+                ? null
+                : () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            domain.title,
+                            style: textTheme.titleMedium,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            if (weight.isNotEmpty) weight,
+                            if (topics.isNotEmpty)
+                              '$complete/${topics.length} complete',
+                          ].join(' · '),
+                          style: textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (topics.isNotEmpty)
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      semanticLabel: _expanded ? 'Collapse' : 'Expand',
+                    ),
+                ],
               ),
-            ],
+            ),
           ),
           if (topics.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -227,7 +268,9 @@ class _DomainSection extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 10),
-          if (topics.isEmpty)
+          if (!_expanded)
+            const SizedBox.shrink()
+          else if (topics.isEmpty)
             const Card(
               child: ListTile(
                 enabled: false,

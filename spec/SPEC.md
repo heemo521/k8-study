@@ -596,3 +596,77 @@ All recommendations accepted:
 3. **Docs version:** link the unversioned (latest) docs and record `reviewedAt`.
 4. **Ads flag:** `ADS_ENABLED` defaults to false in every build.
 5. **URLs:** hash URL strategy.
+
+## 13. v1.1 — complete curriculum, gaps, multi-subject (added after v1 review)
+
+The goal after v1 was complete CKA material, a clear sense of where you are,
+fast discovery of knowledge gaps, and easy onboarding of new subjects (Linux,
+Docker, …).
+
+### 13.1 Content
+
+- 33 Kubernetes topics cover all five CKA domains plus Foundations, with
+  432 flashcards and 451 questions.
+- Each topic was written from its source pages, then fact-checked
+  independently against them. `docs/SOURCES.md` lists every cited page.
+- `subject.json` `topics` sets the recommended **study order**. Topics may
+  declare `prerequisites`, which must appear earlier in that order.
+- Practice tests:
+  - a CKA domain-weighted mock (30 questions);
+  - a mixed test across all topics;
+  - one test per exam domain.
+
+### 13.2 Multi-subject content
+
+```
+assets/content/catalog.json                 # subject ids, in display order
+assets/content/subjects/<id>/subject.json   # metadata, exam, domains, study order, source allow-list, attributions
+assets/content/subjects/<id>/practice_tests.json
+assets/content/subjects/<id>/topics/*.json
+```
+
+- A new subject is data only. The steps are in `docs/ADDING_CONTENT.md`;
+  `tool/validate_content.py` checks content without Flutter.
+- The About page and source allow-lists are driven by `subject.json`.
+- A subject switcher appears in the Learn app bar once there are two or more
+  subjects.
+- Progress is keyed by item id. Ids must be unique across subjects; a test
+  checks this.
+
+### 13.3 Where am I
+
+- **Continue card** (S1) shows "Continue / Up next · Topic N of M", the
+  topic's Notes/Cards/Quiz status and a button for the next step.
+  - The next action is the recently opened topic if it's incomplete.
+  - Otherwise it's the next incomplete topic after it, wrapping round to
+    earlier gaps.
+- **Domain sections** show a weight, "x/y complete" and a progress bar, and
+  can be collapsed. Fully complete domains start collapsed.
+- **Topic cards** show their study-order number and step chips: Notes x/y,
+  Cards, and Quiz best %, marked red when below mastery.
+- **Topic hub** shows "Topic N of M", prerequisites (with completion), and
+  previous/next topic links.
+- **Notes** have a sections menu with read state and jump-to-section, and
+  support deep links (`?section=`).
+- **Search** (S1 app bar) covers topics, note sections and flashcards. A hit
+  opens the exact section.
+
+### 13.4 Finding gaps
+
+- **Answer history** (`k8s.answers`): for each question, times seen, times
+  correct, whether the latest answer was right, and when. It is recorded by
+  topic quizzes, retries, reviews and practice tests.
+- **Progress & gaps** (S10) shows:
+  - reviews due: flashcards due across topics, and questions missed last
+    time;
+  - **readiness by domain**: topic progress plus accuracy on answered
+    questions;
+  - **knowledge gaps by competency**, weakest first. A competency is a gap
+    when its accuracy is below 80% or fewer than half its questions have been
+    answered;
+  - topics that need attention, and practice history.
+- **Review quizzes** (`/progress/review?kind=missed|competency|domain&id=…`)
+  draw from that pool, prioritising questions that were wrong or are unseen.
+  They feed answer history but not topic best scores.
+- **Due-card session** (`/progress/cards`) reviews every due flashcard in the
+  subject in one Leitner session.
