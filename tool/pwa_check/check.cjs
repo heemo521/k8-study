@@ -214,6 +214,16 @@ async function noHorizontalScroll(page) {
   check('practice per-domain breakdown', await hasText(page, 'By CKA domain'));
   await shot(page, '12-practice-results');
 
+  // ---- Second subject (Docker) ----------------------------------------------
+  await go(page, '/');
+  await tap(page, 'Switch subject', false);
+  await tap(page, 'Docker', false);
+  check('switch to the Docker subject', await hasText(page, 'Docker Overview & Architecture'));
+  await shot(page, '18-docker-home');
+  await tap(page, 'Switch subject', false);
+  await tap(page, 'Kubernetes', false);
+  check('switch back to Kubernetes', await hasText(page, '1 of '));
+
   // ---- No horizontal scroll at 390 and 360 ----------------------------------
   const routes = ['/', '/topic/kubeadm', '/topic/kubeadm/notes', '/topic/kubeadm/cards',
     '/topic/kubeadm/quiz', '/practice', '/progress', '/about'];

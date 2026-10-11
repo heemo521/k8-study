@@ -16,23 +16,30 @@ class SubjectTitle extends StatelessWidget {
     if (catalog.subjects.length < 2) {
       return Text('K8 Study · ${current.subject.title}');
     }
-    return InkWell(
-      key: const ValueKey('subject-switcher'),
-      borderRadius: BorderRadius.circular(8),
+    return Semantics(
+      button: true,
+      label: 'Switch subject, current: ${current.subject.title}',
+      // excludeSemantics drops the InkWell's action, so re-provide it.
       onTap: () => showSubjectPicker(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                current.subject.title,
-                overflow: TextOverflow.ellipsis,
+      excludeSemantics: true,
+      child: InkWell(
+        key: const ValueKey('subject-switcher'),
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => showSubjectPicker(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  current.subject.title,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            const Icon(Icons.arrow_drop_down),
-          ],
+              const Icon(Icons.arrow_drop_down),
+            ],
+          ),
         ),
       ),
     );

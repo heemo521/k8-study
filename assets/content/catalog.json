@@ -1,6 +1,7 @@
 {
   "catalogVersion": 1,
   "subjects": [
-    "kubernetes"
+    "kubernetes",
+    "docker"
   ]
 }

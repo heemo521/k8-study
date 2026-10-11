@@ -1,0 +1,839 @@
+{
+  "id": "docker-containers",
+  "title": "Running Containers",
+  "summary": "Start containers with docker run, publish ports, override defaults, then list, inspect, exec into, stop and remove them.",
+  "order": 1,
+  "domainIds": [
+    "docker-run"
+  ],
+  "competencyIds": [
+    "dk-run",
+    "dk-net"
+  ],
+  "prerequisites": [
+    "docker-overview"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "docker-containers-run",
+      "heading": "docker run essentials",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/",
+      "sourceTitle": "docker container run",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "`docker run` (alias of `docker container run`) creates a new container from an image and starts it, pulling the image first if it isn't present. Usage: `docker run [OPTIONS] IMAGE [COMMAND] [ARG...]`."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Flag",
+            "Effect"
+          ],
+          "rows": [
+            [
+              "-d, --detach",
+              "Run in the background and print the container ID"
+            ],
+            [
+              "--name",
+              "Give the container a name; otherwise the daemon picks a random one such as vibrant_cannon"
+            ],
+            [
+              "-i / -t",
+              "Keep STDIN open / allocate a pseudo-TTY; `-it` gives an interactive shell"
+            ],
+            [
+              "--rm",
+              "Remove the container (and its anonymous volumes) when it exits"
+            ],
+            [
+              "--restart",
+              "Restart policy: `no` (default), `on-failure[:max-retries]`, `always`, `unless-stopped`"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker run --name <name> -d <image>\ndocker stop <name>\ndocker rm <name>\ndocker run -it <image>            # interactive session"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A detached container exits when its root process exits. Don't run something like `service nginx start` as the command: it returns at once, so the container stops.",
+            "A stopped container keeps its filesystem by default. `docker start` restarts it with its earlier changes intact; `docker ps -a` lists stopped containers too.",
+            "Combining `--restart` with `--rm` is an error."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-ports",
+      "heading": "Publishing and exposing ports",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/publishing-ports/",
+      "sourceTitle": "Publishing and exposing ports",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Containers are isolated, so you can't reach their apps directly. Publishing a port at container creation sets up a forwarding rule from a host port to a container port with `-p` (`--publish`)."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker run -d -p 8080:80 nginx             # HOST_PORT:CONTAINER_PORT\ndocker run -d -p 127.0.0.1:8080:80 nginx   # HOST_IP:HOST_PORT:CONTAINER_PORT\ndocker run -p 80 nginx                     # host port picked by Docker (ephemeral)\ndocker run -P nginx                        # publish every EXPOSEd port"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The `EXPOSE` instruction in an image only documents a port; exposed ports aren't published unless you ask.",
+            "`-P` (`--publish-all`) maps all exposed ports to ephemeral host ports, handy for avoiding port conflicts in dev and test.",
+            "With an ephemeral port, `docker ps` shows the chosen mapping in the PORTS column, for example `0.0.0.0:54772->80/tcp`."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Without a host IP, a published port listens on all interfaces (`0.0.0.0` / `::`), so anything reaching the machine can connect. Prefix `127.0.0.1:` to keep it local, especially for databases."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-override",
+      "heading": "Overriding container defaults",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/overriding-container-defaults/",
+      "sourceTitle": "Overriding container defaults",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A container runs the program its image is configured with, but `docker run` flags let you change ports, environment, resources and the command itself."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker run -d -e POSTGRES_PASSWORD=secret -p 5433:5432 postgres   # 2nd instance on another host port\ndocker run --env-file .env postgres env                             # many variables from a file\ndocker run -e POSTGRES_PASSWORD=secret --memory=\"512m\" --cpus=\"0.5\" postgres\ndocker run -e POSTGRES_PASSWORD=secret postgres docker-entrypoint.sh -h localhost -p 5432"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`-e foo=bar` sets one variable; `--env-file` avoids a long list of `-e` flags.",
+            "Containers have no resource limits by default. `--memory` caps memory and `--cpus` sets a CPU quota (0.5 = half a core). `docker stats` shows live usage.",
+            "Anything after the image name replaces the image's default command."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Running two copies of the same database? Keep the container port and change only the host port: `-p 5432:5432` for one, `-p 5433:5432` for the other."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-ps",
+      "heading": "Listing containers",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/ls/",
+      "sourceTitle": "docker container ls",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "`docker ps` is an alias of `docker container ls` (also `docker container list` and `docker container ps`). By default it shows only running containers."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Flag",
+            "Effect"
+          ],
+          "rows": [
+            [
+              "-a, --all",
+              "Include stopped containers"
+            ],
+            [
+              "-q, --quiet",
+              "Print only container IDs"
+            ],
+            [
+              "-f, --filter",
+              "Filter by key=value, e.g. `status=exited`, `name=<name>`, `ancestor=<image>`"
+            ],
+            [
+              "-s, --size",
+              "Show writable-layer size and virtual size"
+            ],
+            [
+              "--no-trunc",
+              "Don't truncate output"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Valid `status` values: created, restarting, running, removing, paused, exited, dead."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-logs",
+      "heading": "Reading logs",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/logs/",
+      "sourceTitle": "docker container logs",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "`docker logs <container>` fetches the logs that exist when you run it. Add flags to stream or trim them."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker logs -f <container>           # keep streaming STDOUT and STDERR\ndocker logs -n <lines> <container>   # --tail; default is all\ndocker logs -t <container>           # add timestamps\ndocker logs --since 42m <container>  # relative or absolute time"
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-exec",
+      "heading": "Running commands in a container",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/exec/",
+      "sourceTitle": "docker container exec",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "`docker exec` runs a **new** command inside a running container, in its default working directory."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker exec -it <container> sh                    # interactive shell\ndocker exec -d <container> touch /tmp/execWorks   # in the background\ndocker exec -e VAR_A=1 <container> env            # extra env for this process only\ndocker exec -it -w /root <container> pwd          # other working dir\ndocker exec -it <container> sh -c \"echo a && echo b\""
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The command must be an executable. A quoted chain like `\"echo a && echo b\"` fails; wrap it in `sh -c`.",
+            "It only runs while the container's PID 1 is running, and isn't rerun if the container restarts.",
+            "Exec into a paused container fails until you unpause it."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-stop",
+      "heading": "Stopping containers",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/stop/",
+      "sourceTitle": "docker container stop",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "`docker stop <container>` sends the main process **SIGTERM**, then **SIGKILL** after a grace period.",
+            "Change the first signal with the `STOPSIGNAL` Dockerfile instruction, `--stop-signal` on `docker run`, or `-s` on `docker stop`.",
+            "`-t, --timeout` sets the wait in seconds; `-1` waits forever. The daemon default is **10 seconds** on Linux and 30 on Windows."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-network",
+      "heading": "Networking basics",
+      "sourceUrl": "https://docs.docker.com/engine/network/",
+      "sourceTitle": "Networking overview",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Without `--network`, a container joins the built-in **default bridge** network. It can reach outside services through masquerading.",
+            "On the default bridge, containers reach each other by IP only, **not by name**.",
+            "On a **user-defined** network, containers reach each other by IP or by container name, using Docker's embedded DNS server at `127.0.0.11`.",
+            "On a bridge network, every container port is reachable from the host and from containers on the same network. Use `-p` to reach it from outside the host or from other bridge networks.",
+            "A container's hostname defaults to its ID; override it with `--hostname`."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker network create -d bridge my-net\ndocker run --network=my-net -it busybox"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Driver",
+            "Purpose"
+          ],
+          "rows": [
+            [
+              "bridge",
+              "Default driver"
+            ],
+            [
+              "host",
+              "No network isolation from the Docker host"
+            ],
+            [
+              "none",
+              "Fully isolated from host and other containers"
+            ],
+            [
+              "overlay",
+              "Connects multiple Docker daemons (Swarm)"
+            ],
+            [
+              "ipvlan / macvlan",
+              "External VLANs / appear as devices on the host's network"
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "docker-containers-fc-01",
+      "front": "What does docker run do if the image isn't available locally?",
+      "back": "It pulls the image, then creates and starts the container.",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/"
+    },
+    {
+      "id": "docker-containers-fc-02",
+      "front": "Restart policies available with --restart?",
+      "back": "no (default), on-failure[:max-retries], always, unless-stopped.",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/"
+    },
+    {
+      "id": "docker-containers-fc-03",
+      "front": "Order of the -p value?",
+      "back": "[HOST_IP:]HOST_PORT:CONTAINER_PORT, e.g. -p 127.0.0.1:8080:80.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/publishing-ports/"
+    },
+    {
+      "id": "docker-containers-fc-04",
+      "front": "What does -P (--publish-all) do?",
+      "back": "Publishes every port the image EXPOSEs to an ephemeral host port.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/publishing-ports/"
+    },
+    {
+      "id": "docker-containers-fc-05",
+      "front": "How do you load many environment variables at once?",
+      "back": "docker run --env-file <file> <image>",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/overriding-container-defaults/"
+    },
+    {
+      "id": "docker-containers-fc-06",
+      "front": "Flags that limit a container's memory and CPU?",
+      "back": "--memory (e.g. \"512m\") and --cpus (e.g. \"0.5\" = half a core).",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/overriding-container-defaults/"
+    },
+    {
+      "id": "docker-containers-fc-07",
+      "front": "How do you list stopped containers as well as running ones?",
+      "back": "docker ps -a (--all).",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/ls/"
+    },
+    {
+      "id": "docker-containers-fc-08",
+      "front": "How do you follow a container's logs live?",
+      "back": "docker logs -f <container> (--follow).",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/logs/"
+    },
+    {
+      "id": "docker-containers-fc-09",
+      "front": "How do you open an interactive shell in a running container?",
+      "back": "docker exec -it <container> sh",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/exec/"
+    },
+    {
+      "id": "docker-containers-fc-10",
+      "front": "Which signals does docker stop send, and what is the default timeout on Linux?",
+      "back": "SIGTERM, then SIGKILL after the grace period. Default 10 seconds on Linux.",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/stop/"
+    },
+    {
+      "id": "docker-containers-fc-11",
+      "front": "Can containers on the default bridge network resolve each other by name?",
+      "back": "No, only by IP. User-defined networks give name resolution.",
+      "sourceUrl": "https://docs.docker.com/engine/network/"
+    },
+    {
+      "id": "docker-containers-fc-12",
+      "front": "Address of Docker's embedded DNS server on custom networks?",
+      "back": "127.0.0.11",
+      "sourceUrl": "https://docs.docker.com/engine/network/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "docker-containers-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-net",
+      "stem": "You want host port 8080 to forward to port 80 inside an nginx container. Which command is correct?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/publishing-ports/",
+      "options": [
+        {
+          "id": "a",
+          "text": "docker run -d -p 8080:80 nginx",
+          "correct": true,
+          "explanation": "The format is HOST_PORT:CONTAINER_PORT."
+        },
+        {
+          "id": "b",
+          "text": "docker run -d -p 80:8080 nginx",
+          "correct": false,
+          "explanation": "This maps host port 80 to container port 8080: the reverse."
+        },
+        {
+          "id": "c",
+          "text": "docker run -d -P 8080 nginx",
+          "correct": false,
+          "explanation": "-P publishes all exposed ports to ephemeral host ports; it takes no port mapping."
+        },
+        {
+          "id": "d",
+          "text": "docker run -d --expose 8080 nginx",
+          "correct": false,
+          "explanation": "--expose exposes a container port without publishing it to the host."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-net",
+      "stem": "A database container was started with -p 5432:5432. Why is that a concern on a shared network?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/publishing-ports/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Without a host IP the port is published on all interfaces, so any traffic reaching the machine can connect",
+          "correct": true,
+          "explanation": "Use 127.0.0.1:5432:5432 to keep it local."
+        },
+        {
+          "id": "b",
+          "text": "The port is only reachable from other containers",
+          "correct": false,
+          "explanation": "Published ports are reachable from outside the host."
+        },
+        {
+          "id": "c",
+          "text": "Docker picks a random host port instead of 5432",
+          "correct": false,
+          "explanation": "Docker picks a port only when HOST_PORT is omitted."
+        },
+        {
+          "id": "d",
+          "text": "Publishing disables the container's network isolation entirely",
+          "correct": false,
+          "explanation": "It sets up a forwarding rule for that port; isolation otherwise stays in place."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "dk-net",
+      "stem": "Ports declared with EXPOSE in an image are published to the host automatically.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/publishing-ports/",
+      "options": [
+        {
+          "id": "true",
+          "text": "True",
+          "correct": false,
+          "explanation": "Exposed ports aren't published by default."
+        },
+        {
+          "id": "false",
+          "text": "False",
+          "correct": true,
+          "explanation": "You must use -p, or -P to publish all exposed ports."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-run",
+      "stem": "You need a second Postgres container next to one already using host port 5432. What is the simplest fix?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/overriding-container-defaults/",
+      "options": [
+        {
+          "id": "a",
+          "text": "docker run -d -e POSTGRES_PASSWORD=secret -p 5433:5432 postgres",
+          "correct": true,
+          "explanation": "Change the host port and keep the container port 5432."
+        },
+        {
+          "id": "b",
+          "text": "docker run -d -e POSTGRES_PASSWORD=secret -p 5432:5433 postgres",
+          "correct": false,
+          "explanation": "The host port 5432 still conflicts, and Postgres listens on 5432 in the container."
+        },
+        {
+          "id": "c",
+          "text": "docker run -d -e POSTGRES_PASSWORD=secret --cpus=\"0.5\" postgres",
+          "correct": false,
+          "explanation": "--cpus limits CPU; it doesn't change ports."
+        },
+        {
+          "id": "d",
+          "text": "Stop the first container; Docker allows only one container per image",
+          "correct": false,
+          "explanation": "You can run many containers from one image."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-05",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "dk-run",
+      "stem": "Which docker run flags set environment variables in the container? Select 2.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/overriding-container-defaults/",
+      "options": [
+        {
+          "id": "a",
+          "text": "-e",
+          "correct": true,
+          "explanation": "-e foo=bar sets foo inside the container."
+        },
+        {
+          "id": "b",
+          "text": "--env-file",
+          "correct": true,
+          "explanation": "Loads variables from a file such as .env."
+        },
+        {
+          "id": "c",
+          "text": "--memory",
+          "correct": false,
+          "explanation": "Sets a memory limit."
+        },
+        {
+          "id": "d",
+          "text": "--network",
+          "correct": false,
+          "explanation": "Attaches the container to a network."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-run",
+      "stem": "docker run -d -p 80:80 my_image service nginx start starts nginx, but the container stops at once. Why?",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The root process (service nginx start) returns, and a detached container exits when its root process exits",
+          "correct": true,
+          "explanation": "Run nginx in the foreground instead, e.g. nginx -g 'daemon off;'."
+        },
+        {
+          "id": "b",
+          "text": "-d always stops containers after start-up",
+          "correct": false,
+          "explanation": "-d runs the container in the background; it keeps running while the root process runs."
+        },
+        {
+          "id": "c",
+          "text": "Port 80 can't be published",
+          "correct": false,
+          "explanation": "Publishing is unrelated to the container exiting."
+        },
+        {
+          "id": "d",
+          "text": "The restart policy defaults to always",
+          "correct": false,
+          "explanation": "The default policy is no."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-run",
+      "stem": "Which restart policy keeps a container down after a daemon restart if you stopped it manually?",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/",
+      "options": [
+        {
+          "id": "a",
+          "text": "unless-stopped",
+          "correct": true,
+          "explanation": "Like always, but a stopped container isn't restarted even when the daemon restarts."
+        },
+        {
+          "id": "b",
+          "text": "always",
+          "correct": false,
+          "explanation": "A manually stopped container comes back when the daemon restarts."
+        },
+        {
+          "id": "c",
+          "text": "on-failure",
+          "correct": false,
+          "explanation": "Restarts only on a non-zero exit code; that's not the rule this question asks about."
+        },
+        {
+          "id": "d",
+          "text": "no",
+          "correct": false,
+          "explanation": "Never restarts automatically, even after a crash."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-08",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "dk-run",
+      "stem": "By default, a container's filesystem persists after the container exits, and docker start brings it back with its changes intact.",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/",
+      "options": [
+        {
+          "id": "true",
+          "text": "True",
+          "correct": true,
+          "explanation": "Unless you used --rm, the container and its filesystem stay until removed."
+        },
+        {
+          "id": "false",
+          "text": "False",
+          "correct": false,
+          "explanation": "Only --rm removes the container automatically on exit."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-09",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-run",
+      "stem": "You need the IDs of all exited containers to pass to docker rm. Which command prints them?",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/ls/",
+      "options": [
+        {
+          "id": "a",
+          "text": "docker ps --filter status=exited -q",
+          "correct": true,
+          "explanation": "-q prints only IDs and the filter selects exited containers."
+        },
+        {
+          "id": "b",
+          "text": "docker ps -s",
+          "correct": false,
+          "explanation": "-s shows sizes, and without -a or a filter only running containers are listed."
+        },
+        {
+          "id": "c",
+          "text": "docker ps -l",
+          "correct": false,
+          "explanation": "-l shows only the latest created container."
+        },
+        {
+          "id": "d",
+          "text": "docker ps --no-trunc",
+          "correct": false,
+          "explanation": "Shows full output but still only running containers."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-run",
+      "stem": "docker exec -it web \"echo a && echo b\" fails. What works?",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/exec/",
+      "options": [
+        {
+          "id": "a",
+          "text": "docker exec -it web sh -c \"echo a && echo b\"",
+          "correct": true,
+          "explanation": "The command must be an executable; a shell runs the chained string."
+        },
+        {
+          "id": "b",
+          "text": "docker exec -d web \"echo a && echo b\"",
+          "correct": false,
+          "explanation": "Running in the background doesn't fix a quoted chained command."
+        },
+        {
+          "id": "c",
+          "text": "docker logs web \"echo a && echo b\"",
+          "correct": false,
+          "explanation": "docker logs fetches output; it doesn't run commands."
+        },
+        {
+          "id": "d",
+          "text": "docker exec -w / web \"echo a && echo b\"",
+          "correct": false,
+          "explanation": "-w changes the working directory only."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-11",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "dk-run",
+      "stem": "Which statements about docker exec are true? Select 2.",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/exec/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It runs only while the container's primary process (PID 1) is running",
+          "correct": true,
+          "explanation": "Stated on the exec reference."
+        },
+        {
+          "id": "b",
+          "text": "Variables set with -e apply only to the exec'd process",
+          "correct": true,
+          "explanation": "Other processes in the container don't see them."
+        },
+        {
+          "id": "c",
+          "text": "The command reruns automatically if the container restarts",
+          "correct": false,
+          "explanation": "It isn't restarted when the container restarts."
+        },
+        {
+          "id": "d",
+          "text": "It works on a paused container",
+          "correct": false,
+          "explanation": "It fails with an error until you unpause the container."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-run",
+      "stem": "docker stop app takes about 10 seconds and the process is then killed. What is happening?",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/stop/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The process ignored SIGTERM, so Docker sent SIGKILL after the default 10-second timeout",
+          "correct": true,
+          "explanation": "Linux containers default to 10 seconds; adjust with -t."
+        },
+        {
+          "id": "b",
+          "text": "docker stop always sends SIGKILL first",
+          "correct": false,
+          "explanation": "SIGTERM (or the configured stop signal) is sent first."
+        },
+        {
+          "id": "c",
+          "text": "The image's restart policy is delaying the stop",
+          "correct": false,
+          "explanation": "Restart policies decide restarts after exit, not stop timing."
+        },
+        {
+          "id": "d",
+          "text": "The daemon's default timeout is 30 seconds on Linux",
+          "correct": false,
+          "explanation": "30 seconds is the Windows default; Linux is 10."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-net",
+      "stem": "Container api must reach container db by name. What is needed?",
+      "sourceUrl": "https://docs.docker.com/engine/network/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Attach both to the same user-defined network",
+          "correct": true,
+          "explanation": "User-defined networks resolve container names via the embedded DNS server."
+        },
+        {
+          "id": "b",
+          "text": "Leave both on the default bridge network",
+          "correct": false,
+          "explanation": "The default bridge allows IP-only communication."
+        },
+        {
+          "id": "c",
+          "text": "Run db with --network none",
+          "correct": false,
+          "explanation": "none isolates the container completely."
+        },
+        {
+          "id": "d",
+          "text": "Publish db's port with -p",
+          "correct": false,
+          "explanation": "Publishing exposes a port outside the host; it doesn't give name resolution."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-14",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "dk-net",
+      "stem": "A container started without --network joins the default bridge network.",
+      "sourceUrl": "https://docs.docker.com/engine/network/",
+      "options": [
+        {
+          "id": "true",
+          "text": "True",
+          "correct": true,
+          "explanation": "The default bridge is the built-in network used when --network is omitted."
+        },
+        {
+          "id": "false",
+          "text": "False",
+          "correct": false,
+          "explanation": "It joins the default bridge."
+        }
+      ]
+    },
+    {
+      "id": "docker-containers-q-15",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "dk-net",
+      "stem": "Which network driver removes network isolation between a container and the Docker host?",
+      "sourceUrl": "https://docs.docker.com/engine/network/",
+      "options": [
+        {
+          "id": "a",
+          "text": "host",
+          "correct": true,
+          "explanation": "The host driver shares the host's network."
+        },
+        {
+          "id": "b",
+          "text": "none",
+          "correct": false,
+          "explanation": "none fully isolates the container."
+        },
+        {
+          "id": "c",
+          "text": "overlay",
+          "correct": false,
+          "explanation": "overlay connects multiple Docker daemons."
+        },
+        {
+          "id": "d",
+          "text": "macvlan",
+          "correct": false,
+          "explanation": "macvlan makes containers appear as devices on the host's network."
+        }
+      ]
+    }
+  ]
+}

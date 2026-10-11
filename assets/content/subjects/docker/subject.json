@@ -1,0 +1,90 @@
+{
+  "id": "docker",
+  "title": "Docker",
+  "tagline": "Containers, images and the Docker CLI",
+  "description": "The Docker fundamentals Kubernetes builds on: architecture, images and Dockerfiles, running containers, and storage and networking.",
+  "contentVersion": 1,
+  "reviewedAt": "2026-10-11",
+  "domains": [
+    {
+      "id": "docker-concepts",
+      "title": "Concepts",
+      "weightPercent": null,
+      "isExamDomain": false,
+      "competencies": [
+        {
+          "id": "dk-arch",
+          "text": "Explain Docker's client–daemon architecture and its objects"
+        }
+      ]
+    },
+    {
+      "id": "docker-build",
+      "title": "Images & Builds",
+      "weightPercent": null,
+      "isExamDomain": false,
+      "competencies": [
+        {
+          "id": "dk-dockerfile",
+          "text": "Write Dockerfiles and build images"
+        },
+        {
+          "id": "dk-images",
+          "text": "Tag, push, pull and manage images"
+        }
+      ]
+    },
+    {
+      "id": "docker-run",
+      "title": "Running Containers",
+      "weightPercent": null,
+      "isExamDomain": false,
+      "competencies": [
+        {
+          "id": "dk-run",
+          "text": "Run, inspect and manage containers"
+        },
+        {
+          "id": "dk-data",
+          "text": "Persist data with volumes and bind mounts"
+        },
+        {
+          "id": "dk-net",
+          "text": "Connect containers with networks and published ports"
+        }
+      ]
+    }
+  ],
+  "topics": [
+    "docker-overview",
+    "docker-images",
+    "docker-containers",
+    "docker-storage"
+  ],
+  "sourceAllowlist": [
+    {
+      "prefix": "https://docs.docker.com/"
+    }
+  ],
+  "attributions": [
+    {
+      "text": "Docker notes are original summaries adapted from the Docker documentation (docs.docker.com, source repository docker/docs), licensed under the Apache License 2.0. Changes: content has been summarized, reorganized, and rewritten. Each note links to its source page.",
+      "links": [
+        {
+          "label": "Docker documentation",
+          "url": "https://docs.docker.com/"
+        },
+        {
+          "label": "Apache License 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ]
+    }
+  ],
+  "trademarks": [
+    {
+      "text": "Docker® is a registered trademark of Docker, Inc. This app is not affiliated with or endorsed by Docker, Inc.",
+      "links": []
+    }
+  ]
+}

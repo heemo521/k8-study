@@ -1,0 +1,523 @@
+{
+  "id": "docker-images",
+  "title": "Images & Dockerfiles",
+  "summary": "Write Dockerfiles, build and tag images, use layers and the build cache, slim images with multi-stage builds, and push to a registry.",
+  "order": 2,
+  "domainIds": ["docker-build"],
+  "competencyIds": ["dk-dockerfile", "dk-images"],
+  "prerequisites": ["docker-overview"],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "docker-images-dockerfile",
+      "heading": "Writing a Dockerfile",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/writing-a-dockerfile/",
+      "sourceTitle": "Writing a Dockerfile",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A **Dockerfile** is a text file of instructions the builder follows to create an image: commands to run, files to copy, the startup command and more. The file is named `Dockerfile` with **no extension**."
+        },
+        {
+          "type": "table",
+          "header": ["Instruction", "Purpose"],
+          "rows": [
+            ["`FROM <image>`", "Base image the build extends"],
+            ["`WORKDIR <path>`", "Directory in the image where files are copied and commands run"],
+            ["`COPY <host-path> <image-path>`", "Copy files from the host into the image"],
+            ["`RUN <command>`", "Run a command during the build"],
+            ["`ENV <name> <value>`", "Environment variable a running container will use"],
+            ["`EXPOSE <port-number>`", "Declares a port the image would like to expose"],
+            ["`USER <user-or-uid>`", "Default user for all subsequent instructions"],
+            ["`CMD [\"<command>\", \"<arg1>\"]`", "Default command a container from this image runs"]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "dockerfile",
+          "text": "FROM node:22-alpine\nWORKDIR /app\nCOPY . .\nRUN yarn install --production\nCMD [\"node\", \"./src/index.js\"]"
+        },
+        {
+          "type": "p",
+          "text": "Typical order: pick a base image, install dependencies, copy in source or binaries, then configure the final image."
+        }
+      ]
+    },
+    {
+      "id": "docker-images-reference",
+      "heading": "Reference rules worth knowing",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/",
+      "sourceTitle": "Dockerfile reference",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "A Dockerfile must begin with `FROM` (after parser directives, comments and global `ARG`s). `ARG` is the only instruction that may come before `FROM`.",
+            "`FROM` without a tag or digest assumes `latest`. Each `FROM` starts a new build stage; `AS <name>` names it.",
+            "`RUN`, `CMD` and `ENTRYPOINT` have an **exec form** (JSON array, double quotes) and a **shell form** (plain string run via a shell). Exec form doesn't do shell variable substitution: `RUN [ \"echo\", \"$HOME\" ]` won't expand `$HOME`.",
+            "`EXPOSE` defaults to TCP (`EXPOSE 80/udp` for UDP) and **doesn't publish** the port; use `-p` or `-P` on `docker run`.",
+            "`ENV` values persist into running containers (override with `docker run --env <key>=<value>`). `ARG` values are build-time only (`--build-arg <varname>=<value>`) and aren't in the final container.",
+            "`WORKDIR` defaults to `/`; relative paths stack on the previous `WORKDIR`. Set it explicitly.",
+            "`USER` sets the user for later `RUN` instructions and for `ENTRYPOINT`/`CMD` at runtime."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Don't pass secrets as build arguments: they are visible in `docker history`. The reference points to `RUN --mount=type=secret` instead."
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "`RUN` executes at build time and commits the result. `CMD` runs nothing at build time; it records the intended command for the image."
+        }
+      ]
+    },
+    {
+      "id": "docker-images-cmd-entrypoint",
+      "heading": "CMD vs ENTRYPOINT",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/",
+      "sourceTitle": "Dockerfile reference",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Specify at least one of `CMD` or `ENTRYPOINT`. Only the **last** of each takes effect.",
+            "`ENTRYPOINT` makes the container run as an executable; override it with `docker run --entrypoint`.",
+            "`CMD` supplies defaults. Arguments after the image name in `docker run <image>` **replace CMD** and are **appended** to an exec-form `ENTRYPOINT`.",
+            "Shell-form `ENTRYPOINT` ignores `CMD` and run arguments, and runs under `/bin/sh -c`, so the executable isn't PID 1 and won't get SIGTERM from `docker stop`.",
+            "If the base image defines `CMD`, setting `ENTRYPOINT` resets `CMD` to empty."
+          ]
+        },
+        {
+          "type": "table",
+          "header": ["Combination", "Command executed"],
+          "rows": [
+            ["No ENTRYPOINT, `CMD [\"exec_cmd\", \"p1_cmd\"]`", "`exec_cmd p1_cmd`"],
+            ["`ENTRYPOINT [\"exec_entry\", \"p1_entry\"]`, `CMD [\"exec_cmd\", \"p1_cmd\"]`", "`exec_entry p1_entry exec_cmd p1_cmd`"],
+            ["`ENTRYPOINT exec_entry p1_entry` (shell), any CMD", "`/bin/sh -c exec_entry p1_entry`"],
+            ["Neither", "error, not allowed"]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Pattern to remember: exec-form `ENTRYPOINT` for the fixed executable plus exec-form `CMD` for overridable default arguments."
+        }
+      ]
+    },
+    {
+      "id": "docker-images-build-tag",
+      "heading": "Build, tag and push",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/",
+      "sourceTitle": "Build, tag, and publish an image",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "`docker build .` builds from the **build context** given as the last argument (a path or URL); the builder finds the Dockerfile and referenced files there. Without a tag the image has no name, only an ID."
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "text": "[HOST[:PORT_NUMBER]/]PATH[:TAG]"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**HOST** omitted: `docker.io` (Docker's public registry).",
+            "**PATH** on Docker Hub is `[NAMESPACE/]REPOSITORY`; no namespace means `library` (Docker Official Images).",
+            "**TAG** omitted: `latest`.",
+            "So `nginx` = `docker.io/library/nginx:latest`."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker build -t <username>/<image> .          # -t or --tag\ndocker image tag <username>/<image> <other-username>/<other-image>:v1\ndocker login\ndocker push <username>/<image>"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Push failing with \"requested access to the resource is denied\"? Check you ran `docker login` and that the username in the image tag is correct."
+        }
+      ]
+    },
+    {
+      "id": "docker-images-layers",
+      "heading": "Image layers",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/understanding-image-layers/",
+      "sourceTitle": "Understanding the image layers",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Each layer holds filesystem changes (additions, deletions, modifications) and is immutable once created. Layers can be **reused between images**: two Python apps can share the same Python base layers, saving build time, storage and bandwidth."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Each downloaded layer is extracted into its own directory on the host.",
+            "Running a container builds a **union filesystem** that stacks the layers into one view, and the container's root is set to it with `chroot`.",
+            "A separate directory is added for the running container's own changes, leaving image layers untouched, so many containers can share one image."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker container commit -m \"Add node\" base-container node-base\ndocker container commit -c \"CMD node app.js\" -m \"Add app\" app-container sample-app\ndocker image history sample-app"
+        },
+        {
+          "type": "p",
+          "text": "`docker container commit` saves a container's changes as a new layer, but you'll rarely build images this way; a Dockerfile is the normal route."
+        }
+      ]
+    },
+    {
+      "id": "docker-images-cache",
+      "heading": "Build cache",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/using-the-build-cache/",
+      "sourceTitle": "Using the build cache",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Docker runs each instruction in order, creating a layer per instruction, and reuses a cached result when it has already run the same step. The cache is **invalidated** when:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The command of a `RUN` instruction changes.",
+            "Files copied by `COPY` or `ADD` change, in content or properties such as permissions.",
+            "Any earlier layer was invalidated: **every following layer is rebuilt too**."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "dockerfile",
+          "text": "FROM node:22-alpine\nWORKDIR /app\nCOPY package.json yarn.lock ./\nRUN yarn install --production\nCOPY . .\nEXPOSE 3000\nCMD [\"node\", \"src/index.js\"]"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Copy the dependency manifest first, install, then `COPY . .`. A source edit then only rebuilds the last `COPY`; the install step shows as `CACHED`. Add a `.dockerignore` (e.g. containing `node_modules`) next to the Dockerfile."
+        }
+      ]
+    },
+    {
+      "id": "docker-images-multistage",
+      "heading": "Multi-stage builds",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/multi-stage-builds/",
+      "sourceTitle": "Multi-stage builds",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A single-stage build leaves compilers and build tools in the final image, making it bulky and riskier. **Multi-stage builds** use several `FROM ... AS <stage-name>` stages: build in one, then `COPY --from=<stage>` only the artifacts into a smaller runtime image. Recommended for all application types."
+        },
+        {
+          "type": "code",
+          "lang": "dockerfile",
+          "text": "FROM eclipse-temurin:21.0.8_9-jdk-jammy AS builder\nWORKDIR /opt/app\nCOPY .mvn/ .mvn\nCOPY mvnw pom.xml ./\nRUN ./mvnw dependency:go-offline\nCOPY ./src ./src\nRUN ./mvnw clean install\n\nFROM eclipse-temurin:21.0.8_9-jre-jammy AS final\nWORKDIR /opt/app\nEXPOSE 8080\nCOPY --from=builder /opt/app/target/*.jar /opt/app/*.jar\nENTRYPOINT [\"java\", \"-jar\", \"/opt/app/*.jar\"]"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The **last stage** is built by default.",
+            "`--target <stage>` builds a specific stage, e.g. `docker build -t spring-helloworld-builder --target builder .`",
+            "In the guide, switching from JDK to a JRE runtime stage cut the image from 880MB to 428MB."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "docker-images-fc-01",
+      "front": "What file extension does a Dockerfile have?",
+      "back": "None. The file is just named `Dockerfile`.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/writing-a-dockerfile/"
+    },
+    {
+      "id": "docker-images-fc-02",
+      "front": "What does `WORKDIR` do?",
+      "back": "Sets the path in the image where files are copied and commands are executed.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/writing-a-dockerfile/"
+    },
+    {
+      "id": "docker-images-fc-03",
+      "front": "Which instruction is the only one allowed before `FROM`?",
+      "back": "`ARG`.",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/"
+    },
+    {
+      "id": "docker-images-fc-04",
+      "front": "Does `EXPOSE 8080` publish the port?",
+      "back": "No. It documents the intended port. Publish with `-p` (or `-P` for all exposed ports) on `docker run`.",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/"
+    },
+    {
+      "id": "docker-images-fc-05",
+      "front": "ENV vs ARG?",
+      "back": "ENV persists into the running container. ARG is a build-time variable (`--build-arg`) not available in the final container.",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/"
+    },
+    {
+      "id": "docker-images-fc-06",
+      "front": "How are `docker run <image> <args>` arguments treated with an exec-form ENTRYPOINT?",
+      "back": "Appended after the ENTRYPOINT elements, replacing any CMD.",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/"
+    },
+    {
+      "id": "docker-images-fc-07",
+      "front": "Why avoid shell-form ENTRYPOINT?",
+      "back": "It runs under `/bin/sh -c`, ignores CMD and run arguments, and the executable isn't PID 1, so it doesn't receive SIGTERM from `docker stop`.",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/"
+    },
+    {
+      "id": "docker-images-fc-08",
+      "front": "Full image name structure?",
+      "back": "`[HOST[:PORT_NUMBER]/]PATH[:TAG]`. Defaults: host `docker.io`, namespace `library`, tag `latest`.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/"
+    },
+    {
+      "id": "docker-images-fc-09",
+      "front": "What does `nginx` expand to as a full image name?",
+      "back": "`docker.io/library/nginx:latest`.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/"
+    },
+    {
+      "id": "docker-images-fc-10",
+      "front": "How do you add another tag to an existing image?",
+      "back": "`docker image tag <source-image> <new-name>:<tag>`.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/"
+    },
+    {
+      "id": "docker-images-fc-11",
+      "front": "How does a container change files without altering image layers?",
+      "back": "A union filesystem stacks the read-only layers and adds a directory specifically for the running container's changes.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/understanding-image-layers/"
+    },
+    {
+      "id": "docker-images-fc-12",
+      "front": "Once a build-cache layer is invalidated, what happens to later layers?",
+      "back": "All following layers are invalidated and rebuilt too.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/using-the-build-cache/"
+    },
+    {
+      "id": "docker-images-fc-13",
+      "front": "In a multi-stage build, which stage is built by default, and how do you pick another?",
+      "back": "The last stage. Use `--target <stage>` to build a different one.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/multi-stage-builds/"
+    },
+    {
+      "id": "docker-images-fc-14",
+      "front": "How does a later stage get files from an earlier one?",
+      "back": "`COPY --from=<stage-name> <src> <dest>`.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/multi-stage-builds/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "docker-images-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-dockerfile",
+      "stem": "Which Dockerfile instruction sets the base image the build extends?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/writing-a-dockerfile/",
+      "options": [
+        { "id": "a", "text": "FROM", "correct": true, "explanation": "FROM <image> specifies the base image." },
+        { "id": "b", "text": "WORKDIR", "correct": false, "explanation": "WORKDIR sets the working directory." },
+        { "id": "c", "text": "CMD", "correct": false, "explanation": "CMD sets the default container command." },
+        { "id": "d", "text": "USER", "correct": false, "explanation": "USER sets the default user." }
+      ]
+    },
+    {
+      "id": "docker-images-q-02",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "dk-dockerfile",
+      "stem": "Adding `EXPOSE 3000` to a Dockerfile is enough to reach the app on host port 3000 without any docker run flags.",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/",
+      "options": [
+        { "id": "a", "text": "True", "correct": false, "explanation": "EXPOSE doesn't publish the port; it acts as documentation." },
+        { "id": "b", "text": "False", "correct": true, "explanation": "Use -p or -P on docker run to publish it." }
+      ]
+    },
+    {
+      "id": "docker-images-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-dockerfile",
+      "stem": "An image has `ENTRYPOINT [\"exec_entry\", \"p1_entry\"]` and `CMD [\"exec_cmd\", \"p1_cmd\"]`. What runs with a plain `docker run <image>`?",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/",
+      "options": [
+        { "id": "a", "text": "exec_entry p1_entry exec_cmd p1_cmd", "correct": true, "explanation": "Exec-form CMD supplies default arguments appended to the exec-form ENTRYPOINT." },
+        { "id": "b", "text": "exec_cmd p1_cmd", "correct": false, "explanation": "That's what runs when there's no ENTRYPOINT." },
+        { "id": "c", "text": "/bin/sh -c exec_entry p1_entry", "correct": false, "explanation": "That's the shell-form ENTRYPOINT result." },
+        { "id": "d", "text": "An error", "correct": false, "explanation": "Only having neither CMD nor ENTRYPOINT is an error." }
+      ]
+    },
+    {
+      "id": "docker-images-q-04",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "dk-dockerfile",
+      "stem": "`docker stop` on your container always waits for the timeout instead of letting the app shut down cleanly. The Dockerfile uses `ENTRYPOINT my-server --verbose`. What's the likely cause?",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/",
+      "options": [
+        { "id": "a", "text": "Shell-form ENTRYPOINT runs under /bin/sh -c, so the app isn't PID 1 and doesn't get SIGTERM", "correct": true, "explanation": "The reference says shell form doesn't pass signals. Use the exec form." },
+        { "id": "b", "text": "The image is missing an EXPOSE instruction", "correct": false, "explanation": "EXPOSE is port documentation and has nothing to do with signals." },
+        { "id": "c", "text": "CMD must be declared before ENTRYPOINT", "correct": false, "explanation": "Order isn't the problem; the shell form is." },
+        { "id": "d", "text": "WORKDIR defaults to /", "correct": false, "explanation": "The working directory doesn't affect signal delivery." }
+      ]
+    },
+    {
+      "id": "docker-images-q-05",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "dk-dockerfile",
+      "stem": "Which statements about ENV and ARG are correct? Select 2.",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/",
+      "options": [
+        { "id": "a", "text": "ENV values persist in containers run from the image", "correct": true, "explanation": "They can be viewed with docker inspect and changed with docker run --env." },
+        { "id": "b", "text": "ARG values are passed at build time with --build-arg and aren't in the final container", "correct": true, "explanation": "ARG isn't embedded in the image." },
+        { "id": "c", "text": "ARG is a safe way to pass API tokens", "correct": false, "explanation": "Build arguments are visible in docker history; the reference advises against it." },
+        { "id": "d", "text": "ENV can appear before FROM", "correct": false, "explanation": "Only ARG may precede FROM." }
+      ]
+    },
+    {
+      "id": "docker-images-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-dockerfile",
+      "stem": "A Dockerfile contains `WORKDIR /a`, then `WORKDIR b`, then `WORKDIR c`, then `RUN pwd`. What does pwd print?",
+      "sourceUrl": "https://docs.docker.com/reference/dockerfile/",
+      "options": [
+        { "id": "a", "text": "/a/b/c", "correct": true, "explanation": "Relative WORKDIR paths are relative to the previous WORKDIR." },
+        { "id": "b", "text": "/c", "correct": false, "explanation": "c is relative, not absolute." },
+        { "id": "c", "text": "c", "correct": false, "explanation": "pwd prints an absolute path built from the stacked WORKDIRs." },
+        { "id": "d", "text": "/", "correct": false, "explanation": "/ is only the default when no WORKDIR is set." }
+      ]
+    },
+    {
+      "id": "docker-images-q-07",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-images",
+      "stem": "Which full image name does `nginx` resolve to?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/",
+      "options": [
+        { "id": "a", "text": "docker.io/library/nginx:latest", "correct": true, "explanation": "Default host docker.io, namespace library, tag latest." },
+        { "id": "b", "text": "docker.io/nginx/nginx:stable", "correct": false, "explanation": "No namespace means library, and the default tag is latest." },
+        { "id": "c", "text": "ghcr.io/library/nginx:latest", "correct": false, "explanation": "The default host is docker.io, not the GitHub Container Registry." },
+        { "id": "d", "text": "localhost/nginx", "correct": false, "explanation": "Omitting the host means docker.io." }
+      ]
+    },
+    {
+      "id": "docker-images-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "dk-images",
+      "stem": "You need to publish a locally built image to Docker Hub under your account. Which steps apply? Select 3.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/",
+      "options": [
+        { "id": "a", "text": "Tag it with your username, e.g. docker build -t <username>/<image> .", "correct": true, "explanation": "The name determines where the image can be pushed." },
+        { "id": "b", "text": "Authenticate with docker login", "correct": true, "explanation": "You must be authenticated before pushing." },
+        { "id": "c", "text": "Run docker push <username>/<image>", "correct": true, "explanation": "This pushes the image's layers to the registry." },
+        { "id": "d", "text": "Run docker pull <username>/<image> first", "correct": false, "explanation": "pull downloads from a registry; it's not part of publishing." }
+      ]
+    },
+    {
+      "id": "docker-images-q-09",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-images",
+      "stem": "In `docker build .`, what does the final `.` specify?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/",
+      "options": [
+        { "id": "a", "text": "The build context, where the builder finds the Dockerfile and referenced files", "correct": true, "explanation": "It is the path or URL of the build context." },
+        { "id": "b", "text": "The image tag", "correct": false, "explanation": "Tags are set with -t or --tag." },
+        { "id": "c", "text": "The registry to push to", "correct": false, "explanation": "Pushing uses docker push and the image name." },
+        { "id": "d", "text": "The base image", "correct": false, "explanation": "The base image comes from FROM in the Dockerfile." }
+      ]
+    },
+    {
+      "id": "docker-images-q-10",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "dk-images",
+      "stem": "Several containers can run from the same image because each container gets its own directory for changes while the image layers stay untouched.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/understanding-image-layers/",
+      "options": [
+        { "id": "a", "text": "True", "correct": true, "explanation": "The union filesystem adds a container-specific directory on top of the image layers." },
+        { "id": "b", "text": "False", "correct": false, "explanation": "Image layers remain unchanged, which is what allows sharing." }
+      ]
+    },
+    {
+      "id": "docker-images-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-dockerfile",
+      "stem": "Your Dockerfile is `FROM node:22-alpine`, `WORKDIR /app`, `COPY . .`, `RUN yarn install --production`. Every HTML edit reinstalls all dependencies. Best fix?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/using-the-build-cache/",
+      "options": [
+        { "id": "a", "text": "Copy package.json and yarn.lock first, run yarn install, then COPY . .", "correct": true, "explanation": "The install layer then stays cached unless the dependency files change." },
+        { "id": "b", "text": "Move RUN yarn install above FROM", "correct": false, "explanation": "Instructions run after FROM; this wouldn't build." },
+        { "id": "c", "text": "Add EXPOSE 3000", "correct": false, "explanation": "EXPOSE doesn't affect caching." },
+        { "id": "d", "text": "Replace COPY with ADD", "correct": false, "explanation": "File changes invalidate the cache for both COPY and ADD." }
+      ]
+    },
+    {
+      "id": "docker-images-q-12",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "dk-dockerfile",
+      "stem": "Which events invalidate the build cache? Select 3.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/using-the-build-cache/",
+      "options": [
+        { "id": "a", "text": "Changing the command in a RUN instruction", "correct": true, "explanation": "Docker detects the modification and invalidates that layer." },
+        { "id": "b", "text": "Changing permissions on a file copied with COPY", "correct": true, "explanation": "Property changes, not just content changes, invalidate the cache." },
+        { "id": "c", "text": "An earlier layer being invalidated", "correct": true, "explanation": "All following layers are invalidated too." },
+        { "id": "d", "text": "Rebuilding with no changes to the Dockerfile or source", "correct": false, "explanation": "That rebuild reuses cached layers." }
+      ]
+    },
+    {
+      "id": "docker-images-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-dockerfile",
+      "stem": "In a multi-stage Dockerfile, how does the final stage get the compiled JAR from a stage named builder?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/multi-stage-builds/",
+      "options": [
+        { "id": "a", "text": "COPY --from=builder <src> <dest>", "correct": true, "explanation": "COPY --from copies files from an earlier stage." },
+        { "id": "b", "text": "FROM builder --copy", "correct": false, "explanation": "FROM sets a base image; it doesn't copy individual files." },
+        { "id": "c", "text": "docker image tag builder final", "correct": false, "explanation": "That adds a tag to an image; it doesn't move files between stages." },
+        { "id": "d", "text": "RUN ./mvnw clean install in the final stage", "correct": false, "explanation": "That would bring the build tooling back into the runtime image." }
+      ]
+    },
+    {
+      "id": "docker-images-q-14",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-dockerfile",
+      "stem": "You want to build only the `builder` stage of a multi-stage Dockerfile. Which command?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/multi-stage-builds/",
+      "options": [
+        { "id": "a", "text": "docker build -t spring-helloworld-builder --target builder .", "correct": true, "explanation": "--target selects the stage; otherwise the last stage is built." },
+        { "id": "b", "text": "docker build -t spring-helloworld-builder .", "correct": false, "explanation": "Without --target the last stage (final) is built." },
+        { "id": "c", "text": "docker push builder", "correct": false, "explanation": "push uploads an image; it doesn't build." },
+        { "id": "d", "text": "docker container commit builder", "correct": false, "explanation": "commit saves a container's changes, not a Dockerfile stage." }
+      ]
+    },
+    {
+      "id": "docker-images-q-15",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "dk-dockerfile",
+      "stem": "A main benefit of multi-stage builds is a smaller final image with a reduced attack surface, because build tools stay out of it.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/multi-stage-builds/",
+      "options": [
+        { "id": "a", "text": "True", "correct": true, "explanation": "Separating build and runtime environments shrinks the image and improves security." },
+        { "id": "b", "text": "False", "correct": false, "explanation": "That's exactly the stated benefit." }
+      ]
+    }
+  ]
+}

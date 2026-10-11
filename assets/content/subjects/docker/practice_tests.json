@@ -1,0 +1,15 @@
+{
+  "tests": [
+    {
+      "id": "docker-mixed",
+      "title": "Docker basics \u2014 mixed",
+      "description": "Random questions from every Docker topic.",
+      "questionCount": 15,
+      "timeLimitMinutes": 20,
+      "filter": {
+        "domainIds": null
+      },
+      "weighting": "uniform"
+    }
+  ]
+}
