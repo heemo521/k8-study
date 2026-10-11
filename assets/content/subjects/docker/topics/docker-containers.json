@@ -120,7 +120,7 @@
           "items": [
             "`-e foo=bar` sets one variable; `--env-file` avoids a long list of `-e` flags.",
             "Containers have no resource limits by default. `--memory` caps memory and `--cpus` sets a CPU quota (0.5 = half a core). `docker stats` shows live usage.",
-            "Anything after the image name replaces the image's default command."
+            "Arguments after the image name override the image's default startup command, e.g. `postgres docker-entrypoint.sh -h localhost -p 5432`."
           ]
         },
         {
@@ -389,9 +389,9 @@
         },
         {
           "id": "d",
-          "text": "docker run -d --expose 8080 nginx",
+          "text": "docker run -d -p 80 nginx",
           "correct": false,
-          "explanation": "--expose exposes a container port without publishing it to the host."
+          "explanation": "Omitting HOST_PORT publishes container port 80 on an ephemeral host port, not 8080."
         }
       ]
     },
@@ -733,9 +733,9 @@
         },
         {
           "id": "c",
-          "text": "The image's restart policy is delaying the stop",
+          "text": "docker stop sends SIGKILL only when you pass -s SIGKILL",
           "correct": false,
-          "explanation": "Restart policies decide restarts after exit, not stop timing."
+          "explanation": "Without -s it sends SIGTERM first, and SIGKILL follows anyway if the container hasn't exited when the timeout elapses."
         },
         {
           "id": "d",

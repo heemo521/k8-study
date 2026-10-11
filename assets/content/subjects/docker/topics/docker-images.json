@@ -292,7 +292,7 @@
     {
       "id": "docker-images-fc-11",
       "front": "How does a container change files without altering image layers?",
-      "back": "A union filesystem stacks the read-only layers and adds a directory specifically for the running container's changes.",
+      "back": "A union filesystem stacks the immutable image layers and adds a directory specifically for the running container's changes.",
       "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/understanding-image-layers/"
     },
     {
@@ -460,7 +460,7 @@
       "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/using-the-build-cache/",
       "options": [
         { "id": "a", "text": "Copy package.json and yarn.lock first, run yarn install, then COPY . .", "correct": true, "explanation": "The install layer then stays cached unless the dependency files change." },
-        { "id": "b", "text": "Move RUN yarn install above FROM", "correct": false, "explanation": "Instructions run after FROM; this wouldn't build." },
+        { "id": "b", "text": "Add a .dockerignore containing node_modules but keep the instruction order", "correct": false, "explanation": "Any edit to a copied file still invalidates COPY . . and every layer after it, including the install." },
         { "id": "c", "text": "Add EXPOSE 3000", "correct": false, "explanation": "EXPOSE doesn't affect caching." },
         { "id": "d", "text": "Replace COPY with ADD", "correct": false, "explanation": "File changes invalidate the cache for both COPY and ADD." }
       ]

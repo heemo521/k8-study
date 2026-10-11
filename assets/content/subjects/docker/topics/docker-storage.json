@@ -197,7 +197,7 @@
             "Bind mounts are **writable by default**, so container processes can change or delete host files. Add `ro`/`readonly` to prevent that.",
             "The path is on the **daemon** host, not the client, and the container depends on that host's directory layout.",
             "Mounting over a non-empty container directory hides its contents. Unlike volumes, nothing is copied.",
-            "SELinux `z`/`Z` labels can only be set with `-v`, not `--mount`."
+            "SELinux `z`/`Z` labeling is listed among the `-v` options, not the `--mount` options. It relabels the host path itself, so use it with great care."
           ]
         }
       ]
@@ -533,9 +533,9 @@
         },
         {
           "id": "b",
-          "text": "docker run -d --read-only nginx-vol:/usr/share/nginx/html nginx:latest",
+          "text": "docker run -d --mount source=nginx-vol,destination=/usr/share/nginx/html nginx:latest",
           "correct": false,
-          "explanation": "--read-only affects the root filesystem and takes no mount argument."
+          "explanation": "Without readonly (or ro) the volume is mounted read-write."
         },
         {
           "id": "c",
@@ -699,13 +699,13 @@
           "id": "c",
           "text": "Copying the files into the image",
           "correct": false,
-          "explanation": "You'd have to rebuild for every change."
+          "explanation": "Files baked into the image don't follow later changes on the host; a bind mount shares the host files directly."
         },
         {
           "id": "d",
           "text": "The container's writable layer",
           "correct": false,
-          "explanation": "The host can't share files through it."
+          "explanation": "By default a container can't directly access data on the host; you need a bind mount or volume for that."
         }
       ]
     },
