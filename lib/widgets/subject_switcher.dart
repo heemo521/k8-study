@@ -17,6 +17,8 @@ class SubjectTitle extends StatelessWidget {
       return Text('K8 Study · ${current.subject.title}');
     }
     return Semantics(
+      // Own node: otherwise it merges into the app bar's title node.
+      container: true,
       button: true,
       label: 'Switch subject, current: ${current.subject.title}',
       // excludeSemantics drops the InkWell's action, so re-provide it.

@@ -26,17 +26,18 @@ final _skipPatterns = [
 bool _include(String path) =>
     !_skipExact.contains(path) && !_skipPatterns.any((p) => p.hasMatch(path));
 
-/// 64-bit FNV-1a, enough to version the cache by build contents.
+/// 64-bit FNV-1a over every byte. Dart VM ints are 64-bit and wrap on
+/// overflow, which is exactly the arithmetic FNV needs.
 String _fnv1a(Iterable<List<int>> chunks) {
-  var hash = BigInt.parse('cbf29ce484222325', radix: 16);
-  final prime = BigInt.parse('100000001b3', radix: 16);
-  final mask = (BigInt.one << 64) - BigInt.one;
+  var hash = 0xcbf29ce484222325;
+  const prime = 0x100000001b3;
   for (final chunk in chunks) {
     for (final b in chunk) {
-      hash = ((hash ^ BigInt.from(b)) * prime) & mask;
+      hash = (hash ^ b) * prime;
     }
   }
-  return hash.toRadixString(16).padLeft(16, '0');
+  String hex32(int v) => v.toRadixString(16).padLeft(8, '0');
+  return hex32((hash >>> 32) & 0xffffffff) + hex32(hash & 0xffffffff);
 }
 
 void main(List<String> args) {
@@ -55,22 +56,12 @@ void main(List<String> args) {
       .toList()
     ..sort();
 
-  // Hash over path + contents. Small text files are hashed whole; for large
-  // binaries the size and first/last 64 KB are enough to detect a change.
+  // Hash over every path and every byte, so any change to any precached
+  // file produces a new cache version.
   final hash = _fnv1a([
     for (final path in files) ...[
       utf8.encode(path),
-      () {
-        final f = File('${root.path}/$path');
-        final len = f.lengthSync();
-        if (len <= 256 * 1024) return f.readAsBytesSync();
-        final raf = f.openSync();
-        final head = raf.readSync(64 * 1024);
-        raf.setPositionSync(len - 64 * 1024);
-        final tail = raf.readSync(64 * 1024);
-        raf.closeSync();
-        return [...utf8.encode('$len'), ...head, ...tail];
-      }(),
+      File('${root.path}/$path').readAsBytesSync(),
     ],
   ]);
 
