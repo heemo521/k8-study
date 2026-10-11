@@ -24,19 +24,23 @@ class SearchHit {
 String _plain(String s) => s.replaceAll('**', '').replaceAll('`', '');
 
 String blockText(NoteBlock b) => switch (b) {
-      ParagraphBlock(:final text) => text,
-      BulletsBlock(:final items) => items.join(' · '),
-      CodeBlock(:final text) => text,
-      CalloutBlock(:final text) => text,
-      TableBlock(:final header, :final rows) =>
-        [header.join(' | '), for (final r in rows) r.join(' | ')].join(' · '),
-    };
+  ParagraphBlock(:final text) => text,
+  BulletsBlock(:final items) => items.join(' · '),
+  CodeBlock(:final text) => text,
+  CalloutBlock(:final text) => text,
+  TableBlock(:final header, :final rows) => [
+    header.join(' | '),
+    for (final r in rows) r.join(' | '),
+  ].join(' · '),
+};
 
 /// ~[width]-char window around the first match of [needle] in [text].
 String snippetAround(String text, String needle, {int width = 110}) {
   final plain = _plain(text).replaceAll('\n', ' ');
   final i = plain.toLowerCase().indexOf(needle.toLowerCase());
-  if (i < 0) return plain.length <= width ? plain : '${plain.substring(0, width)}…';
+  if (i < 0) {
+    return plain.length <= width ? plain : '${plain.substring(0, width)}…';
+  }
   final start = (i - width ~/ 3).clamp(0, plain.length);
   final end = (start + width).clamp(0, plain.length);
   return '${start > 0 ? '…' : ''}${plain.substring(start, end)}${end < plain.length ? '…' : ''}';
@@ -62,41 +66,56 @@ List<SearchHit> search(ContentBundle content, String query, {int limit = 50}) {
   final cardHits = <SearchHit>[];
   for (final topic in content.topics) {
     if (matches('${topic.title} ${topic.summary}')) {
-      topicHits.add(SearchHit(
+      topicHits.add(
+        SearchHit(
           kind: SearchKind.topic,
           topic: topic,
           title: topic.title,
-          snippet: topic.summary));
+          snippet: topic.summary,
+        ),
+      );
     }
     for (final s in topic.sections) {
       final body = s.blocks.map(blockText).join(' ');
       if (matches(s.heading)) {
-        headingHits.add(SearchHit(
+        headingHits.add(
+          SearchHit(
             kind: SearchKind.section,
             topic: topic,
             sectionId: s.id,
             title: s.heading,
-            snippet: snippetAround(body, terms.first)));
+            snippet: snippetAround(body, terms.first),
+          ),
+        );
       } else if (matches('${s.heading} $body')) {
-        bodyHits.add(SearchHit(
+        bodyHits.add(
+          SearchHit(
             kind: SearchKind.section,
             topic: topic,
             sectionId: s.id,
             title: s.heading,
-            snippet: snippetAround(body, terms.first)));
+            snippet: snippetAround(body, terms.first),
+          ),
+        );
       }
     }
     for (final c in topic.flashcards) {
       if (matches('${c.front} ${c.back}')) {
-        cardHits.add(SearchHit(
+        cardHits.add(
+          SearchHit(
             kind: SearchKind.flashcard,
             topic: topic,
             title: _plain(c.front),
-            snippet: _plain(c.back)));
+            snippet: _plain(c.back),
+          ),
+        );
       }
     }
   }
-  return [...topicHits, ...headingHits, ...bodyHits, ...cardHits]
-      .take(limit)
-      .toList();
+  return [
+    ...topicHits,
+    ...headingHits,
+    ...bodyHits,
+    ...cardHits,
+  ].take(limit).toList();
 }

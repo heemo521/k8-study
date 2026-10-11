@@ -21,20 +21,24 @@ class ContentLoader {
     if (ids is! List || ids.isEmpty) {
       throw const FormatException('catalog.json.subjects: non-empty list');
     }
-    return Catalog(await Future.wait([
-      for (final id in ids) loadSubject(id as String),
-    ]));
+    return Catalog(
+      await Future.wait([for (final id in ids) loadSubject(id as String)]),
+    );
   }
 
   Future<ContentBundle> loadSubject(String id) async {
     final dir = 'subjects/$id';
-    final subject =
-        SubjectInfo.fromJson(await _json('$dir/subject.json'), '$id/subject.json');
+    final subject = SubjectInfo.fromJson(
+      await _json('$dir/subject.json'),
+      '$id/subject.json',
+    );
     final topics = await Future.wait([
       for (final t in subject.topicIds)
-        _json('$dir/topics/$t.json').then((raw) => Topic.fromJson(raw, '$t.json')),
+        _json('$dir/topics/$t.json')
+            .then((raw) => Topic.fromJson(raw, '$t.json')),
     ]);
-    final tests = await _json('$dir/practice_tests.json') as Map<String, dynamic>;
+    final tests =
+        await _json('$dir/practice_tests.json') as Map<String, dynamic>;
     final testList = tests['tests'];
     if (testList is! List) {
       throw FormatException('$id/practice_tests.json.tests: expected list');

@@ -31,7 +31,7 @@
             "**Ephemeral** volume types live and die with the Pod. **Persistent** volumes outlive any single Pod.",
             "Whatever the type, data in a Pod's volumes survives **container restarts**.",
             "Declare volumes once in `.spec.volumes`, then mount them per container in `.spec.containers[*].volumeMounts`.",
-            "Each container chooses its own mount path; a container that doesn't list a volume doesn't see it.",
+            "For each container, you specify independently where to mount each volume it uses.",
             "A volume can't be mounted inside another volume (use `subPath` instead), and can't hard-link into another volume."
           ]
         },

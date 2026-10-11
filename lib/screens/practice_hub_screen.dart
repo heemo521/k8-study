@@ -30,56 +30,61 @@ class PracticeHubScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Practice')),
-      body: PageList(children: [
-        if (content.exam case final exam?)
-          Card(
-            color: scheme.tertiaryContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                exam.note,
-                style: textTheme.bodyMedium
-                    ?.copyWith(color: scheme.onTertiaryContainer),
-              ),
-            ),
-          ),
-        if (content.practiceTests.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Text('No practice tests for ${content.subject.title} yet.',
-                style: textTheme.bodyMedium),
-          ),
-        const SizedBox(height: 16),
-        for (final test in content.practiceTests)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Card(
-              child: ListTile(
-                key: ValueKey('practice-${test.id}'),
-                title: Text(test.title),
-                subtitle: Text(
-                  '${_count(test, content)} questions · '
-                  '${test.timeLimitMinutes} min'
-                  '${progress.bestPracticePct(test.id) == null ? '' : ' · best ${progress.bestPracticePct(test.id)}%'}'
-                  '\n${test.description}',
+      body: PageList(
+        children: [
+          if (content.exam case final exam?)
+            Card(
+              color: scheme.tertiaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  exam.note,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: scheme.onTertiaryContainer,
+                  ),
                 ),
-                isThreeLine: true,
-                trailing: const Icon(Icons.play_arrow),
-                onTap: () => _showSetup(context, test),
               ),
             ),
-          ),
-        if (uncovered.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text('Coming later', style: textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text(
-            'No questions yet for: ${uncovered.map((d) => d.title).join(', ')}.',
-            style: textTheme.bodySmall,
-          ),
+          if (content.practiceTests.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text(
+                'No practice tests for ${content.subject.title} yet.',
+                style: textTheme.bodyMedium,
+              ),
+            ),
+          const SizedBox(height: 16),
+          for (final test in content.practiceTests)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Card(
+                child: ListTile(
+                  key: ValueKey('practice-${test.id}'),
+                  title: Text(test.title),
+                  subtitle: Text(
+                    '${_count(test, content)} questions · '
+                    '${test.timeLimitMinutes} min'
+                    '${progress.bestPracticePct(test.id) == null ? '' : ' · best ${progress.bestPracticePct(test.id)}%'}'
+                    '\n${test.description}',
+                  ),
+                  isThreeLine: true,
+                  trailing: const Icon(Icons.play_arrow),
+                  onTap: () => _showSetup(context, test),
+                ),
+              ),
+            ),
+          if (uncovered.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Coming later', style: textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'No questions yet for: ${uncovered.map((d) => d.title).join(', ')}.',
+              style: textTheme.bodySmall,
+            ),
+          ],
+          ads.banner(AdPlacement.practiceHubBanner),
         ],
-        ads.banner(AdPlacement.practiceHubBanner),
-      ]),
+      ),
     );
   }
 
@@ -102,8 +107,10 @@ class PracticeHubScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(test.title,
-                      style: Theme.of(sheetContext).textTheme.titleMedium),
+                  Text(
+                    test.title,
+                    style: Theme.of(sheetContext).textTheme.titleMedium,
+                  ),
                   SwitchListTile(
                     key: const ValueKey('timer-switch'),
                     contentPadding: EdgeInsets.zero,

@@ -50,13 +50,21 @@ class _QuizScreenState extends State<QuizScreen> {
         final retry = retryMissed && missed.isNotEmpty;
         _spec = TopicQuizSpec(topicId, retryMissed: retry);
         _title = retry ? 'Retry missed' : '${topic.title} · Quiz';
-        _attempt = QuizAttempt(retry
-            ? drawQuiz(
-                bank: topic.questions.where((q) => missed.contains(q.id)).toList(),
-                random: random,
-                count: missed.length,
-              )
-            : drawQuiz(bank: topic.questions, random: random, priorityIds: missed));
+        _attempt = QuizAttempt(
+          retry
+              ? drawQuiz(
+                  bank: topic.questions
+                      .where((q) => missed.contains(q.id))
+                      .toList(),
+                  random: random,
+                  count: missed.length,
+                )
+              : drawQuiz(
+                  bank: topic.questions,
+                  random: random,
+                  priorityIds: missed,
+                ),
+        );
       case ReviewQuizSpec(:final kind, :final id):
         final pool = reviewPool(content, progress, kind: kind, id: id);
         _title = switch (kind) {
@@ -71,7 +79,8 @@ class _QuizScreenState extends State<QuizScreen> {
             if (progress.answerStats(q.id)?.lastCorrect != true) q.id,
         };
         _attempt = QuizAttempt(
-            drawQuiz(bank: pool, random: random, priorityIds: weak));
+          drawQuiz(bank: pool, random: random, priorityIds: weak),
+        );
     }
   }
 
@@ -107,12 +116,15 @@ class _QuizScreenState extends State<QuizScreen> {
         progress.recordQuiz(topicId, attempt.percent, attempt.missedIds);
       }
     }
-    context.read<SessionStore>().lastQuiz =
-        QuizResult(spec: _spec, attempt: attempt);
+    context.read<SessionStore>().lastQuiz = QuizResult(
+      spec: _spec,
+      attempt: attempt,
+    );
     // Interstitial (if any) shows before the results screen renders.
-    await context
-        .read<AdsService>()
-        .maybeShowInterstitial(context, AdPlacement.quizComplete);
+    await context.read<AdsService>().maybeShowInterstitial(
+      context,
+      AdPlacement.quizComplete,
+    );
     if (mounted) context.go(_spec.resultPath);
   }
 
@@ -124,11 +136,13 @@ class _QuizScreenState extends State<QuizScreen> {
         content: const Text('This attempt will not be saved.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Stay')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Stay'),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Leave')),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Leave'),
+          ),
         ],
       ),
     );
@@ -148,8 +162,10 @@ class _QuizScreenState extends State<QuizScreen> {
     }
     final total = attempt.questions.length;
     final answered = attempt.answers.length;
-    final score =
-        attempt.questions.take(answered).where(attempt.correct).length;
+    final score = attempt.questions
+        .take(answered)
+        .where(attempt.correct)
+        .length;
     final topicTitle = _spec is ReviewQuizSpec
         ? context.read<ContentBundle>().topic(_current.question.topicId)?.title
         : null;
@@ -167,52 +183,64 @@ class _QuizScreenState extends State<QuizScreen> {
             preferredSize: const Size.fromHeight(34),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Column(children: [
-                LinearProgressIndicator(
-                  value: (_index + (_revealed ? 1 : 0)) / total,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                const SizedBox(height: 6),
-                Row(children: [
-                  Text('Q ${_index + 1}/$total',
-                      key: const ValueKey('quiz-position'),
-                      style: Theme.of(context).textTheme.labelLarge),
-                  const Spacer(),
-                  Text('Score $score/$answered',
-                      style: Theme.of(context).textTheme.labelLarge),
-                ]),
-              ]),
+              child: Column(
+                children: [
+                  LinearProgressIndicator(
+                    value: (_index + (_revealed ? 1 : 0)) / total,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text(
+                        'Q ${_index + 1}/$total',
+                        key: const ValueKey('quiz-position'),
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Score $score/$answered',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-        body: PageList(children: [
-          if (topicTitle != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text('From: $topicTitle',
-                  style: Theme.of(context).textTheme.labelMedium),
+        body: PageList(
+          children: [
+            if (topicTitle != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'From: $topicTitle',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+            QuestionView(
+              key: ValueKey(_current.question.id),
+              presented: _current,
+              selected: _selected,
+              revealed: _revealed,
+              onChanged: (s) => setState(() => _selected = s),
             ),
-          QuestionView(
-            key: ValueKey(_current.question.id),
-            presented: _current,
-            selected: _selected,
-            revealed: _revealed,
-            onChanged: (s) => setState(() => _selected = s),
-          ),
-          const SizedBox(height: 16),
-          if (!_revealed)
-            FilledButton(
-              key: const ValueKey('submit'),
-              onPressed: _selected.isEmpty ? null : _submit,
-              child: const Text('Submit'),
-            )
-          else
-            FilledButton(
-              key: const ValueKey('next'),
-              onPressed: _next,
-              child: Text(_index + 1 < total ? 'Next' : 'See results'),
-            ),
-        ]),
+            const SizedBox(height: 16),
+            if (!_revealed)
+              FilledButton(
+                key: const ValueKey('submit'),
+                onPressed: _selected.isEmpty ? null : _submit,
+                child: const Text('Submit'),
+              )
+            else
+              FilledButton(
+                key: const ValueKey('next'),
+                onPressed: _next,
+                child: Text(_index + 1 < total ? 'Next' : 'See results'),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -153,7 +153,7 @@
         {
           "type": "callout",
           "kind": "exam",
-          "text": "Sorting events by `.metadata.creationTimestamp` puts the newest last, which is quick for spotting what just broke. `kubectl events --types=Warning` filters out the noise."
+          "text": "`kubectl get events --sort-by=.metadata.creationTimestamp` lists events sorted by timestamp, and `kubectl events --types=Warning` lists only the warnings."
         }
       ]
     },
@@ -467,7 +467,7 @@
           "id": "b",
           "text": "kubectl attach <pod> -i",
           "correct": false,
-          "explanation": "Attach connects to the existing process; it gives no tools."
+          "explanation": "The page uses attach only to reconnect to a debug session; it adds no debugging tools."
         },
         {
           "id": "c",

@@ -9,12 +9,8 @@ ThemeData _theme(Brightness brightness) {
     useMaterial3: true,
     visualDensity: VisualDensity.standard,
     materialTapTargetSize: MaterialTapTargetSize.padded,
-    textTheme: Typography.material2021(platform: TargetPlatform.android)
-        .black
-        .apply(
-          bodyColor: scheme.onSurface,
-          displayColor: scheme.onSurface,
-        )
+    textTheme: Typography.material2021(platform: TargetPlatform.android).black
+        .apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface)
         .copyWith(
           bodyLarge: const TextStyle(fontSize: 16, height: 1.45),
           bodyMedium: const TextStyle(fontSize: 16, height: 1.45),

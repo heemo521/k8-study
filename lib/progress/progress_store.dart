@@ -45,18 +45,18 @@ class AnswerStats {
   final DateTime lastAt;
 
   Map<String, dynamic> toJson() => {
-        'n': seen,
-        'c': correct,
-        'last': lastCorrect,
-        'at': lastAt.toIso8601String(),
-      };
+    'n': seen,
+    'c': correct,
+    'last': lastCorrect,
+    'at': lastAt.toIso8601String(),
+  };
 
   static AnswerStats fromJson(Map<String, dynamic> j) => AnswerStats(
-        seen: j['n'] as int,
-        correct: j['c'] as int,
-        lastCorrect: j['last'] as bool,
-        lastAt: DateTime.parse(j['at'] as String),
-      );
+    seen: j['n'] as int,
+    correct: j['c'] as int,
+    lastCorrect: j['last'] as bool,
+    lastAt: DateTime.parse(j['at'] as String),
+  );
 }
 
 class QuizStats {
@@ -77,20 +77,20 @@ class QuizStats {
   final List<String> missed;
 
   Map<String, dynamic> toJson() => {
-        'attempts': attempts,
-        'bestPct': bestPct,
-        'lastPct': lastPct,
-        'lastAt': lastAt.toIso8601String(),
-        'missed': missed,
-      };
+    'attempts': attempts,
+    'bestPct': bestPct,
+    'lastPct': lastPct,
+    'lastAt': lastAt.toIso8601String(),
+    'missed': missed,
+  };
 
   static QuizStats fromJson(Map<String, dynamic> j) => QuizStats(
-        attempts: j['attempts'] as int,
-        bestPct: j['bestPct'] as int,
-        lastPct: j['lastPct'] as int,
-        lastAt: DateTime.parse(j['lastAt'] as String),
-        missed: [for (final m in (j['missed'] as List? ?? const [])) m as String],
-      );
+    attempts: j['attempts'] as int,
+    bestPct: j['bestPct'] as int,
+    lastPct: j['lastPct'] as int,
+    lastAt: DateTime.parse(j['lastAt'] as String),
+    missed: [for (final m in (j['missed'] as List? ?? const [])) m as String],
+  );
 }
 
 class PracticeRecord {
@@ -109,28 +109,26 @@ class PracticeRecord {
   final DateTime at;
 
   Map<String, dynamic> toJson() => {
-        'testId': testId,
-        'pct': pct,
-        'perDomain': {
-          for (final e in perDomain.entries) e.key: e.value.toJson(),
-        },
-        'durationSec': durationSec,
-        'at': at.toIso8601String(),
-      };
+    'testId': testId,
+    'pct': pct,
+    'perDomain': {for (final e in perDomain.entries) e.key: e.value.toJson()},
+    'durationSec': durationSec,
+    'at': at.toIso8601String(),
+  };
 
   static PracticeRecord fromJson(Map<String, dynamic> j) => PracticeRecord(
-        testId: j['testId'] as String,
-        pct: j['pct'] as int,
-        perDomain: {
-          for (final e in (j['perDomain'] as Map<String, dynamic>).entries)
-            e.key: DomainScore(
-              (e.value as Map<String, dynamic>)['correct'] as int,
-              (e.value as Map<String, dynamic>)['total'] as int,
-            ),
-        },
-        durationSec: j['durationSec'] as int,
-        at: DateTime.parse(j['at'] as String),
-      );
+    testId: j['testId'] as String,
+    pct: j['pct'] as int,
+    perDomain: {
+      for (final e in (j['perDomain'] as Map<String, dynamic>).entries)
+        e.key: DomainScore(
+          (e.value as Map<String, dynamic>)['correct'] as int,
+          (e.value as Map<String, dynamic>)['total'] as int,
+        ),
+    },
+    durationSec: j['durationSec'] as int,
+    at: DateTime.parse(j['at'] as String),
+  );
 }
 
 class ProgressStore extends ChangeNotifier implements AdCapStore {
@@ -169,35 +167,66 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     final stored = _prefs.getInt(StorageKeys.schema);
     if (stored != schemaVersion) _migrate(stored);
 
-    _notes = _read(StorageKeys.notes, {}, (j) => {
-          for (final e in (j as Map<String, dynamic>).entries)
-            e.key: {for (final s in e.value as List) s as String},
-        });
-    _cards = _read(StorageKeys.cards, {}, (j) => {
-          for (final e in (j as Map<String, dynamic>).entries)
-            e.key: CardState.fromJson(e.value as Map<String, dynamic>),
-        });
-    _quiz = _read(StorageKeys.quiz, {}, (j) => {
-          for (final e in (j as Map<String, dynamic>).entries)
-            e.key: QuizStats.fromJson(e.value as Map<String, dynamic>),
-        });
-    _practice = _read(StorageKeys.practice, [], (j) => [
-          for (final r in j as List) PracticeRecord.fromJson(r as Map<String, dynamic>),
-        ]);
-    _ads = _read(StorageKeys.ads, AdCapState.initial,
-        (j) => AdCapState.fromJson(j as Map<String, dynamic>));
+    _notes = _read(
+      StorageKeys.notes,
+      {},
+      (j) => {
+        for (final e in (j as Map<String, dynamic>).entries)
+          e.key: {for (final s in e.value as List) s as String},
+      },
+    );
+    _cards = _read(
+      StorageKeys.cards,
+      {},
+      (j) => {
+        for (final e in (j as Map<String, dynamic>).entries)
+          e.key: CardState.fromJson(e.value as Map<String, dynamic>),
+      },
+    );
+    _quiz = _read(
+      StorageKeys.quiz,
+      {},
+      (j) => {
+        for (final e in (j as Map<String, dynamic>).entries)
+          e.key: QuizStats.fromJson(e.value as Map<String, dynamic>),
+      },
+    );
+    _practice = _read(
+      StorageKeys.practice,
+      [],
+      (j) => [
+        for (final r in j as List)
+          PracticeRecord.fromJson(r as Map<String, dynamic>),
+      ],
+    );
+    _ads = _read(
+      StorageKeys.ads,
+      AdCapState.initial,
+      (j) => AdCapState.fromJson(j as Map<String, dynamic>),
+    );
     final settings = _read<Map<String, dynamic>>(
-        StorageKeys.settings, const {}, (j) => j as Map<String, dynamic>);
+      StorageKeys.settings,
+      const {},
+      (j) => j as Map<String, dynamic>,
+    );
     _practiceTimerOn = settings['practiceTimerOn'] as bool? ?? true;
     _subjectId = settings['subjectId'] as String?;
-    _answers = _read(StorageKeys.answers, {}, (j) => {
-          for (final e in (j as Map<String, dynamic>).entries)
-            e.key: AnswerStats.fromJson(e.value as Map<String, dynamic>),
-        });
-    _recent = _read(StorageKeys.recent, {}, (j) => {
-          for (final e in (j as Map<String, dynamic>).entries)
-            e.key: e.value as String,
-        });
+    _answers = _read(
+      StorageKeys.answers,
+      {},
+      (j) => {
+        for (final e in (j as Map<String, dynamic>).entries)
+          e.key: AnswerStats.fromJson(e.value as Map<String, dynamic>),
+      },
+    );
+    _recent = _read(
+      StorageKeys.recent,
+      {},
+      (j) => {
+        for (final e in (j as Map<String, dynamic>).entries)
+          e.key: e.value as String,
+      },
+    );
   }
 
   /// Schema migrations. v1 is the first schema, so an unknown or missing
@@ -206,7 +235,8 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _prefs.setInt(StorageKeys.schema, schemaVersion);
   }
 
-  void _write(String key, Object json) => _prefs.setString(key, jsonEncode(json));
+  void _write(String key, Object json) =>
+      _prefs.setString(key, jsonEncode(json));
 
   // ---- notes ---------------------------------------------------------------
 
@@ -251,8 +281,8 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   QuizStats? quizStats(String topicId) => _quiz[topicId];
 
   void _saveQuiz() => _write(StorageKeys.quiz, {
-        for (final e in _quiz.entries) e.key: e.value.toJson(),
-      });
+    for (final e in _quiz.entries) e.key: e.value.toJson(),
+  });
 
   /// A full quiz attempt finished: counts toward attempts and best score.
   void recordQuiz(String topicId, int pct, Set<String> missed) {
@@ -390,9 +420,9 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   // ---- settings ------------------------------------------------------------
 
   void _saveSettings() => _write(StorageKeys.settings, {
-        'practiceTimerOn': _practiceTimerOn,
-        if (_subjectId != null) 'subjectId': _subjectId,
-      });
+    'practiceTimerOn': _practiceTimerOn,
+    if (_subjectId != null) 'subjectId': _subjectId,
+  });
 
   bool get practiceTimerOn => _practiceTimerOn;
 

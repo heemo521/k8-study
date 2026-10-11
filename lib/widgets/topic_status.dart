@@ -16,28 +16,38 @@ class TopicStepRow extends StatelessWidget {
     final p = context.watch<ProgressStore>();
     final read = p.readCount(topic);
     final total = topic.sections.length;
-    final started = topic.flashcards.where((c) => p.cardState(c.id) != null).length;
+    final started = topic.flashcards
+        .where((c) => p.cardState(c.id) != null)
+        .length;
     final best = p.quizStats(topic.id)?.bestPct;
-    return Wrap(spacing: 6, runSpacing: 4, children: [
-      StepChip(
-        label: read == total ? 'Notes' : 'Notes $read/$total',
-        state: read == total
-            ? ProgressState.done
-            : (read > 0 ? ProgressState.partial : ProgressState.todo),
-      ),
-      StepChip(
-        label: started == 0 ? 'Cards' : 'Cards $started/${topic.flashcards.length}',
-        state: started == topic.flashcards.length
-            ? ProgressState.done
-            : (started > 0 ? ProgressState.partial : ProgressState.todo),
-      ),
-      StepChip(
-        label: best == null ? 'Quiz' : 'Quiz $best%',
-        state: best == null
-            ? ProgressState.todo
-            : (best >= masteryPercent ? ProgressState.done : ProgressState.weak),
-      ),
-    ]);
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        StepChip(
+          label: read == total ? 'Notes' : 'Notes $read/$total',
+          state: read == total
+              ? ProgressState.done
+              : (read > 0 ? ProgressState.partial : ProgressState.todo),
+        ),
+        StepChip(
+          label: started == 0
+              ? 'Cards'
+              : 'Cards $started/${topic.flashcards.length}',
+          state: started == topic.flashcards.length
+              ? ProgressState.done
+              : (started > 0 ? ProgressState.partial : ProgressState.todo),
+        ),
+        StepChip(
+          label: best == null ? 'Quiz' : 'Quiz $best%',
+          state: best == null
+              ? ProgressState.todo
+              : (best >= masteryPercent
+                    ? ProgressState.done
+                    : ProgressState.weak),
+        ),
+      ],
+    );
   }
 }
 
@@ -53,14 +63,26 @@ class StepChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (icon, fg, bg) = switch (state) {
-      ProgressState.done =>
-        (Icons.check_circle, scheme.onPrimaryContainer, scheme.primaryContainer),
-      ProgressState.partial => (Icons.timelapse, scheme.onSecondaryContainer,
-          scheme.secondaryContainer),
-      ProgressState.weak =>
-        (Icons.error_outline, scheme.onErrorContainer, scheme.errorContainer),
-      ProgressState.todo => (Icons.radio_button_unchecked, scheme.onSurfaceVariant,
-          scheme.surfaceContainerHighest),
+      ProgressState.done => (
+        Icons.check_circle,
+        scheme.onPrimaryContainer,
+        scheme.primaryContainer,
+      ),
+      ProgressState.partial => (
+        Icons.timelapse,
+        scheme.onSecondaryContainer,
+        scheme.secondaryContainer,
+      ),
+      ProgressState.weak => (
+        Icons.error_outline,
+        scheme.onErrorContainer,
+        scheme.errorContainer,
+      ),
+      ProgressState.todo => (
+        Icons.radio_button_unchecked,
+        scheme.onSurfaceVariant,
+        scheme.surfaceContainerHighest,
+      ),
     };
     final name = switch (state) {
       ProgressState.done => 'done',
@@ -77,12 +99,18 @@ class StepChip extends StatelessWidget {
           color: bg,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: fg),
-          const SizedBox(width: 4),
-          Text(label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: fg)),
-        ]),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: fg),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: fg),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -61,7 +61,10 @@ void main() {
 
     test('never exceeds total supply', () {
       final alloc = allocateByWeight(
-          available: {'a': 3}, weights: {'a': 1}, total: 10);
+        available: {'a': 3},
+        weights: {'a': 1},
+        total: 10,
+      );
       expect(alloc, {'a': 3});
     });
   });
@@ -71,10 +74,14 @@ void main() {
 
     test('counts down from wall-clock time and expires', () {
       final t = TestTimer(startedAt: start, limit: const Duration(minutes: 30));
-      expect(t.remaining(start.add(const Duration(minutes: 10))),
-          const Duration(minutes: 20));
-      expect(t.expired(start.add(const Duration(minutes: 29, seconds: 59))),
-          isFalse);
+      expect(
+        t.remaining(start.add(const Duration(minutes: 10))),
+        const Duration(minutes: 20),
+      );
+      expect(
+        t.expired(start.add(const Duration(minutes: 29, seconds: 59))),
+        isFalse,
+      );
       expect(t.expired(start.add(const Duration(minutes: 30))), isTrue);
       expect(t.remaining(start.add(const Duration(hours: 2))), Duration.zero);
     });
@@ -85,5 +92,4 @@ void main() {
       expect(t.expired(start.add(const Duration(days: 1))), isFalse);
     });
   });
-
 }

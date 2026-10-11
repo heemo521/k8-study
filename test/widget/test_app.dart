@@ -22,8 +22,10 @@ class FixedClock implements Clock {
 final testNow = DateTime(2026, 10, 11, 9);
 
 /// Phone viewport from spec §3.1.
-Future<void> setPhoneViewport(WidgetTester tester,
-    {Size size = const Size(390, 844)}) async {
+Future<void> setPhoneViewport(
+  WidgetTester tester, {
+  Size size = const Size(390, 844),
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -39,8 +41,8 @@ class TestHarness {
 
 Catalog? _catalog;
 
-Future<Catalog> loadCatalog(WidgetTester tester) async =>
-    _catalog ??= (await tester.runAsync(() => ContentLoader(rootBundle).load()))!;
+Future<Catalog> loadCatalog(WidgetTester tester) async => _catalog ??=
+    (await tester.runAsync(() => ContentLoader(rootBundle).load()))!;
 
 Future<TestHarness> pumpApp(
   WidgetTester tester, {
@@ -52,18 +54,22 @@ Future<TestHarness> pumpApp(
   final cat = catalog ?? await loadCatalog(tester);
   SharedPreferences.setMockInitialValues(prefs);
   final clock = FixedClock(testNow);
-  final progress =
-      ProgressStore(await SharedPreferences.getInstance(), clock: clock);
-  await tester.pumpWidget(K8StudyApp(
-    // Fresh state per pump so a new initialLocation takes effect.
-    key: UniqueKey(),
-    catalog: cat,
-    progress: progress,
-    ads: ads?.call(progress) ?? const NoopAdsService(),
+  final progress = ProgressStore(
+    await SharedPreferences.getInstance(),
     clock: clock,
-    random: Random(42),
-    initialLocation: initialLocation,
-  ));
+  );
+  await tester.pumpWidget(
+    K8StudyApp(
+      // Fresh state per pump so a new initialLocation takes effect.
+      key: UniqueKey(),
+      catalog: cat,
+      progress: progress,
+      ads: ads?.call(progress) ?? const NoopAdsService(),
+      clock: clock,
+      random: Random(42),
+      initialLocation: initialLocation,
+    ),
+  );
   await tester.pumpAndSettle();
   return TestHarness(cat, progress, clock);
 }

@@ -55,52 +55,59 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
         ],
       ),
-      body: PageList(children: [
-        if (query.length < 2)
-          Padding(
-            padding: const EdgeInsets.only(top: 24),
-            child: Text(
-              'Search topics, notes and flashcards — try “taint”, '
-              '“etcd snapshot” or “NodePort”.',
-              style: textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          )
-        else if (hits.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 24),
-            child: Text('No matches for “$query”.',
-                style: textTheme.bodyMedium, textAlign: TextAlign.center),
-          )
-        else ...[
-          Text('${hits.length}${hits.length == 50 ? '+' : ''} results',
-              style: textTheme.labelMedium),
-          const SizedBox(height: 8),
-          for (final h in hits)
-            Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Icon(switch (h.kind) {
-                  SearchKind.topic => Icons.menu_book_outlined,
-                  SearchKind.section => Icons.article_outlined,
-                  SearchKind.flashcard => Icons.style_outlined,
-                }),
-                title: Text(h.title),
-                subtitle: Text(
-                  '${h.kind == SearchKind.topic ? 'Topic' : h.topic.title} · ${h.snippet}',
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onTap: () => context.go(switch (h.kind) {
-                  SearchKind.section =>
-                    '/topic/${h.topic.id}/notes?section=${h.sectionId}',
-                  SearchKind.flashcard => '/topic/${h.topic.id}/cards',
-                  SearchKind.topic => '/topic/${h.topic.id}',
-                }),
+      body: PageList(
+        children: [
+          if (query.length < 2)
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: Text(
+                'Search topics, notes and flashcards — try “taint”, '
+                '“etcd snapshot” or “NodePort”.',
+                style: textTheme.bodyMedium,
+                textAlign: TextAlign.center,
               ),
+            )
+          else if (hits.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: Text(
+                'No matches for “$query”.',
+                style: textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            )
+          else ...[
+            Text(
+              '${hits.length}${hits.length == 50 ? '+' : ''} results',
+              style: textTheme.labelMedium,
             ),
+            const SizedBox(height: 8),
+            for (final h in hits)
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: Icon(switch (h.kind) {
+                    SearchKind.topic => Icons.menu_book_outlined,
+                    SearchKind.section => Icons.article_outlined,
+                    SearchKind.flashcard => Icons.style_outlined,
+                  }),
+                  title: Text(h.title),
+                  subtitle: Text(
+                    '${h.kind == SearchKind.topic ? 'Topic' : h.topic.title} · ${h.snippet}',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () => context.go(switch (h.kind) {
+                    SearchKind.section =>
+                      '/topic/${h.topic.id}/notes?section=${h.sectionId}',
+                    SearchKind.flashcard => '/topic/${h.topic.id}/cards',
+                    SearchKind.topic => '/topic/${h.topic.id}',
+                  }),
+                ),
+              ),
+          ],
         ],
-      ]),
+      ),
     );
   }
 }

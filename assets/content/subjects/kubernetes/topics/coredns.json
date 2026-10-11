@@ -90,7 +90,7 @@
         {
           "type": "bullets",
           "items": [
-            "Pod A record form: `<pod-IPv4-address>.<namespace>.pod.<cluster-domain>` with dots in the IP turned into dashes, e.g. `172-17-0-3.default.pod.cluster.local`.",
+            "Legacy kube-dns Pod A record form (from before the DNS specification): `<pod-IPv4-address>.<namespace>.pod.<cluster-domain>` with dots in the IP turned into dashes, e.g. `172-17-0-3.default.pod.cluster.local`.",
             "A Pod's hostname is its `metadata.name` unless `spec.hostname` is set.",
             "With `spec.hostname: foo` and `spec.subdomain: bar` in `my-namespace`, the FQDN is `foo.bar.my-namespace.svc.cluster.local`.",
             "DNS only serves records for that FQDN if a **headless Service named like the subdomain** exists in the same namespace.",

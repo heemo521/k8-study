@@ -193,7 +193,7 @@
             "Sidecars ignore the Pod policy because their own container-level `restartPolicy` is `Always`.",
             "Restarts use exponential back-off: 10s, 20s, 40s and so on, capped at 300 seconds (5 minutes).",
             "After a container runs cleanly for 10 minutes, the back-off timer resets.",
-            "Restarts happen in place, on the same node. They are the kubelet's self-healing for containers."
+            "Restart policy only covers replacement containers inside the same Pod, on the same node."
           ]
         }
       ]

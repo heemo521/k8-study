@@ -25,7 +25,7 @@
           "type": "bullets",
           "items": [
             "Upgrade **one minor version at a time** (e.g. 1.36.x → 1.37.x). Skipping minor versions is unsupported. Patch upgrades within a minor (1.37.x → 1.37.y) follow the same steps.",
-            "Order: **primary control plane node → other control plane nodes → worker nodes**, one node at a time.",
+            "Order: **primary control plane node → other control plane nodes → worker nodes**. Control plane nodes go one at a time; workers one or a few at a time, keeping enough capacity for your workloads.",
             "Swap must be disabled. Back up important components first; kubeadm upgrade doesn't touch your workloads.",
             "Drain a node before a minor-version kubelet upgrade. Control plane nodes may be running CoreDNS or other critical Pods.",
             "Match kubelet and kubeadm versions. An older kubelet is allowed if it is within the supported skew.",

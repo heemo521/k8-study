@@ -41,12 +41,17 @@ class QuizResultScreen extends StatelessWidget {
     final pct = attempt.percent;
 
     final children = <Widget>[
-      Text('$pct%',
-          key: const ValueKey('quiz-score'),
-          style: textTheme.displayMedium,
-          textAlign: TextAlign.center),
-      Text('${attempt.correctCount} of ${attempt.questions.length} correct',
-          style: textTheme.titleMedium, textAlign: TextAlign.center),
+      Text(
+        '$pct%',
+        key: const ValueKey('quiz-score'),
+        style: textTheme.displayMedium,
+        textAlign: TextAlign.center,
+      ),
+      Text(
+        '${attempt.correctCount} of ${attempt.questions.length} correct',
+        style: textTheme.titleMedium,
+        textAlign: TextAlign.center,
+      ),
       const SizedBox(height: 8),
     ];
     final actions = <Widget>[];
@@ -58,8 +63,11 @@ class QuizResultScreen extends StatelessWidget {
         final mastered = (stats?.bestPct ?? 0) >= masteryPercent;
         children.addAll([
           if (retryMissed)
-            Text('Retry runs don’t change your best score.',
-                style: textTheme.bodySmall, textAlign: TextAlign.center)
+            Text(
+              'Retry runs don’t change your best score.',
+              style: textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            )
           else
             Text(
               pct >= masteryPercent
@@ -69,11 +77,17 @@ class QuizResultScreen extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           if (stats != null)
-            Text('Best so far: ${stats.bestPct}%',
-                style: textTheme.bodySmall, textAlign: TextAlign.center),
+            Text(
+              'Best so far: ${stats.bestPct}%',
+              style: textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
           const SizedBox(height: 4),
-          Text('The mastery mark is this app’s own bar, not an exam pass mark.',
-              style: textTheme.bodySmall, textAlign: TextAlign.center),
+          Text(
+            'The mastery mark is this app’s own bar, not an exam pass mark.',
+            style: textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
         ]);
         final next = mastered ? nextAction(content, progress) : null;
         actions.addAll([
@@ -107,8 +121,13 @@ class QuizResultScreen extends StatelessWidget {
           ),
         ]);
       case ReviewQuizSpec():
-        children.add(Text('Answers count toward your gap analysis.',
-            style: textTheme.bodySmall, textAlign: TextAlign.center));
+        children.add(
+          Text(
+            'Answers count toward your gap analysis.',
+            style: textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        );
         actions.addAll([
           FilledButton(
             key: const ValueKey('review-again'),
@@ -131,20 +150,22 @@ class QuizResultScreen extends StatelessWidget {
         }),
         leading: BackButton(onPressed: () => context.go(spec.exitPath)),
       ),
-      body: PageList(children: [
-        ...children,
-        const SizedBox(height: 16),
-        Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 8,
-          runSpacing: 8,
-          children: actions,
-        ),
-        const SizedBox(height: 16),
-        Text('Review', style: textTheme.titleMedium),
-        const SizedBox(height: 8),
-        AttemptReview(attempt: attempt),
-      ]),
+      body: PageList(
+        children: [
+          ...children,
+          const SizedBox(height: 16),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: actions,
+          ),
+          const SizedBox(height: 16),
+          Text('Review', style: textTheme.titleMedium),
+          const SizedBox(height: 8),
+          AttemptReview(attempt: attempt),
+        ],
+      ),
     );
   }
 }

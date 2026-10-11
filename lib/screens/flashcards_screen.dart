@@ -44,9 +44,10 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     super.initState();
     final topic = _topic;
     if (topic != null) {
-      context
-          .read<ProgressStore>()
-          .markTopicVisited(context.read<ContentBundle>().subject.id, topic.id);
+      context.read<ProgressStore>().markTopicVisited(
+        context.read<ContentBundle>().subject.id,
+        topic.id,
+      );
     }
     _startSession(practice: false);
   }
@@ -61,8 +62,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     final topic = _topic;
     final content = context.read<ContentBundle>();
     if (topic == null && !_allDue) return;
-    final pool = topic?.flashcards ??
-        dueCards(content, context.read<ProgressStore>(), context.read<Clock>().now());
+    final pool =
+        topic?.flashcards ??
+        dueCards(
+          content,
+          context.read<ProgressStore>(),
+          context.read<Clock>().now(),
+        );
     final cards = practice
         ? ([...pool]..shuffle(context.read<Random>()))
         : buildSession(
@@ -126,7 +132,9 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
       onKeyEvent: _onKey,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(topic == null ? 'Due flashcards' : '${topic.title} · Cards'),
+          title: Text(
+            topic == null ? 'Due flashcards' : '${topic.title} · Cards',
+          ),
           leading: BackButton(onPressed: () => context.go(_exitPath)),
         ),
         body: PageWidth(
@@ -140,23 +148,26 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                         : () => _startSession(practice: true),
                   )
                 : session.isDone
-                    ? _Summary(
-                        session: session,
-                        onAgain: () =>
-                            _startSession(practice: session.practiceMode),
-                        nextLabel: topic == null ? 'Back to Progress' : 'Next: Quiz',
-                        onNext: () => context.go(
-                            topic == null ? '/progress' : '/topic/${topic.id}/quiz'),
-                      )
-                    : _CardView(
-                        session: session,
-                        topicTitle: topic == null
-                            ? content.topic(session.current.topicId)?.title
-                            : null,
-                        flipped: _flipped,
-                        onFlip: _flip,
-                        onAnswer: _answer,
-                      ),
+                ? _Summary(
+                    session: session,
+                    onAgain: () =>
+                        _startSession(practice: session.practiceMode),
+                    nextLabel: topic == null
+                        ? 'Back to Progress'
+                        : 'Next: Quiz',
+                    onNext: () => context.go(
+                      topic == null ? '/progress' : '/topic/${topic.id}/quiz',
+                    ),
+                  )
+                : _CardView(
+                    session: session,
+                    topicTitle: topic == null
+                        ? content.topic(session.current.topicId)?.title
+                        : null,
+                    flipped: _flipped,
+                    onFlip: _flip,
+                    onAnswer: _answer,
+                  ),
           ),
         ),
       ),
@@ -204,7 +215,9 @@ class _CardView extends StatelessWidget {
         Expanded(
           child: Semantics(
             button: true,
-            label: flipped ? 'Card answer. Tap to flip back' : 'Card prompt. Tap to flip',
+            label: flipped
+                ? 'Card answer. Tap to flip back'
+                : 'Card prompt. Tap to flip',
             child: GestureDetector(
               key: const ValueKey('flashcard'),
               onTap: onFlip,
@@ -220,11 +233,15 @@ class _CardView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(flipped ? 'ANSWER' : 'PROMPT',
-                            style: textTheme.labelSmall),
+                        Text(
+                          flipped ? 'ANSWER' : 'PROMPT',
+                          style: textTheme.labelSmall,
+                        ),
                         const SizedBox(height: 12),
-                        InlineText(flipped ? card.back : card.front,
-                            style: textTheme.headlineSmall),
+                        InlineText(
+                          flipped ? card.back : card.front,
+                          style: textTheme.headlineSmall,
+                        ),
                         if (flipped) ...[
                           const SizedBox(height: 16),
                           SourceLink(url: card.sourceUrl),
@@ -245,23 +262,25 @@ class _CardView extends StatelessWidget {
             child: const Text('Show answer (Space)'),
           )
         else
-          Row(children: [
-            Expanded(
-              child: OutlinedButton(
-                key: const ValueKey('again'),
-                onPressed: () => onAnswer(false),
-                child: const Text('Again (1)'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  key: const ValueKey('again'),
+                  onPressed: () => onAnswer(false),
+                  child: const Text('Again (1)'),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton(
-                key: const ValueKey('got-it'),
-                onPressed: () => onAnswer(true),
-                child: const Text('Got it (2)'),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  key: const ValueKey('got-it'),
+                  onPressed: () => onAnswer(true),
+                  child: const Text('Got it (2)'),
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
       ],
     );
   }
@@ -288,10 +307,17 @@ class _Summary extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Session done', style: textTheme.headlineSmall, textAlign: TextAlign.center),
+        Text(
+          'Session done',
+          style: textTheme.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
-        Text('${session.reviewed} reviewed · ${session.gotItCount} got it',
-            style: textTheme.bodyLarge, textAlign: TextAlign.center),
+        Text(
+          '${session.reviewed} reviewed · ${session.gotItCount} got it',
+          style: textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 24),
         OutlinedButton(onPressed: onAgain, child: const Text('Review again')),
         const SizedBox(height: 8),
@@ -316,7 +342,8 @@ class _CaughtUp extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress = context.read<ProgressStore>();
     final now = context.read<Clock>().now();
-    final cards = topic?.flashcards ??
+    final cards =
+        topic?.flashcards ??
         context.read<ContentBundle>().allFlashcards.toList();
     final next = nextDueDate(cards, progress.cardStates, now);
     final days = next?.difference(dateOnly(now)).inDays;
@@ -325,7 +352,11 @@ class _CaughtUp extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('All caught up', style: textTheme.headlineSmall, textAlign: TextAlign.center),
+        Text(
+          'All caught up',
+          style: textTheme.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
         Text(
           days == null
@@ -344,7 +375,8 @@ class _CaughtUp extends StatelessWidget {
         ],
         FilledButton(
           onPressed: () => context.go(
-              topic == null ? '/progress' : '/topic/${topic!.id}/quiz'),
+            topic == null ? '/progress' : '/topic/${topic!.id}/quiz',
+          ),
           child: Text(topic == null ? 'Back to Progress' : 'Next: Quiz'),
         ),
       ],

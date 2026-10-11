@@ -39,41 +39,49 @@ class TopicBrowserScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: PageList(children: [
-        _ContinueCard(content: content, progress: progress),
-        if (due > 0 || missed > 0) ...[
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            if (due > 0)
-              ActionChip(
-                key: const ValueKey('chip-due-cards'),
-                avatar: const Icon(Icons.style_outlined, size: 18),
-                label: Text('$due ${due == 1 ? 'card' : 'cards'} due'),
-                onPressed: () => context.go('/progress/cards'),
-              ),
-            if (missed > 0)
-              ActionChip(
-                key: const ValueKey('chip-missed'),
-                avatar: const Icon(Icons.replay, size: 18),
-                label: Text('$missed missed ${missed == 1 ? 'question' : 'questions'}'),
-                onPressed: () => context.go('/progress/review?kind=missed'),
-              ),
-            ActionChip(
-              avatar: const Icon(Icons.insights_outlined, size: 18),
-              label: const Text('Find my gaps'),
-              onPressed: () => context.go('/progress'),
+      body: PageList(
+        children: [
+          _ContinueCard(content: content, progress: progress),
+          if (due > 0 || missed > 0) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (due > 0)
+                  ActionChip(
+                    key: const ValueKey('chip-due-cards'),
+                    avatar: const Icon(Icons.style_outlined, size: 18),
+                    label: Text('$due ${due == 1 ? 'card' : 'cards'} due'),
+                    onPressed: () => context.go('/progress/cards'),
+                  ),
+                if (missed > 0)
+                  ActionChip(
+                    key: const ValueKey('chip-missed'),
+                    avatar: const Icon(Icons.replay, size: 18),
+                    label: Text(
+                      '$missed missed ${missed == 1 ? 'question' : 'questions'}',
+                    ),
+                    onPressed: () => context.go('/progress/review?kind=missed'),
+                  ),
+                ActionChip(
+                  avatar: const Icon(Icons.insights_outlined, size: 18),
+                  label: const Text('Find my gaps'),
+                  onPressed: () => context.go('/progress'),
+                ),
+              ],
             ),
-          ]),
+          ],
+          const SizedBox(height: 16),
+          for (final domain in content.domainsInDisplayOrder)
+            _DomainSection(
+              content: content,
+              domain: domain,
+              topics: content.topicsForDomain(domain.id),
+            ),
+          ads.banner(AdPlacement.topicListBanner),
         ],
-        const SizedBox(height: 16),
-        for (final domain in content.domainsInDisplayOrder)
-          _DomainSection(
-            content: content,
-            domain: domain,
-            topics: content.topicsForDomain(domain.id),
-          ),
-        ads.banner(AdPlacement.topicListBanner),
-      ]),
+      ),
     );
   }
 }
@@ -101,9 +109,12 @@ class _ContinueCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('$complete of $total topics complete',
-                style: textTheme.labelLarge
-                    ?.copyWith(color: scheme.onPrimaryContainer)),
+            Text(
+              '$complete of $total topics complete',
+              style: textTheme.labelLarge?.copyWith(
+                color: scheme.onPrimaryContainer,
+              ),
+            ),
             const SizedBox(height: 6),
             LinearProgressIndicator(
               value: total == 0 ? 0 : complete / total,
@@ -113,13 +124,19 @@ class _ContinueCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             if (next == null) ...[
-              Text('Every topic is complete',
-                  style: textTheme.titleLarge
-                      ?.copyWith(color: scheme.onPrimaryContainer)),
+              Text(
+                'Every topic is complete',
+                style: textTheme.titleLarge?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text('Keep your flashcards up to date and try a practice test.',
-                  style: textTheme.bodyMedium
-                      ?.copyWith(color: scheme.onPrimaryContainer)),
+              Text(
+                'Keep your flashcards up to date and try a practice test.',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () => context.go('/practice'),
@@ -129,13 +146,17 @@ class _ContinueCard extends StatelessWidget {
               Text(
                 '${next.resuming ? 'Continue' : (complete == 0 && !progress.topicStarted(next.topic) ? 'Start here' : 'Up next')}'
                 ' · Topic ${next.position} of ${next.total}',
-                style: textTheme.labelMedium
-                    ?.copyWith(color: scheme.onPrimaryContainer),
+                style: textTheme.labelMedium?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
               ),
               const SizedBox(height: 2),
-              Text(next.topic.title,
-                  style: textTheme.titleLarge
-                      ?.copyWith(color: scheme.onPrimaryContainer)),
+              Text(
+                next.topic.title,
+                style: textTheme.titleLarge?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
               const SizedBox(height: 8),
               TopicStepRow(topic: next.topic),
               const SizedBox(height: 12),
@@ -183,17 +204,20 @@ class _DomainSection extends StatelessWidget {
             child: Text(domain.title, style: textTheme.titleMedium),
           ),
           const SizedBox(height: 2),
-          Row(children: [
-            Expanded(
-              child: Text(
-                [
-                  if (weight.isNotEmpty) weight,
-                  if (topics.isNotEmpty) '$complete/${topics.length} complete',
-                ].join(' · '),
-                style: textTheme.bodySmall,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  [
+                    if (weight.isNotEmpty) weight,
+                    if (topics.isNotEmpty)
+                      '$complete/${topics.length} complete',
+                  ].join(' · '),
+                  style: textTheme.bodySmall,
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
           if (topics.isNotEmpty) ...[
             const SizedBox(height: 6),
             LinearProgressIndicator(
@@ -217,7 +241,9 @@ class _DomainSection extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _TopicCard(
-                    topic: t, position: content.topics.indexOf(t) + 1),
+                  topic: t,
+                  position: content.topics.indexOf(t) + 1,
+                ),
               ),
         ],
       ),
@@ -245,13 +271,19 @@ class _TopicCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Stack(alignment: Alignment.center, children: [
-                ProgressRing(value: progress.topicProgress(topic), size: 40),
-                complete
-                    ? Icon(Icons.check,
-                        size: 18, color: Theme.of(context).colorScheme.primary)
-                    : Text('$position', style: textTheme.labelMedium),
-              ]),
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  ProgressRing(value: progress.topicProgress(topic), size: 40),
+                  complete
+                      ? Icon(
+                          Icons.check,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        )
+                      : Text('$position', style: textTheme.labelMedium),
+                ],
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -259,10 +291,12 @@ class _TopicCard extends StatelessWidget {
                   children: [
                     Text(topic.title, style: textTheme.titleSmall),
                     const SizedBox(height: 2),
-                    Text(topic.summary,
-                        style: textTheme.bodySmall,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
+                    Text(
+                      topic.summary,
+                      style: textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: 6),
                     TopicStepRow(topic: topic),
                   ],

@@ -22,12 +22,18 @@ class SubjectTitle extends StatelessWidget {
       onTap: () => showSubjectPicker(context),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Flexible(
-            child: Text(current.subject.title, overflow: TextOverflow.ellipsis),
-          ),
-          const Icon(Icons.arrow_drop_down),
-        ]),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                current.subject.title,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
       ),
     );
   }
@@ -41,27 +47,35 @@ Future<void> showSubjectPicker(BuildContext context) {
     context: context,
     showDragHandle: true,
     builder: (sheet) => SafeArea(
-      child: ListView(shrinkWrap: true, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Text('Choose a subject',
-              style: Theme.of(sheet).textTheme.titleMedium),
-        ),
-        for (final s in catalog.subjects)
-          ListTile(
-            key: ValueKey('subject-${s.subject.id}'),
-            selected: s.subject.id == current,
-            title: Text(s.subject.title),
-            subtitle: Text(
-                '${s.subject.tagline} · '
-                '${s.topics.where(progress.topicComplete).length}/${s.topics.length} topics complete'),
-            trailing: s.subject.id == current ? const Icon(Icons.check) : null,
-            onTap: () {
-              progress.subjectId = s.subject.id;
-              Navigator.pop(sheet);
-            },
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'Choose a subject',
+              style: Theme.of(sheet).textTheme.titleMedium,
+            ),
           ),
-      ]),
+          for (final s in catalog.subjects)
+            ListTile(
+              key: ValueKey('subject-${s.subject.id}'),
+              selected: s.subject.id == current,
+              title: Text(s.subject.title),
+              subtitle: Text(
+                '${s.subject.tagline} · '
+                '${s.topics.where(progress.topicComplete).length}/${s.topics.length} topics complete',
+              ),
+              trailing: s.subject.id == current
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () {
+                progress.subjectId = s.subject.id;
+                Navigator.pop(sheet);
+              },
+            ),
+        ],
+      ),
     ),
   );
 }

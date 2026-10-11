@@ -31,11 +31,11 @@ class CardState {
   bool isDue(DateTime now) => !dateOnly(dueAt).isAfter(dateOnly(now));
 
   Map<String, dynamic> toJson() => {
-        'box': box,
-        'dueAt': formatDate(dueAt),
-        if (lastReviewedAt != null)
-          'lastReviewedAt': lastReviewedAt!.toIso8601String(),
-      };
+    'box': box,
+    'dueAt': formatDate(dueAt),
+    if (lastReviewedAt != null)
+      'lastReviewedAt': lastReviewedAt!.toIso8601String(),
+  };
 
   static CardState fromJson(Map<String, dynamic> json) {
     final box = json['box'];
@@ -75,27 +75,33 @@ List<Flashcard> buildSession({
   required Random random,
   int cap = sessionCap,
 }) {
-  final due = cards
-      .where((c) => states[c.id] != null && states[c.id]!.isDue(now))
-      .toList()
-    ..sort((a, b) => states[a.id]!.dueAt.compareTo(states[b.id]!.dueAt));
+  final due =
+      cards
+          .where((c) => states[c.id] != null && states[c.id]!.isDue(now))
+          .toList()
+        ..sort((a, b) => states[a.id]!.dueAt.compareTo(states[b.id]!.dueAt));
   final fresh = cards.where((c) => states[c.id] == null).toList();
 
   final dueTaken = due.take(cap).toList()..shuffle(random);
-  final freshTaken =
-      fresh.take(max(0, cap - dueTaken.length)).toList()..shuffle(random);
+  final freshTaken = fresh.take(max(0, cap - dueTaken.length)).toList()
+    ..shuffle(random);
   return [...dueTaken, ...freshTaken];
 }
 
 /// Number of cards that a normal session would include right now.
-int dueCount(List<Flashcard> cards, Map<String, CardState> states, DateTime now) =>
-    cards
-        .where((c) => states[c.id] == null || states[c.id]!.isDue(now))
-        .length;
+int dueCount(
+  List<Flashcard> cards,
+  Map<String, CardState> states,
+  DateTime now,
+) =>
+    cards.where((c) => states[c.id] == null || states[c.id]!.isDue(now)).length;
 
 /// Earliest future due date among [cards], or null.
 DateTime? nextDueDate(
-    List<Flashcard> cards, Map<String, CardState> states, DateTime now) {
+  List<Flashcard> cards,
+  Map<String, CardState> states,
+  DateTime now,
+) {
   DateTime? next;
   for (final c in cards) {
     final s = states[c.id];
@@ -108,7 +114,7 @@ DateTime? nextDueDate(
 /// A running review session. Mutable; pure Dart.
 class FlashcardSession {
   FlashcardSession({required List<Flashcard> cards, this.practiceMode = false})
-      : _queue = [...cards];
+    : _queue = [...cards];
 
   /// "Practice anyway": reviewing doesn't change box or due date.
   final bool practiceMode;

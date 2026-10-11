@@ -18,25 +18,30 @@ class NoteBlockView extends StatelessWidget {
       child: switch (block) {
         ParagraphBlock(:final text) => InlineText(text, style: body),
         BulletsBlock(:final items) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final item in items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('•  ', style: body),
-                      Expanded(child: InlineText(item, style: body)),
-                    ],
-                  ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final item in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('•  ', style: body),
+                    Expanded(child: InlineText(item, style: body)),
+                  ],
                 ),
-            ],
-          ),
+              ),
+          ],
+        ),
         CodeBlock(:final text) => _CodeView(text: text),
-        CalloutBlock(:final kind, :final text) => _Callout(kind: kind, text: text),
-        TableBlock(:final header, :final rows) =>
-          _TableView(header: header, rows: rows),
+        CalloutBlock(:final kind, :final text) => _Callout(
+          kind: kind,
+          text: text,
+        ),
+        TableBlock(:final header, :final rows) => _TableView(
+          header: header,
+          rows: rows,
+        ),
       },
     );
   }
@@ -80,8 +85,8 @@ class _CodeView extends StatelessWidget {
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: text));
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied')));
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('Copied')));
               }
             },
           ),
@@ -101,12 +106,24 @@ class _Callout extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (icon, label, bg, fg) = switch (kind) {
-      CalloutKind.key => (Icons.lightbulb_outline, 'Key point',
-          scheme.primaryContainer, scheme.onPrimaryContainer),
-      CalloutKind.exam => (Icons.school_outlined, 'Exam tip',
-          scheme.tertiaryContainer, scheme.onTertiaryContainer),
-      CalloutKind.warn => (Icons.warning_amber_outlined, 'Watch out',
-          scheme.errorContainer, scheme.onErrorContainer),
+      CalloutKind.key => (
+        Icons.lightbulb_outline,
+        'Key point',
+        scheme.primaryContainer,
+        scheme.onPrimaryContainer,
+      ),
+      CalloutKind.exam => (
+        Icons.school_outlined,
+        'Exam tip',
+        scheme.tertiaryContainer,
+        scheme.onTertiaryContainer,
+      ),
+      CalloutKind.warn => (
+        Icons.warning_amber_outlined,
+        'Watch out',
+        scheme.errorContainer,
+        scheme.onErrorContainer,
+      ),
     };
     return Container(
       padding: const EdgeInsets.all(12),
@@ -120,8 +137,11 @@ class _Callout extends StatelessWidget {
           Icon(icon, color: fg, size: 20, semanticLabel: label),
           const SizedBox(width: 10),
           Expanded(
-            child: InlineText(text,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: fg)),
+            child: InlineText(
+              text,
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: fg),
+            ),
           ),
         ],
       ),
@@ -140,46 +160,57 @@ class _TableView extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final cellStyle = textTheme.bodyMedium?.copyWith(fontSize: 14);
-    return LayoutBuilder(builder: (context, constraints) {
-      // Fit the viewport when possible; scroll horizontally inside the box
-      // otherwise (never the page).
-      final minWidth = header.length * 110.0;
-      final width =
-          constraints.maxWidth > minWidth ? constraints.maxWidth : minWidth;
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: width,
-          child: Table(
-            border: TableBorder.all(color: scheme.outlineVariant),
-            columnWidths: {
-              for (var i = 0; i < header.length; i++)
-                i: const FlexColumnWidth(),
-            },
-            children: [
-              TableRow(
-                decoration: BoxDecoration(color: scheme.surfaceContainerHighest),
-                children: [
-                  for (final h in header)
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(h,
-                          style: cellStyle?.copyWith(fontWeight: FontWeight.w700)),
-                    ),
-                ],
-              ),
-              for (final row in rows)
-                TableRow(children: [
-                  for (final cell in row)
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: InlineText(cell, style: cellStyle),
-                    ),
-                ]),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Fit the viewport when possible; scroll horizontally inside the box
+        // otherwise (never the page).
+        final minWidth = header.length * 110.0;
+        final width = constraints.maxWidth > minWidth
+            ? constraints.maxWidth
+            : minWidth;
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: width,
+            child: Table(
+              border: TableBorder.all(color: scheme.outlineVariant),
+              columnWidths: {
+                for (var i = 0; i < header.length; i++)
+                  i: const FlexColumnWidth(),
+              },
+              children: [
+                TableRow(
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest,
+                  ),
+                  children: [
+                    for (final h in header)
+                      Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Text(
+                          h,
+                          style: cellStyle?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                for (final row in rows)
+                  TableRow(
+                    children: [
+                      for (final cell in row)
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: InlineText(cell, style: cellStyle),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   }
 }

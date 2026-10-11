@@ -39,9 +39,10 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final topic = _topic;
       if (topic == null || !mounted) return;
-      context
-          .read<ProgressStore>()
-          .markTopicVisited(context.read<ContentBundle>().subject.id, topic.id);
+      context.read<ProgressStore>().markTopicVisited(
+        context.read<ContentBundle>().subject.id,
+        topic.id,
+      );
       if (widget.sectionId != null) {
         _jumpTo(widget.sectionId!);
       } else {
@@ -53,8 +54,11 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
   void _jumpTo(String sectionId) {
     final ctx = _headingKeys[sectionId]?.currentContext;
     if (ctx == null) return;
-    Scrollable.ensureVisible(ctx,
-        duration: const Duration(milliseconds: 250), alignment: 0.02);
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 250),
+      alignment: 0.02,
+    );
   }
 
   Future<void> _showSections(Topic topic) async {
@@ -63,16 +67,21 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
       context: context,
       showDragHandle: true,
       builder: (sheet) => SafeArea(
-        child: ListView(shrinkWrap: true, children: [
-          for (var i = 0; i < topic.sections.length; i++)
-            ListTile(
-              leading: Icon(read.contains(topic.sections[i].id)
-                  ? Icons.check_circle
-                  : Icons.radio_button_unchecked),
-              title: Text('${i + 1}. ${topic.sections[i].heading}'),
-              onTap: () => Navigator.pop(sheet, topic.sections[i].id),
-            ),
-        ]),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (var i = 0; i < topic.sections.length; i++)
+              ListTile(
+                leading: Icon(
+                  read.contains(topic.sections[i].id)
+                      ? Icons.check_circle
+                      : Icons.radio_button_unchecked,
+                ),
+                title: Text('${i + 1}. ${topic.sections[i].heading}'),
+                onTap: () => Navigator.pop(sheet, topic.sections[i].id),
+              ),
+          ],
+        ),
       ),
     );
     if (picked != null) _jumpTo(picked);
@@ -125,8 +134,10 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
           padding: const EdgeInsets.only(top: 8, bottom: 8),
           child: Semantics(
             header: true,
-            child: Text('${i + 1}. ${section.heading}',
-                style: textTheme.titleLarge),
+            child: Text(
+              '${i + 1}. ${section.heading}',
+              style: textTheme.titleLarge,
+            ),
           ),
         ),
         for (final block in section.blocks) NoteBlockView(block),
@@ -134,14 +145,19 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
           key: footerKey,
           children: [
             Expanded(
-              child: SourceLink(url: section.sourceUrl, title: section.sourceTitle),
+              child: SourceLink(
+                url: section.sourceUrl,
+                title: section.sourceTitle,
+              ),
             ),
             isRead
                 ? Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Icon(Icons.check_circle,
-                        color: Theme.of(context).colorScheme.primary,
-                        semanticLabel: 'Read'),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Theme.of(context).colorScheme.primary,
+                      semanticLabel: 'Read',
+                    ),
                   )
                 : TextButton(
                     key: ValueKey('mark-read-${section.id}'),
@@ -182,16 +198,18 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
           preferredSize: const Size.fromHeight(28),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Row(children: [
-              Expanded(
-                child: LinearProgressIndicator(
-                  value: total == 0 ? 1 : readCount / total,
-                  borderRadius: BorderRadius.circular(3),
+            child: Row(
+              children: [
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: total == 0 ? 1 : readCount / total,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Text('$readCount/$total', style: textTheme.labelMedium),
-            ]),
+                const SizedBox(width: 12),
+                Text('$readCount/$total', style: textTheme.labelMedium),
+              ],
+            ),
           ),
         ),
       ),

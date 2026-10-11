@@ -132,7 +132,7 @@
           "items": [
             "A GatewayClass's `controllerName` tells an implementation which classes it manages.",
             "A Gateway must reference a GatewayClass through `gatewayClassName`.",
-            "Each **listener** sets a protocol, port and optional hostname.",
+            "Each **listener** has a name, protocol and port; the example listener also sets a hostname and `allowedRoutes`.",
             "If `addresses` is left unset, the implementation's controller assigns an address or hostname to the Gateway."
           ]
         },

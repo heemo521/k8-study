@@ -13,7 +13,7 @@ const { chromium } = require('playwright');
 
 const BASE = process.env.BASE_URL || 'http://localhost:8080/';
 const SHOT_DIR = path.resolve(__dirname, process.env.SHOT_DIR || '../../docs/screenshots');
-const CONTENT_DIR = path.resolve(__dirname, '../../assets/content');
+const CONTENT_DIR = path.resolve(__dirname, '../../assets/content/subjects/kubernetes');
 const PHONE = { width: 390, height: 844 };
 
 const results = [];
@@ -186,8 +186,22 @@ async function noHorizontalScroll(page) {
 
   // ---- Persistence across reload --------------------------------------------
   await go(page, '/');
-  check('progress persists after reload', await hasText(page, '1 of 6 topics complete'));
+  const topicCount = JSON.parse(fs.readFileSync(path.join(CONTENT_DIR, 'subject.json'), 'utf8')).topics.length;
+  check('progress persists after reload', await hasText(page, `1 of ${topicCount} topics complete`));
   await shot(page, '10-home-after');
+
+  // ---- Gaps view and search -------------------------------------------------
+  await go(page, '/progress');
+  check('readiness shows accuracy for answered questions', await hasText(page, '% accuracy on'));
+  await shot(page, '15-progress-readiness');
+  for (let i = 0; i < 6 && !(await findIndex(page, 'Knowledge gaps', true) >= 0); i++) await scrollDown(page, 400);
+  check('gap analysis section present', await hasText(page, 'Knowledge gaps'));
+  await shot(page, '16-progress-gaps');
+  await go(page, '/search');
+  await page.keyboard.type('taint');
+  await page.waitForTimeout(800);
+  check('search returns results', await hasText(page, 'results'));
+  await shot(page, '17-search');
 
   // ---- Practice test ---------------------------------------------------------
   await go(page, '/practice');
@@ -223,7 +237,7 @@ async function noHorizontalScroll(page) {
   await waitApp(page);
   check('offline reload renders the app', await hasText(page, 'K8 Study'));
   await go(page, '/topic/kubeadm/notes');
-  check('offline: topic notes render', await hasText(page, '1. What kubeadm does'));
+  check('offline: topic notes render', await hasText(page, '1. Prepare the hosts'));
   await shot(page, '14-offline-notes');
   await ctx.setOffline(false);
 

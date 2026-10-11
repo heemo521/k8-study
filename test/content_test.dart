@@ -30,7 +30,11 @@ void main() {
     for (final s in catalog.subjects) {
       final id = s.subject.id;
       expect(pubspec, contains('assets/content/subjects/$id/\n'), reason: id);
-      expect(pubspec, contains('assets/content/subjects/$id/topics/'), reason: id);
+      expect(
+        pubspec,
+        contains('assets/content/subjects/$id/topics/'),
+        reason: id,
+      );
     }
   });
 
@@ -45,8 +49,11 @@ void main() {
         ...t.questions.map((q) => q.id),
       ]) {
         expect(itemIds.add(id), isTrue, reason: 'duplicate id $id');
-        expect(id.startsWith('${t.id}-'), isTrue,
-            reason: '$id must be prefixed with "${t.id}-"');
+        expect(
+          id.startsWith('${t.id}-'),
+          isTrue,
+          reason: '$id must be prefixed with "${t.id}-"',
+        );
       }
     }
   });
@@ -60,29 +67,41 @@ void main() {
     });
   }
 
-  subjectTest('every section, card and question has an allow-listed source URL', (content) {
-    for (final t in content.topics) {
-      for (final (id, url) in [
-        for (final s in t.sections) (s.id, s.sourceUrl),
-        for (final c in t.flashcards) (c.id, c.sourceUrl),
-        for (final q in t.questions) (q.id, q.sourceUrl),
-      ]) {
-        expect(content.subject.sourceAllowed(t.id, url), isTrue,
-            reason: '$id → $url');
+  subjectTest(
+    'every section, card and question has an allow-listed source URL',
+    (content) {
+      for (final t in content.topics) {
+        for (final (id, url) in [
+          for (final s in t.sections) (s.id, s.sourceUrl),
+          for (final c in t.flashcards) (c.id, c.sourceUrl),
+          for (final q in t.questions) (q.id, q.sourceUrl),
+        ]) {
+          expect(
+            content.subject.sourceAllowed(t.id, url),
+            isTrue,
+            reason: '$id → $url',
+          );
+        }
       }
-    }
-  });
+    },
+  );
 
   subjectTest('question shape rules', (content) {
     for (final q in content.allQuestions) {
       final correct = q.options.where((o) => o.correct).length;
       final optionIds = q.options.map((o) => o.id).toSet();
-      expect(optionIds.length, q.options.length,
-          reason: '${q.id}: duplicate option ids');
+      expect(
+        optionIds.length,
+        q.options.length,
+        reason: '${q.id}: duplicate option ids',
+      );
       for (final o in q.options) {
         expect(o.text.trim(), isNotEmpty, reason: '${q.id}/${o.id} text');
-        expect(o.explanation.trim(), isNotEmpty,
-            reason: '${q.id}/${o.id} needs an explanation');
+        expect(
+          o.explanation.trim(),
+          isNotEmpty,
+          reason: '${q.id}/${o.id} needs an explanation',
+        );
       }
       switch (q.type) {
         case QuestionType.single:
@@ -91,12 +110,17 @@ void main() {
         case QuestionType.multi:
           expect(correct, greaterThanOrEqualTo(2), reason: q.id);
           expect(q.options.length, inInclusiveRange(3, 5), reason: q.id);
-          expect(q.stem, contains('Select $correct'),
-              reason: '${q.id}: stem must say "Select $correct"');
+          expect(
+            q.stem,
+            contains('Select $correct'),
+            reason: '${q.id}: stem must say "Select $correct"',
+          );
         case QuestionType.truefalse:
           expect(correct, 1, reason: q.id);
-          expect(q.options.map((o) => o.text).toSet(), {'True', 'False'},
-              reason: q.id);
+          expect(q.options.map((o) => o.text).toSet(), {
+            'True',
+            'False',
+          }, reason: q.id);
       }
       expect(q.difficulty, inInclusiveRange(1, 3), reason: q.id);
     }
@@ -112,8 +136,11 @@ void main() {
       }
       for (final q in t.questions) {
         if (q.competencyId != null) {
-          expect(content.competencyText(q.competencyId!), isNotNull,
-              reason: '${q.id} → ${q.competencyId}');
+          expect(
+            content.competencyText(q.competencyId!),
+            isNotNull,
+            reason: '${q.id} → ${q.competencyId}',
+          );
         }
       }
     }
@@ -158,8 +185,10 @@ void main() {
             BulletsBlock(:final items) => items.join(' '),
             CodeBlock(:final text) => text,
             CalloutBlock(:final text) => text,
-            TableBlock(:final header, :final rows) =>
-              [...header, ...rows.expand((r) => r)].join(' '),
+            TableBlock(:final header, :final rows) => [
+              ...header,
+              ...rows.expand((r) => r),
+            ].join(' '),
           };
           words += text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
         }
@@ -170,45 +199,64 @@ void main() {
 
   subjectTest('every practice test can be filled', (content) {
     for (final test in content.practiceTests) {
-      expect(practicePool(test, content).length,
-          greaterThanOrEqualTo(test.questionCount),
-          reason: test.id);
+      expect(
+        practicePool(test, content).length,
+        greaterThanOrEqualTo(test.questionCount),
+        reason: test.id,
+      );
     }
   });
 
-  subjectTest('exam domain weights sum to 100 (when a subject has weights)', (content) {
+  subjectTest('exam domain weights sum to 100 (when a subject has weights)', (
+    content,
+  ) {
     final weighted = content.domains.where((d) => d.weightPercent != null);
     if (weighted.isEmpty) return;
     expect(weighted.fold<int>(0, (a, d) => a + d.weightPercent!), 100);
   });
 
   subjectTest('topic list matches the files on disk', (content) {
-    final onDisk = Directory('assets/content/subjects/${content.subject.id}/topics')
-        .listSync()
-        .whereType<File>()
-        .map((f) => f.uri.pathSegments.last.replaceAll('.json', ''))
-        .toSet();
+    final onDisk =
+        Directory('assets/content/subjects/${content.subject.id}/topics')
+            .listSync()
+            .whereType<File>()
+            .map((f) => f.uri.pathSegments.last.replaceAll('.json', ''))
+            .toSet();
     expect(content.subject.topicIds.toSet(), onDisk);
-    expect(content.subject.topicIds.length, onDisk.length,
-        reason: 'no duplicate topic entries');
+    expect(
+      content.subject.topicIds.length,
+      onDisk.length,
+      reason: 'no duplicate topic entries',
+    );
   });
 
-  subjectTest('prerequisites resolve and come earlier in study order', (content) {
+  subjectTest('prerequisites resolve and come earlier in study order', (
+    content,
+  ) {
     for (final t in content.topics) {
       for (final pre in t.prerequisites) {
         final p = content.topic(pre);
         expect(p, isNotNull, reason: '${t.id} → $pre');
-        expect(content.topics.indexOf(p!), lessThan(content.topics.indexOf(t)),
-            reason: '${t.id}: prerequisite $pre must be studied first');
+        expect(
+          content.topics.indexOf(p!),
+          lessThan(content.topics.indexOf(t)),
+          reason: '${t.id}: prerequisite $pre must be studied first',
+        );
       }
     }
   });
 
-  subjectTest('every competency is covered by at least one question', (content) {
+  subjectTest('every competency is covered by at least one question', (
+    content,
+  ) {
     final covered = {for (final q in content.allQuestions) q.competencyId};
     for (final d in content.domains) {
       for (final c in d.competencies) {
-        expect(covered, contains(c.id), reason: '${content.subject.id}: ${c.id}');
+        expect(
+          covered,
+          contains(c.id),
+          reason: '${content.subject.id}: ${c.id}',
+        );
       }
     }
   });

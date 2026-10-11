@@ -12,12 +12,12 @@ class PageWidth extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: maxContentWidth),
-          child: child,
-        ),
-      );
+    alignment: Alignment.topCenter,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: maxContentWidth),
+      child: child,
+    ),
+  );
 }
 
 /// A width-capped, padded, scrolling list of children.
@@ -35,18 +35,18 @@ class PageList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-        controller: controller,
-        padding: EdgeInsets.zero,
-        children: [
-          PageWidth(
-            child: Padding(
-              padding: padding,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: children,
-              ),
-            ),
+    controller: controller,
+    padding: EdgeInsets.zero,
+    children: [
+      PageWidth(
+        child: Padding(
+          padding: padding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
           ),
-        ],
-      );
+        ),
+      ),
+    ],
+  );
 }

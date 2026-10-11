@@ -17,7 +17,10 @@ Future<void> tapKey(WidgetTester tester, String key) async {
 }
 
 /// Answers the visible quiz question correctly (or deliberately wrong).
-Future<void> answerCurrent(WidgetTester tester, {required bool correctly}) async {
+Future<void> answerCurrent(
+  WidgetTester tester, {
+  required bool correctly,
+}) async {
   final view = tester.widget<QuestionView>(find.byType(QuestionView));
   final q = view.presented.question;
   final picks = correctly
@@ -25,7 +28,9 @@ Future<void> answerCurrent(WidgetTester tester, {required bool correctly}) async
       : [q.options.firstWhere((o) => !o.correct)];
   for (final o in picks) {
     final f = find.descendant(
-        of: find.byType(QuestionView), matching: find.text(o.text));
+      of: find.byType(QuestionView),
+      matching: find.text(o.text),
+    );
     await tester.ensureVisible(f.first);
     await tester.pumpAndSettle();
     await tester.tap(f.first);
@@ -35,31 +40,39 @@ Future<void> answerCurrent(WidgetTester tester, {required bool correctly}) async
 }
 
 void main() {
-  testWidgets('study → flashcards → quiz → results → retry missed', (tester) async {
+  testWidgets('study → flashcards → quiz → results → retry missed', (
+    tester,
+  ) async {
     await setPhoneViewport(tester);
     final h = await pumpApp(tester);
     const topicId = 'namespaces';
     final topic = h.content.topic(topicId)!;
 
     // S1 → S2
-    expect(find.text('0 of ${h.content.topics.length} topics complete'),
-        findsOneWidget);
+    expect(
+      find.text('0 of ${h.content.topics.length} topics complete'),
+      findsOneWidget,
+    );
     await tapKey(tester, 'topic-card-$topicId');
     expect(find.text(topic.title), findsWidgets);
 
     // S2 → S3: read every section (scrolling marks them; tap any leftovers).
     await tapKey(tester, 'step-notes');
     await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('next-flashcards')), 300,
-        scrollable: find.byType(Scrollable).first);
+      find.byKey(const ValueKey('next-flashcards')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     for (final s in topic.sections) {
       final mark = find.byKey(ValueKey('mark-read-${s.id}'));
       if (mark.evaluate().isNotEmpty) await tapKey(tester, 'mark-read-${s.id}');
     }
     expect(h.progress.notesComplete(topic), isTrue);
-    expect(find.text('${topic.sections.length}/${topic.sections.length}'),
-        findsOneWidget);
+    expect(
+      find.text('${topic.sections.length}/${topic.sections.length}'),
+      findsOneWidget,
+    );
 
     // S3 → S4: review every card in the session.
     await tapKey(tester, 'next-flashcards');
@@ -69,8 +82,10 @@ void main() {
       await tapKey(tester, 'got-it');
       expect(++guard, lessThan(50));
     }
-    expect(topic.flashcards.every((c) => h.progress.cardState(c.id)?.box == 2),
-        isTrue);
+    expect(
+      topic.flashcards.every((c) => h.progress.cardState(c.id)?.box == 2),
+      isTrue,
+    );
 
     // S4 → S5: 10 questions, first one wrong.
     await tapKey(tester, 'next-quiz');
@@ -114,9 +129,17 @@ void main() {
 
     // Answer the first question, flag the second, leave the rest blank.
     final view = tester.widget<QuestionView>(find.byType(QuestionView));
-    final correct = view.presented.question.options.firstWhere((o) => o.correct);
-    await tester.tap(find.descendant(
-        of: find.byType(QuestionView), matching: find.text(correct.text)).first);
+    final correct = view.presented.question.options.firstWhere(
+      (o) => o.correct,
+    );
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(QuestionView),
+            matching: find.text(correct.text),
+          )
+          .first,
+    );
     await tester.pumpAndSettle();
     // Deferred feedback: no verdict shown.
     expect(find.textContaining('Correct'), findsNothing);
@@ -129,9 +152,14 @@ void main() {
     await tapKey(tester, 'confirm-finish');
 
     expect(find.byKey(const ValueKey('practice-score')), findsOneWidget);
-    expect(find.byKey(const ValueKey('breakdown-cluster-arch')), findsOneWidget);
-    expect(h.progress.practiceHistory.single.perDomain['cluster-arch']!.total,
-        test.questionCount);
+    expect(
+      find.byKey(const ValueKey('breakdown-cluster-arch')),
+      findsOneWidget,
+    );
+    expect(
+      h.progress.practiceHistory.single.perDomain['cluster-arch']!.total,
+      test.questionCount,
+    );
   });
 
   testWidgets('timer expiry auto-finishes the test', (tester) async {
@@ -144,8 +172,9 @@ void main() {
     expect(find.byKey(const ValueKey('practice-score')), findsOneWidget);
   });
 
-  testWidgets('every top-level screen lays out at 360px without overflow',
-      (tester) async {
+  testWidgets('every top-level screen lays out at 360px without overflow', (
+    tester,
+  ) async {
     await setPhoneViewport(tester, size: const Size(360, 740));
     for (final path in [
       '/',

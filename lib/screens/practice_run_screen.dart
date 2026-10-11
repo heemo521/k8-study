@@ -44,11 +44,13 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
     final test = content.practiceTest(widget.testId);
     if (test == null) return;
     _test = test;
-    _attempt = QuizAttempt(drawPractice(
-      test: test,
-      content: content,
-      random: context.read<Random>(),
-    ));
+    _attempt = QuizAttempt(
+      drawPractice(
+        test: test,
+        content: content,
+        random: context.read<Random>(),
+      ),
+    );
     _timer = TestTimer(
       startedAt: _clock.now(),
       limit: context.read<ProgressStore>().practiceTimerOn
@@ -86,16 +88,20 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Finish the test?'),
-          content: Text('$unanswered unanswered '
-              '${unanswered == 1 ? 'question' : 'questions'} will be marked wrong.'),
+          content: Text(
+            '$unanswered unanswered '
+            '${unanswered == 1 ? 'question' : 'questions'} will be marked wrong.',
+          ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Keep going')),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep going'),
+            ),
             TextButton(
-                key: const ValueKey('confirm-finish'),
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Finish')),
+              key: const ValueKey('confirm-finish'),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Finish'),
+            ),
           ],
         ),
       );
@@ -113,22 +119,25 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
     final duration = _timer.elapsed(_clock.now());
     final breakdown = domainBreakdown(attempt, content);
     final progress = context.read<ProgressStore>()..recordAnswers(attempt);
-    progress.recordPractice(PracticeRecord(
-          testId: widget.testId,
-          pct: attempt.percent,
-          perDomain: breakdown,
-          durationSec: duration.inSeconds,
-          at: _clock.now(),
-        ));
+    progress.recordPractice(
+      PracticeRecord(
+        testId: widget.testId,
+        pct: attempt.percent,
+        perDomain: breakdown,
+        durationSec: duration.inSeconds,
+        at: _clock.now(),
+      ),
+    );
     context.read<SessionStore>().lastPractice = PracticeResult(
       testId: widget.testId,
       attempt: attempt,
       duration: duration,
       breakdown: breakdown,
     );
-    await context
-        .read<AdsService>()
-        .maybeShowInterstitial(context, AdPlacement.practiceComplete);
+    await context.read<AdsService>().maybeShowInterstitial(
+      context,
+      AdPlacement.practiceComplete,
+    );
     if (mounted) context.go('/practice/${widget.testId}/result');
   }
 
@@ -140,11 +149,13 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
         content: const Text('This attempt will not be saved.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Stay')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Stay'),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Leave')),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Leave'),
+          ),
         ],
       ),
     );
@@ -166,40 +177,43 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
                 runSpacing: 8,
                 children: [
                   for (var i = 0; i < _attempt!.questions.length; i++)
-                    Builder(builder: (_) {
-                      final id = _attempt!.questions[i].question.id;
-                      final answered = _attempt!.isAnswered(id);
-                      final flagged = _flagged.contains(id);
-                      return SizedBox.square(
-                        dimension: 48,
-                        child: Semantics(
-                          label: 'Question ${i + 1}'
-                              '${answered ? ', answered' : ', blank'}'
-                              '${flagged ? ', flagged' : ''}',
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              backgroundColor: answered
-                                  ? scheme.primaryContainer
-                                  : null,
-                              side: BorderSide(
-                                color: flagged
-                                    ? scheme.tertiary
-                                    : (i == _index
-                                        ? scheme.primary
-                                        : scheme.outlineVariant),
-                                width: flagged || i == _index ? 2 : 1,
+                    Builder(
+                      builder: (_) {
+                        final id = _attempt!.questions[i].question.id;
+                        final answered = _attempt!.isAnswered(id);
+                        final flagged = _flagged.contains(id);
+                        return SizedBox.square(
+                          dimension: 48,
+                          child: Semantics(
+                            label:
+                                'Question ${i + 1}'
+                                '${answered ? ', answered' : ', blank'}'
+                                '${flagged ? ', flagged' : ''}',
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                backgroundColor: answered
+                                    ? scheme.primaryContainer
+                                    : null,
+                                side: BorderSide(
+                                  color: flagged
+                                      ? scheme.tertiary
+                                      : (i == _index
+                                            ? scheme.primary
+                                            : scheme.outlineVariant),
+                                  width: flagged || i == _index ? 2 : 1,
+                                ),
                               ),
+                              onPressed: () {
+                                Navigator.pop(sheetContext);
+                                _goTo(i);
+                              },
+                              child: Text(flagged ? '${i + 1}⚑' : '${i + 1}'),
                             ),
-                            onPressed: () {
-                              Navigator.pop(sheetContext);
-                              _goTo(i);
-                            },
-                            child: Text(flagged ? '${i + 1}⚑' : '${i + 1}'),
                           ),
-                        ),
-                      );
-                    }),
+                        );
+                      },
+                    ),
                 ],
               ),
             ),
@@ -219,7 +233,9 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
     final attempt = _attempt;
     if (test == null || attempt == null || attempt.questions.isEmpty) {
       return const NotFoundView(
-          message: 'Practice test not found.', backTo: '/practice');
+        message: 'Practice test not found.',
+        backTo: '/practice',
+      );
     }
     final total = attempt.questions.length;
     final id = _current.question.id;
@@ -234,17 +250,21 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
       child: Scaffold(
         appBar: AppBar(
           leading: CloseButton(onPressed: _confirmLeave),
-          title: Text('Q ${_index + 1}/$total',
-              key: const ValueKey('practice-position')),
+          title: Text(
+            'Q ${_index + 1}/$total',
+            key: const ValueKey('practice-position'),
+          ),
           actions: [
             if (remaining != null)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(_fmt(remaining),
-                      key: const ValueKey('practice-timer'),
-                      semanticsLabel: 'Time left ${_fmt(remaining)}',
-                      style: Theme.of(context).textTheme.titleMedium),
+                  child: Text(
+                    _fmt(remaining),
+                    key: const ValueKey('practice-timer'),
+                    semanticsLabel: 'Time left ${_fmt(remaining)}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
               ),
             IconButton(
@@ -254,56 +274,61 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
             ),
           ],
         ),
-        body: PageList(children: [
-          QuestionView(
-            key: ValueKey(id),
-            presented: _current,
-            selected: attempt.answers[id] ?? const {},
-            revealed: false,
-            onChanged: (s) => setState(() => attempt.answer(id, s)),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: const ValueKey('flag'),
-              onPressed: () => setState(
-                  () => flagged ? _flagged.remove(id) : _flagged.add(id)),
-              icon: Icon(flagged ? Icons.flag : Icons.outlined_flag),
-              label: Text(flagged ? 'Flagged for review' : 'Flag for review'),
+        body: PageList(
+          children: [
+            QuestionView(
+              key: ValueKey(id),
+              presented: _current,
+              selected: attempt.answers[id] ?? const {},
+              revealed: false,
+              onChanged: (s) => setState(() => attempt.answer(id, s)),
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _index == 0 ? null : () => _goTo(_index - 1),
-                child: const Text('Previous'),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const ValueKey('flag'),
+                onPressed: () => setState(
+                  () => flagged ? _flagged.remove(id) : _flagged.add(id),
+                ),
+                icon: Icon(flagged ? Icons.flag : Icons.outlined_flag),
+                label: Text(flagged ? 'Flagged for review' : 'Flag for review'),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _index + 1 < total
-                  ? FilledButton(
-                      key: const ValueKey('practice-next'),
-                      onPressed: () => _goTo(_index + 1),
-                      child: const Text('Next'),
-                    )
-                  : FilledButton(
-                      key: const ValueKey('practice-finish'),
-                      onPressed: _confirmFinish,
-                      child: const Text('Finish'),
-                    ),
-            ),
-          ]),
-          if (_index + 1 < total) ...[
             const SizedBox(height: 8),
-            TextButton(
-              onPressed: _confirmFinish,
-              child: const Text('Finish test'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _index == 0 ? null : () => _goTo(_index - 1),
+                    child: const Text('Previous'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _index + 1 < total
+                      ? FilledButton(
+                          key: const ValueKey('practice-next'),
+                          onPressed: () => _goTo(_index + 1),
+                          child: const Text('Next'),
+                        )
+                      : FilledButton(
+                          key: const ValueKey('practice-finish'),
+                          onPressed: _confirmFinish,
+                          child: const Text('Finish'),
+                        ),
+                ),
+              ],
             ),
+            if (_index + 1 < total) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _confirmFinish,
+                child: const Text('Finish test'),
+              ),
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }

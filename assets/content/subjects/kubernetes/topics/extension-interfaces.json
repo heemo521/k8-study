@@ -357,13 +357,13 @@
           "id": "b",
           "text": "No CNI plugin is installed",
           "correct": false,
-          "explanation": "Missing networking doesn't stop the kubelet talking to the runtime."
+          "explanation": "The CRI page ties this registration failure to missing v1 CRI API support, not to networking."
         },
         {
           "id": "c",
           "text": "The device plugin socket was deleted",
           "correct": false,
-          "explanation": "That affects device plugins, not node registration."
+          "explanation": "The CRI page doesn't link node registration to device plugins."
         },
         {
           "id": "d",

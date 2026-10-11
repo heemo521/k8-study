@@ -25,5 +25,8 @@ abstract interface class AdsService {
 
   /// Shows an interstitial if enabled and the frequency cap allows.
   /// Completes when it is dismissed (or immediately if none is shown).
-  Future<void> maybeShowInterstitial(BuildContext context, AdPlacement placement);
+  Future<void> maybeShowInterstitial(
+    BuildContext context,
+    AdPlacement placement,
+  );
 }

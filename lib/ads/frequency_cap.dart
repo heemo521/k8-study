@@ -15,17 +15,17 @@ class AdCapState {
   final DateTime? lastShownAt;
 
   Map<String, dynamic> toJson() => {
-        'quizzesSinceInterstitial': completionsSinceAd,
-        if (lastShownAt != null)
-          'lastInterstitialAt': lastShownAt!.toIso8601String(),
-      };
+    'quizzesSinceInterstitial': completionsSinceAd,
+    if (lastShownAt != null)
+      'lastInterstitialAt': lastShownAt!.toIso8601String(),
+  };
 
   static AdCapState fromJson(Map<String, dynamic> j) => AdCapState(
-        completionsSinceAd: j['quizzesSinceInterstitial'] as int,
-        lastShownAt: j['lastInterstitialAt'] == null
-            ? null
-            : DateTime.parse(j['lastInterstitialAt'] as String),
-      );
+    completionsSinceAd: j['quizzesSinceInterstitial'] as int,
+    lastShownAt: j['lastInterstitialAt'] == null
+        ? null
+        : DateTime.parse(j['lastInterstitialAt'] as String),
+  );
 }
 
 abstract interface class AdCapStore {
@@ -39,7 +39,8 @@ bool registerCompletionAndCheck(AdCapStore store, DateTime now) {
   final s = store.adCapState;
   final count = s.completionsSinceAd + 1;
   final last = s.lastShownAt;
-  final allowed = count >= completionsPerAd &&
+  final allowed =
+      count >= completionsPerAd &&
       (last == null || now.difference(last) >= minInterval);
   store.adCapState = allowed
       ? AdCapState(completionsSinceAd: 0, lastShownAt: now)

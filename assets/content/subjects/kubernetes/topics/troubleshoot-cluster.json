@@ -122,7 +122,7 @@
         {
           "type": "callout",
           "kind": "exam",
-          "text": "A control plane component still shows up as a Pod, so `kubectl logs <pod-name>` works while the API server is up. If the API server itself is down, go to the node: `journalctl -u kubelet` for the kubelet, or the component's files under `/var/log`."
+          "text": "On the node itself, read the kubelet with `journalctl -u kubelet` (systemd) and the Pod-based components through their files under `/var/log`."
         }
       ]
     },
@@ -411,7 +411,7 @@
           "id": "a",
           "text": "The kubelet on that node is down or unreachable",
           "correct": true,
-          "explanation": "The node controller stopped hearing from the kubelet."
+          "explanation": "The page shows this exact picture for a down node: network cut, or a kubelet that died and won't restart."
         },
         {
           "id": "b",
@@ -800,7 +800,7 @@
       "type": "single",
       "difficulty": 2,
       "competencyId": "ts-components",
-      "stem": "After changing kubelet flags on a kubeadm node, which commands apply the change?",
+      "stem": "After installing a new kubelet package on a kubeadm node, which commands make it take effect?",
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
       "options": [
         {

@@ -437,7 +437,7 @@
           "id": "c",
           "text": "The Service has no endpoints",
           "correct": false,
-          "explanation": "Endpoints don't affect DNS lookup of a ClusterIP Service."
+          "explanation": "The namespace-qualified name resolved, so the guide points to a namespace mismatch, not endpoints."
         },
         {
           "id": "d",

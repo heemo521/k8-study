@@ -128,6 +128,10 @@
             [
               "OnDelete",
               "No automatic update; new Pods use the new template only after you delete the old ones"
+            ],
+            [
+              "Recreate (alpha since v1.37, off by default)",
+              "Deletes all Pods and waits for them to terminate before creating new ones; needs the `StatefulSetRecreateStrategy` feature gate"
             ]
           ]
         },
@@ -337,7 +341,7 @@
     {
       "id": "workload-controllers-fc-08",
       "front": "StatefulSet update strategies?",
-      "back": "RollingUpdate (default, optionally with partition) and OnDelete.",
+      "back": "RollingUpdate (the default, optionally with a partition) and OnDelete. A third, Recreate, is alpha since v1.37 and needs a feature gate.",
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
     },
     {

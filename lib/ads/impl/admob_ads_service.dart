@@ -21,5 +21,7 @@ class AdMobAdsService implements AdsService {
 
   @override
   Future<void> maybeShowInterstitial(
-          BuildContext context, AdPlacement placement) async {}
+    BuildContext context,
+    AdPlacement placement,
+  ) async {}
 }

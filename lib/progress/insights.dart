@@ -19,18 +19,18 @@ TopicStep nextStep(Topic topic, ProgressStore p) {
 }
 
 String stepLabel(TopicStep step) => switch (step) {
-      TopicStep.notes => 'Read the notes',
-      TopicStep.cards => 'Review flashcards',
-      TopicStep.quiz => 'Take the quiz',
-      TopicStep.done => 'Complete',
-    };
+  TopicStep.notes => 'Read the notes',
+  TopicStep.cards => 'Review flashcards',
+  TopicStep.quiz => 'Take the quiz',
+  TopicStep.done => 'Complete',
+};
 
 String stepPath(Topic topic, TopicStep step) => switch (step) {
-      TopicStep.notes => '/topic/${topic.id}/notes',
-      TopicStep.cards => '/topic/${topic.id}/cards',
-      TopicStep.quiz => '/topic/${topic.id}/quiz',
-      TopicStep.done => '/topic/${topic.id}',
-    };
+  TopicStep.notes => '/topic/${topic.id}/notes',
+  TopicStep.cards => '/topic/${topic.id}/cards',
+  TopicStep.quiz => '/topic/${topic.id}/quiz',
+  TopicStep.done => '/topic/${topic.id}',
+};
 
 class NextAction {
   const NextAction({
@@ -52,21 +52,24 @@ class NextAction {
   final bool resuming;
 }
 
-/// The recently opened topic if it isn't complete, else the first incomplete
-/// topic in study order. Null when everything is complete.
+/// The recently opened topic if it isn't complete, else the next incomplete
+/// topic after it in study order (wrapping). Null when everything is complete.
 NextAction? nextAction(ContentBundle content, ProgressStore p) {
   final topics = content.topics;
   NextAction build(Topic t, bool resuming) => NextAction(
-        topic: t,
-        step: nextStep(t, p),
-        position: topics.indexOf(t) + 1,
-        total: topics.length,
-        resuming: resuming,
-      );
+    topic: t,
+    step: nextStep(t, p),
+    position: topics.indexOf(t) + 1,
+    total: topics.length,
+    resuming: resuming,
+  );
 
   final recent = content.topic(p.recentTopic(content.subject.id) ?? '');
   if (recent != null && !p.topicComplete(recent)) return build(recent, true);
-  for (final t in topics) {
+  // Move forward from the last topic studied, then wrap to earlier gaps.
+  final start = recent == null ? 0 : topics.indexOf(recent) + 1;
+  for (var i = 0; i < topics.length; i++) {
+    final t = topics[(start + i) % topics.length];
     if (!p.topicComplete(t)) return build(t, false);
   }
   return null;
@@ -117,7 +120,7 @@ List<DomainReadiness> domainReadiness(ContentBundle content, ProgressStore p) {
           progress: topics.isEmpty
               ? 0
               : topics.map(p.topicProgress).reduce((a, b) => a + b) /
-                  topics.length,
+                    topics.length,
           questionsSeen: seen.length,
           questionsTotal: questions.length,
           accuracy: seen.isEmpty
@@ -168,8 +171,9 @@ List<CompetencyGap> competencyGaps(ContentBundle content, ProgressStore p) {
           domain: content.domainOfCompetency(e.key)!,
           questionIds: e.value,
           seen: e.value.where((id) => p.answerStats(id) != null).length,
-          rightLastTime:
-              e.value.where((id) => p.answerStats(id)?.lastCorrect ?? false).length,
+          rightLastTime: e.value
+              .where((id) => p.answerStats(id)?.lastCorrect ?? false)
+              .length,
         ),
   ];
   double rank(CompetencyGap g) =>
@@ -190,9 +194,9 @@ List<Topic> weakTopics(ContentBundle content, ProgressStore p) =>
 
 /// Questions whose most recent answer was wrong.
 List<Question> missedQuestions(ContentBundle content, ProgressStore p) => [
-      for (final q in content.allQuestions)
-        if (p.answerStats(q.id)?.lastCorrect == false) q,
-    ];
+  for (final q in content.allQuestions)
+    if (p.answerStats(q.id)?.lastCorrect == false) q,
+];
 
 int dueCardCount(ContentBundle content, ProgressStore p, DateTime now) =>
     content.allFlashcards
@@ -200,10 +204,13 @@ int dueCardCount(ContentBundle content, ProgressStore p, DateTime now) =>
         .length;
 
 /// Due cards (seen before and due now) across the subject.
-List<Flashcard> dueCards(ContentBundle content, ProgressStore p, DateTime now) =>
-    content.allFlashcards
-        .where((c) => p.cardState(c.id)?.isDue(now) ?? false)
-        .toList();
+List<Flashcard> dueCards(
+  ContentBundle content,
+  ProgressStore p,
+  DateTime now,
+) => content.allFlashcards
+    .where((c) => p.cardState(c.id)?.isDue(now) ?? false)
+    .toList();
 
 /// Questions for a review quiz.
 List<Question> reviewPool(

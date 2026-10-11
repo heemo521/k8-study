@@ -17,7 +17,8 @@ class SourceLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uri = Uri.parse(url);
-    final label = title ??
+    final label =
+        title ??
         context.read<ContentBundle>().sourceTitle(url) ??
         uri.host + uri.path;
     final color = Theme.of(context).colorScheme.primary;
@@ -31,17 +32,19 @@ class SourceLink extends StatelessWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text.rich(
-              TextSpan(children: [
-                TextSpan(text: 'Source: $label '),
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: Icon(Icons.open_in_new, size: 14, color: color),
-                ),
-              ]),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: color,
-                    decoration: TextDecoration.underline,
+              TextSpan(
+                children: [
+                  TextSpan(text: 'Source: $label '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Icon(Icons.open_in_new, size: 14, color: color),
                   ),
+                ],
+              ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: color,
+                decoration: TextDecoration.underline,
+              ),
             ),
           ),
         ),

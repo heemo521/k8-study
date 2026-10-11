@@ -51,7 +51,7 @@
             [
               "Used by",
               "Horizontal Pod Autoscaler, `kubectl top`",
-              "HPA and other automation, plus dashboards"
+              "Autoscaling, for example the Horizontal Pod Autoscaler"
             ]
           ]
         },
@@ -154,7 +154,7 @@
       "blocks": [
         {
           "type": "p",
-          "text": "`kubectl top` reads the Metrics API, so it only works once metrics-server is running."
+          "text": "Quick commands for current node and Pod CPU/memory usage:"
         },
         {
           "type": "code",
@@ -420,7 +420,7 @@
           "id": "c",
           "text": "Writing the metric into the kubelet's /metrics/resource",
           "correct": false,
-          "explanation": "The kubelet's endpoint is fixed; it isn't a custom metrics API."
+          "explanation": "That's the kubelet's resource metrics endpoint; full pipelines expose metrics through a custom or external metrics adapter."
         },
         {
           "id": "d",

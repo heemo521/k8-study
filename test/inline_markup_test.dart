@@ -18,11 +18,14 @@ void main() {
   });
 
   test('markup inside code is not parsed', () {
-    expect(parseInline('`**x**`'), const [InlineSpan('**x**', InlineStyle.code)]);
+    expect(parseInline('`**x**`'), const [
+      InlineSpan('**x**', InlineStyle.code),
+    ]);
   });
 
   test('other characters are literal', () {
-    expect(parseInline('<name> _x_ # y'),
-        const [InlineSpan('<name> _x_ # y', InlineStyle.plain)]);
+    expect(parseInline('<name> _x_ # y'), const [
+      InlineSpan('<name> _x_ # y', InlineStyle.plain),
+    ]);
   });
 }

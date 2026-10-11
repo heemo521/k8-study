@@ -10,18 +10,22 @@ class NotFoundView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text(message, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                  onPressed: () => context.go(backTo),
-                  child: const Text('Go back')),
-            ]),
-          ),
+    appBar: AppBar(),
+    body: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => context.go(backTo),
+              child: const Text('Go back'),
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }

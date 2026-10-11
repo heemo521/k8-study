@@ -17,16 +17,27 @@ void main() {
       expect(s.dueAt, DateTime(2026, 10, 12));
     });
 
-    test('box intervals 1→2 (+1d), 2→3 (+3d), 3→4 (+7d), 4→5 (+14d), 5→5 (+30d)',
-        () {
-      final expected = {1: (2, 1), 2: (3, 3), 3: (4, 7), 4: (5, 14), 5: (5, 30)};
-      expected.forEach((box, outcome) {
-        final s = gotIt(CardState(box: box, dueAt: now), now);
-        expect(s.box, outcome.$1, reason: 'from box $box');
-        expect(s.dueAt, DateTime(2026, 10, 11).add(Duration(days: outcome.$2)),
-            reason: 'from box $box');
-      });
-    });
+    test(
+      'box intervals 1→2 (+1d), 2→3 (+3d), 3→4 (+7d), 4→5 (+14d), 5→5 (+30d)',
+      () {
+        final expected = {
+          1: (2, 1),
+          2: (3, 3),
+          3: (4, 7),
+          4: (5, 14),
+          5: (5, 30),
+        };
+        expected.forEach((box, outcome) {
+          final s = gotIt(CardState(box: box, dueAt: now), now);
+          expect(s.box, outcome.$1, reason: 'from box $box');
+          expect(
+            s.dueAt,
+            DateTime(2026, 10, 11).add(Duration(days: outcome.$2)),
+            reason: 'from box $box',
+          );
+        });
+      },
+    );
 
     test('Again → box 1, due today', () {
       final s = again(now);
@@ -47,12 +58,18 @@ void main() {
     });
 
     test('JSON round-trip and bad box rejected', () {
-      final s = CardState(box: 3, dueAt: DateTime(2026, 10, 20), lastReviewedAt: now);
+      final s = CardState(
+        box: 3,
+        dueAt: DateTime(2026, 10, 20),
+        lastReviewedAt: now,
+      );
       final back = CardState.fromJson(s.toJson());
       expect(back.box, 3);
       expect(back.dueAt, DateTime(2026, 10, 20));
-      expect(() => CardState.fromJson({'box': 9, 'dueAt': '2026-10-20'}),
-          throwsFormatException);
+      expect(
+        () => CardState.fromJson({'box': 9, 'dueAt': '2026-10-20'}),
+        throwsFormatException,
+      );
     });
   });
 
@@ -67,7 +84,11 @@ void main() {
         'c3': CardState(box: 3, dueAt: DateTime(2026, 10, 30)),
       };
       final session = buildSession(
-          cards: cards, states: states, now: now, random: Random(1));
+        cards: cards,
+        states: states,
+        now: now,
+        random: Random(1),
+      );
       expect(session.length, sessionCap);
       expect(session.take(3).map((c) => c.id).toSet(), {'c0', 'c1', 'c2'});
       expect(session.map((c) => c.id), isNot(contains('c3')));
@@ -78,8 +99,9 @@ void main() {
       final cards = [card('a')];
       final states = {'a': CardState(box: 5, dueAt: DateTime(2026, 11, 1))};
       expect(
-          buildSession(cards: cards, states: states, now: now, random: Random(1)),
-          isEmpty);
+        buildSession(cards: cards, states: states, now: now, random: Random(1)),
+        isEmpty,
+      );
       expect(nextDueDate(cards, states, now), DateTime(2026, 11, 1));
     });
   });
@@ -90,7 +112,11 @@ void main() {
       s.answer(knewIt: false, previous: null, now: now); // a → requeued
       s.answer(knewIt: true, previous: null, now: now); // b
       expect(s.current.id, 'a');
-      s.answer(knewIt: false, previous: null, now: now); // a again, not requeued
+      s.answer(
+        knewIt: false,
+        previous: null,
+        now: now,
+      ); // a again, not requeued
       expect(s.isDone, isTrue);
       expect(s.reviewed, 3);
       expect(s.gotItCount, 1);

@@ -22,15 +22,19 @@ Map<String, int> allocateByWeight({
   final weighted = supply.keys.where((k) => (weights[k] ?? 0) > 0).toList();
   final weightSum = weighted.fold<num>(0, (a, k) => a + weights[k]!);
   if (weightSum > 0) {
-    final quotas = {for (final k in weighted) k: target * weights[k]! / weightSum};
+    final quotas = {
+      for (final k in weighted) k: target * weights[k]! / weightSum,
+    };
     var assigned = 0;
     for (final k in weighted) {
       alloc[k] = quotas[k]!.floor();
       assigned += alloc[k]!;
     }
-    final byRemainder = [...weighted]..sort((a, b) {
-        final c = (quotas[b]! - quotas[b]!.floor())
-            .compareTo(quotas[a]! - quotas[a]!.floor());
+    final byRemainder = [...weighted]
+      ..sort((a, b) {
+        final c = (quotas[b]! - quotas[b]!.floor()).compareTo(
+          quotas[a]! - quotas[a]!.floor(),
+        );
         return c != 0 ? c : a.compareTo(b);
       });
     for (var i = 0; assigned < target && i < byRemainder.length; i++) {
@@ -109,7 +113,9 @@ class DomainScore {
 
 /// Per-domain breakdown keyed by each question's topic's primary domain.
 Map<String, DomainScore> domainBreakdown(
-    QuizAttempt attempt, ContentBundle content) {
+  QuizAttempt attempt,
+  ContentBundle content,
+) {
   final correct = <String, int>{};
   final total = <String, int>{};
   for (final p in attempt.questions) {
@@ -140,5 +146,6 @@ class TestTimer {
     return left.isNegative ? Duration.zero : left;
   }
 
-  bool expired(DateTime now) => limit != null && remaining(now) == Duration.zero;
+  bool expired(DateTime now) =>
+      limit != null && remaining(now) == Duration.zero;
 }

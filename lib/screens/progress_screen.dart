@@ -30,11 +30,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     final allCards = content.allFlashcards.toList();
     final complete = content.topics.where(progress.topicComplete).length;
-    final passed = content.topics.where((t) => progress.quizPassed(t.id)).length;
+    final passed = content.topics
+        .where((t) => progress.quizPassed(t.id))
+        .length;
     final due = dueCardCount(content, progress, now);
     final missed = missedQuestions(content, progress).length;
-    final readiness =
-        domainReadiness(content, progress).where((r) => r.hasContent).toList();
+    final readiness = domainReadiness(
+      content,
+      progress,
+    ).where((r) => r.hasContent).toList();
     final gaps = competencyGaps(content, progress);
     final openGaps = gaps.where((g) => g.isGap).toList();
     final shownGaps = _showAllGaps ? gaps : openGaps.take(5).toList();
@@ -48,154 +52,202 @@ class _ProgressScreenState extends State<ProgressScreen> {
         .length;
 
     Widget heading(String text, {String? subtitle}) => Padding(
-          padding: const EdgeInsets.only(top: 20, bottom: 8),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Semantics(header: true, child: Text(text, style: textTheme.titleMedium)),
-            if (subtitle != null) Text(subtitle, style: textTheme.bodySmall),
-          ]),
-        );
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(text, style: textTheme.titleMedium),
+          ),
+          if (subtitle != null) Text(subtitle, style: textTheme.bodySmall),
+        ],
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Progress & gaps')),
-      body: PageList(children: [
-        Row(children: [
-          _Stat(label: 'Topics complete', value: '$complete/${content.topics.length}'),
-          _Stat(
-              label: 'Cards mastered',
-              value: '${progress.masteredCount(allCards)}/${allCards.length}'),
-          _Stat(label: 'Quizzes passed', value: '$passed/${content.topics.length}'),
-        ]),
-
-        // ---- reviews -------------------------------------------------------
-        heading('Review now'),
-        Card(
-          child: Column(children: [
-            ListTile(
-              key: const ValueKey('review-due-cards'),
-              leading: const Icon(Icons.style_outlined),
-              title: Text('$due flashcards due'),
-              subtitle: const Text('Spaced repetition across all topics'),
-              trailing: const Icon(Icons.chevron_right),
-              enabled: due > 0,
-              onTap: () => context.go('/progress/cards'),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              key: const ValueKey('review-missed'),
-              leading: const Icon(Icons.replay),
-              title: Text('$missed missed questions'),
-              subtitle: const Text('Questions you got wrong last time'),
-              trailing: const Icon(Icons.chevron_right),
-              enabled: missed > 0,
-              onTap: () => context.go('/progress/review?kind=missed'),
-            ),
-          ]),
-        ),
-
-        // ---- readiness by domain ------------------------------------------
-        heading(
-          content.exam == null ? 'Progress by area' : '${content.exam!.name} readiness by domain',
-          subtitle: 'Bars show topic progress (notes read and quiz mastery). '
-              'Accuracy uses your latest answer to each question.',
-        ),
-        for (final r in readiness)
-          _DomainRow(readiness: r, examName: content.exam?.name),
-        for (final d in content.domainsInDisplayOrder.where(
-            (d) => d.isExamDomain && content.topicsForDomain(d.id).isEmpty))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text('${d.title}: no topics yet', style: textTheme.bodySmall),
+      body: PageList(
+        children: [
+          Row(
+            children: [
+              _Stat(
+                label: 'Topics complete',
+                value: '$complete/${content.topics.length}',
+              ),
+              _Stat(
+                label: 'Cards mastered',
+                value: '${progress.masteredCount(allCards)}/${allCards.length}',
+              ),
+              _Stat(
+                label: 'Quizzes passed',
+                value: '$passed/${content.topics.length}',
+              ),
+            ],
           ),
 
-        // ---- competency gaps ----------------------------------------------
-        heading(
-          'Knowledge gaps',
-          subtitle: answered == 0
-              ? 'Take a quiz or practice test to see which competencies need work.'
-              : 'Weakest competencies first: low accuracy, or under half the '
-                  'questions answered.',
-        ),
-        if (shownGaps.isEmpty && answered > 0)
-          Text('No open gaps. Every competency is at or above mastery.',
-              style: textTheme.bodyMedium),
-        for (final g in shownGaps) _GapTile(gap: g),
-        if (gaps.length > openGaps.take(5).length)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              key: const ValueKey('toggle-gaps'),
-              onPressed: () => setState(() => _showAllGaps = !_showAllGaps),
-              child: Text(_showAllGaps
-                  ? 'Show only gaps'
-                  : 'Show all ${gaps.length} competencies'),
-            ),
-          ),
-
-        // ---- weak topics ----------------------------------------------------
-        if (weak.isNotEmpty) ...[
-          heading('Needs attention', subtitle: 'Started but not yet complete'),
-          for (final t in weak)
-            Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(t.title),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: TopicStepRow(topic: t),
+          // ---- reviews -------------------------------------------------------
+          heading('Review now'),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  key: const ValueKey('review-due-cards'),
+                  leading: const Icon(Icons.style_outlined),
+                  title: Text(
+                    '$due ${due == 1 ? 'flashcard' : 'flashcards'} due',
+                  ),
+                  subtitle: const Text('Spaced repetition across all topics'),
+                  trailing: const Icon(Icons.chevron_right),
+                  enabled: due > 0,
+                  onTap: () => context.go('/progress/cards'),
                 ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.go('/topic/${t.id}'),
+                const Divider(height: 1),
+                ListTile(
+                  key: const ValueKey('review-missed'),
+                  leading: const Icon(Icons.replay),
+                  title: Text(
+                    '$missed missed ${missed == 1 ? 'question' : 'questions'}',
+                  ),
+                  subtitle: const Text('Questions you got wrong last time'),
+                  trailing: const Icon(Icons.chevron_right),
+                  enabled: missed > 0,
+                  onTap: () => context.go('/progress/review?kind=missed'),
+                ),
+              ],
+            ),
+          ),
+
+          // ---- readiness by domain ------------------------------------------
+          heading(
+            content.exam == null
+                ? 'Progress by area'
+                : '${content.exam!.name} readiness by domain',
+            subtitle:
+                'Bars show topic progress (notes read and quiz mastery). '
+                'Accuracy uses your latest answer to each question.',
+          ),
+          for (final r in readiness)
+            _DomainRow(readiness: r, examName: content.exam?.name),
+          for (final d in content.domainsInDisplayOrder.where(
+            (d) => d.isExamDomain && content.topicsForDomain(d.id).isEmpty,
+          ))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '${d.title}: no topics yet',
+                style: textTheme.bodySmall,
               ),
             ),
-        ],
 
-        // ---- history --------------------------------------------------------
-        heading('Practice history'),
-        if (history.isEmpty)
-          Text('No practice tests taken yet.', style: textTheme.bodyMedium)
-        else
-          for (final r in history)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(content.practiceTest(r.testId)!.title),
-              subtitle: Text('${formatDate(r.at)} · ${r.durationSec ~/ 60} min'),
-              trailing: Text('${r.pct}%', style: textTheme.titleMedium),
+          // ---- competency gaps ----------------------------------------------
+          heading(
+            'Knowledge gaps',
+            subtitle: answered == 0
+                ? 'Take a quiz or practice test to see which competencies need work.'
+                : 'Weakest competencies first: low accuracy, or under half the '
+                      'questions answered.',
+          ),
+          if (shownGaps.isEmpty && answered > 0)
+            Text(
+              'No open gaps. Every competency is at or above mastery.',
+              style: textTheme.bodyMedium,
+            ),
+          for (final g in shownGaps) _GapTile(gap: g),
+          if (gaps.length > openGaps.take(5).length)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const ValueKey('toggle-gaps'),
+                onPressed: () => setState(() => _showAllGaps = !_showAllGaps),
+                child: Text(
+                  _showAllGaps
+                      ? 'Show only gaps'
+                      : 'Show all ${gaps.length} competencies',
+                ),
+              ),
             ),
 
-        const SizedBox(height: 24),
-        OutlinedButton.icon(
-          key: const ValueKey('reset-progress'),
-          style: OutlinedButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error),
-          icon: const Icon(Icons.delete_outline),
-          label: const Text('Reset progress'),
-          onPressed: () => _confirmReset(context, progress),
-        ),
-        const SizedBox(height: 4),
-        Text('Progress is stored only on this device. '
+          // ---- weak topics ----------------------------------------------------
+          if (weak.isNotEmpty) ...[
+            heading(
+              'Needs attention',
+              subtitle: 'Started but not yet complete',
+            ),
+            for (final t in weak)
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  title: Text(t.title),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: TopicStepRow(topic: t),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.go('/topic/${t.id}'),
+                ),
+              ),
+          ],
+
+          // ---- history --------------------------------------------------------
+          heading('Practice history'),
+          if (history.isEmpty)
+            Text('No practice tests taken yet.', style: textTheme.bodyMedium)
+          else
+            for (final r in history)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(content.practiceTest(r.testId)!.title),
+                subtitle: Text(
+                  '${formatDate(r.at)} · ${r.durationSec ~/ 60} min',
+                ),
+                trailing: Text('${r.pct}%', style: textTheme.titleMedium),
+              ),
+
+          const SizedBox(height: 24),
+          OutlinedButton.icon(
+            key: const ValueKey('reset-progress'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Reset progress'),
+            onPressed: () => _confirmReset(context, progress),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Progress is stored only on this device. '
             'Export/import is planned for a later version.',
-            style: textTheme.bodySmall),
-      ]),
+            style: textTheme.bodySmall,
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _confirmReset(BuildContext context, ProgressStore progress) async {
+  Future<void> _confirmReset(
+    BuildContext context,
+    ProgressStore progress,
+  ) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reset all progress?'),
         content: const Text(
-            'This clears notes read, flashcard schedules, quiz scores, answer '
-            'history and practice history on this device, for every subject. '
-            'It cannot be undone.'),
+          'This clears notes read, flashcard schedules, quiz scores, answer '
+          'history and practice history on this device, for every subject. '
+          'It cannot be undone.',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
-              key: const ValueKey('confirm-reset'),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Reset')),
+            key: const ValueKey('confirm-reset'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reset'),
+          ),
         ],
       ),
     );
@@ -220,17 +272,25 @@ class _DomainRow extends StatelessWidget {
       child: InkWell(
         onTap: r.questionsTotal == 0
             ? null
-            : () => context.go('/progress/review?kind=domain&id=${r.domain.id}'),
+            : () =>
+                  context.go('/progress/review?kind=domain&id=${r.domain.id}'),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(children: [
-                Expanded(child: Text(r.domain.title, style: textTheme.titleSmall)),
-                if (r.domain.weightPercent != null)
-                  Text('${r.domain.weightPercent}%', style: textTheme.labelMedium),
-              ]),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(r.domain.title, style: textTheme.titleSmall),
+                  ),
+                  if (r.domain.weightPercent != null)
+                    Text(
+                      '${r.domain.weightPercent}%',
+                      style: textTheme.labelMedium,
+                    ),
+                ],
+              ),
               const SizedBox(height: 6),
               LinearProgressIndicator(
                 value: r.progress,
@@ -247,9 +307,12 @@ class _DomainRow extends StatelessWidget {
               if (r.questionsTotal > 0)
                 Align(
                   alignment: Alignment.centerRight,
-                  child: Text('Review this domain ›',
-                      style: textTheme.labelMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.primary)),
+                  child: Text(
+                    'Review this domain ›',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -279,22 +342,33 @@ class _GapTile extends StatelessWidget {
         title: Text(gap.competency.text, style: textTheme.bodyMedium),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Wrap(spacing: 6, runSpacing: 4, children: [
-            StepChip(
-              label: acc == null ? 'Not tested' : '${(acc * 100).round()}% right',
-              state: state,
-            ),
-            StepChip(
-              label: '${gap.seen}/${gap.total} answered',
-              state: gap.seen * 2 < gap.total ? ProgressState.partial : ProgressState.done,
-            ),
-            Text(gap.domain.title,
-                style: textTheme.labelSmall?.copyWith(color: scheme.outline)),
-          ]),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              StepChip(
+                label: acc == null
+                    ? 'Not tested'
+                    : '${(acc * 100).round()}% right',
+                state: state,
+              ),
+              StepChip(
+                label: '${gap.seen}/${gap.total} answered',
+                state: gap.seen * 2 < gap.total
+                    ? ProgressState.partial
+                    : ProgressState.done,
+              ),
+              Text(
+                gap.domain.title,
+                style: textTheme.labelSmall?.copyWith(color: scheme.outline),
+              ),
+            ],
+          ),
         ),
         trailing: const Icon(Icons.play_circle_outline),
-        onTap: () => context
-            .go('/progress/review?kind=competency&id=${gap.competency.id}'),
+        onTap: () => context.go(
+          '/progress/review?kind=competency&id=${gap.competency.id}',
+        ),
       ),
     );
   }
@@ -313,11 +387,17 @@ class _Stat extends StatelessWidget {
       child: Card(
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: Column(children: [
-            Text(value, style: textTheme.titleLarge),
-            const SizedBox(height: 2),
-            Text(label, style: textTheme.labelSmall, textAlign: TextAlign.center),
-          ]),
+          child: Column(
+            children: [
+              Text(value, style: textTheme.titleLarge),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: textTheme.labelSmall,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

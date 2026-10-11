@@ -359,7 +359,7 @@
           "id": "c",
           "text": "A Role in dev plus a ClusterRoleBinding",
           "correct": false,
-          "explanation": "A ClusterRoleBinding can only reference a ClusterRole."
+          "explanation": "A ClusterRoleBinding grants access cluster-wide; to grant a role in just one namespace you use a RoleBinding."
         },
         {
           "id": "d",

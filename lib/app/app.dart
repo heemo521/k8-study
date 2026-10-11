@@ -36,8 +36,9 @@ class K8StudyApp extends StatefulWidget {
 }
 
 class _K8StudyAppState extends State<K8StudyApp> {
-  late final GoRouter _router =
-      buildRouter(initialLocation: widget.initialLocation);
+  late final GoRouter _router = buildRouter(
+    initialLocation: widget.initialLocation,
+  );
   final _session = SessionStore();
   late final Random _random = widget.random ?? Random();
 
@@ -55,7 +56,8 @@ class _K8StudyAppState extends State<K8StudyApp> {
         ChangeNotifierProvider<ProgressStore>.value(value: widget.progress),
         // The selected subject; screens depend on this, not on the catalog.
         ProxyProvider<ProgressStore, ContentBundle>(
-          update: (_, progress, _) => widget.catalog.subject(progress.subjectId),
+          update: (_, progress, _) =>
+              widget.catalog.subject(progress.subjectId),
           updateShouldNotify: (a, b) => !identical(a, b),
         ),
         Provider<AdsService>.value(value: widget.ads),

@@ -12,7 +12,10 @@ const interstitialCloseDelay = Duration(seconds: 3);
 /// Web v1 implementation: AdSense-sized placeholders, no ad network calls and
 /// no `adsbygoogle.js`. Real AdSense is a later, separately approved change.
 class PlaceholderAdsService implements AdsService {
-  PlaceholderAdsService({required this.capStore, this.clock = const SystemClock()});
+  PlaceholderAdsService({
+    required this.capStore,
+    this.clock = const SystemClock(),
+  });
 
   final AdCapStore capStore;
   final Clock clock;
@@ -29,7 +32,9 @@ class PlaceholderAdsService implements AdsService {
 
   @override
   Future<void> maybeShowInterstitial(
-      BuildContext context, AdPlacement placement) async {
+    BuildContext context,
+    AdPlacement placement,
+  ) async {
     if (!registerCompletionAndCheck(capStore, clock.now())) return;
     if (!context.mounted) return;
     await showGeneralDialog<void>(
@@ -60,8 +65,10 @@ class _BannerPlaceholder extends StatelessWidget {
               border: Border.all(color: scheme.outlineVariant),
               color: scheme.surfaceContainerHighest,
             ),
-            child: Text('Ad placeholder',
-                style: Theme.of(context).textTheme.labelMedium),
+            child: Text(
+              'Ad placeholder',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
           ),
         ),
       ),
@@ -105,8 +112,10 @@ class _InterstitialPlaceholderState extends State<_InterstitialPlaceholder> {
         child: Stack(
           children: [
             Center(
-              child: Text('Ad placeholder',
-                  style: Theme.of(context).textTheme.headlineSmall),
+              child: Text(
+                'Ad placeholder',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
             ),
             Positioned(
               top: 8,

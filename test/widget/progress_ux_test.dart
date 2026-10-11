@@ -19,8 +19,9 @@ Future<void> tapKey(WidgetTester tester, String key) async {
 }
 
 void main() {
-  testWidgets('continue card starts at topic 1, then resumes the last topic',
-      (tester) async {
+  testWidgets('continue card starts at topic 1, then resumes the last topic', (
+    tester,
+  ) async {
     await setPhoneViewport(tester);
     final h = await pumpApp(tester);
     final first = h.content.topics.first;
@@ -33,13 +34,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Continue · Topic 4 of'), findsOneWidget);
     await tapKey(tester, 'continue-button');
-    expect(find.byKey(const ValueKey('sections-menu')), findsOneWidget,
-        reason: 'continue opens the notes step');
+    expect(
+      find.byKey(const ValueKey('sections-menu')),
+      findsOneWidget,
+      reason: 'continue opens the notes step',
+    );
     expect(find.text(later.title), findsOneWidget);
   });
 
-  testWidgets('gap analysis lists weak competencies and reviews them',
-      (tester) async {
+  testWidgets('gap analysis lists weak competencies and reviews them', (
+    tester,
+  ) async {
     await setPhoneViewport(tester);
     final h = await pumpApp(tester, initialLocation: '/progress');
     expect(find.textContaining('Take a quiz or practice test'), findsOneWidget);
@@ -59,8 +64,10 @@ void main() {
     final tile = find.byKey(ValueKey('gap-${target.competency.id}'));
     await tester.ensureVisible(tile);
     await tester.pumpAndSettle();
-    expect(find.descendant(of: tile, matching: find.text('0% right')),
-        findsOneWidget);
+    expect(
+      find.descendant(of: tile, matching: find.text('0% right')),
+      findsOneWidget,
+    );
     await tester.tap(tile);
     await tester.pumpAndSettle();
 
@@ -70,8 +77,9 @@ void main() {
     expect(find.textContaining('From: '), findsOneWidget);
   });
 
-  testWidgets('missed questions review runs and records answers',
-      (tester) async {
+  testWidgets('missed questions review runs and records answers', (
+    tester,
+  ) async {
     await setPhoneViewport(tester);
     final h = await pumpApp(tester);
     final q = h.content.topics.first.questions.first;
@@ -82,7 +90,9 @@ void main() {
     expect(find.text('Q 1/1'), findsOneWidget);
     final correct = q.options.firstWhere((o) => o.correct);
     final f = find.descendant(
-        of: find.byType(QuestionView), matching: find.text(correct.text));
+      of: find.byType(QuestionView),
+      matching: find.text(correct.text),
+    );
     await tester.tap(f.first);
     await tester.pumpAndSettle();
     await tapKey(tester, 'submit');
@@ -92,8 +102,9 @@ void main() {
     expect(missedQuestions(h.content, h.progress), isEmpty);
   });
 
-  testWidgets('due flashcards across topics are reviewed in one session',
-      (tester) async {
+  testWidgets('due flashcards across topics are reviewed in one session', (
+    tester,
+  ) async {
     await setPhoneViewport(tester);
     final h = await pumpApp(tester);
     final cards = [
@@ -119,7 +130,10 @@ void main() {
     await setPhoneViewport(tester);
     final h = await pumpApp(tester);
     await tapKey(tester, 'open-search');
-    await tester.enterText(find.byKey(const ValueKey('search-field')), 'kube-node-lease');
+    await tester.enterText(
+      find.byKey(const ValueKey('search-field')),
+      'kube-node-lease',
+    );
     await tester.pumpAndSettle();
     expect(find.textContaining('results'), findsOneWidget);
     // First section hit for the namespaces topic.
@@ -130,42 +144,57 @@ void main() {
     expect(h.progress.recentTopic(h.content.subject.id), 'namespaces');
   });
 
-  testWidgets('subject switcher appears with 2+ subjects and switches content',
-      (tester) async {
-    await setPhoneViewport(tester);
-    final real = (await loadCatalog(tester)).subjects.first;
-    final fake = ContentBundle(
-      subject: SubjectInfo(
-        id: 'docker',
-        title: 'Docker',
-        tagline: 'Containers',
-        description: 'Test subject',
-        contentVersion: 1,
-        reviewedAt: '2026-10-11',
-        exam: null,
-        domains: const [
-          Domain(id: 'basics', title: 'Basics', weightPercent: null,
-              isExamDomain: false, competencies: []),
-        ],
-        topicIds: const ['docker-intro'],
-        sourceAllowlist: const [],
-        attributions: const [],
-        trademarks: const [],
-      ),
-      topics: const [
-        Topic(
-          id: 'docker-intro', title: 'Docker Intro', summary: 'What it is',
-          order: 1, domainIds: ['basics'], competencyIds: [], estMinutes: 5,
-          reviewedAt: '2026-10-11', sections: [], flashcards: [], questions: [],
+  testWidgets(
+    'subject switcher appears with 2+ subjects and switches content',
+    (tester) async {
+      await setPhoneViewport(tester);
+      final real = (await loadCatalog(tester)).subjects.first;
+      final fake = ContentBundle(
+        subject: SubjectInfo(
+          id: 'docker',
+          title: 'Docker',
+          tagline: 'Containers',
+          description: 'Test subject',
+          contentVersion: 1,
+          reviewedAt: '2026-10-11',
+          exam: null,
+          domains: const [
+            Domain(
+              id: 'basics',
+              title: 'Basics',
+              weightPercent: null,
+              isExamDomain: false,
+              competencies: [],
+            ),
+          ],
+          topicIds: const ['docker-intro'],
+          sourceAllowlist: const [],
+          attributions: const [],
+          trademarks: const [],
         ),
-      ],
-      practiceTests: const [],
-    );
-    await pumpApp(tester, catalog: Catalog([real, fake]));
-    await tapKey(tester, 'subject-switcher');
-    await tapKey(tester, 'subject-docker');
-    expect(find.text('Docker'), findsWidgets);
-    expect(find.text('Docker Intro'), findsWidgets);
-    expect(find.text('Basics'), findsOneWidget);
-  });
+        topics: const [
+          Topic(
+            id: 'docker-intro',
+            title: 'Docker Intro',
+            summary: 'What it is',
+            order: 1,
+            domainIds: ['basics'],
+            competencyIds: [],
+            estMinutes: 5,
+            reviewedAt: '2026-10-11',
+            sections: [],
+            flashcards: [],
+            questions: [],
+          ),
+        ],
+        practiceTests: const [],
+      );
+      await pumpApp(tester, catalog: Catalog([real, fake]));
+      await tapKey(tester, 'subject-switcher');
+      await tapKey(tester, 'subject-docker');
+      expect(find.text('Docker'), findsWidgets);
+      expect(find.text('Docker Intro'), findsWidgets);
+      expect(find.text('Basics'), findsOneWidget);
+    },
+  );
 }

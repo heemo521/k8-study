@@ -22,17 +22,18 @@ class InlineText extends StatelessWidget {
             switch (span.style) {
               markup.InlineStyle.plain => TextSpan(text: span.text),
               markup.InlineStyle.bold => TextSpan(
-                  text: span.text,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
+                text: span.text,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               markup.InlineStyle.code => TextSpan(
-                  text: span.text,
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontFamilyFallback: const ['Courier New', 'Courier'],
-                    fontSize: (base.fontSize ?? 16) * 0.92,
-                    backgroundColor: scheme.surfaceContainerHighest,
-                  ),
+                text: span.text,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontFamilyFallback: const ['Courier New', 'Courier'],
+                  fontSize: (base.fontSize ?? 16) * 0.92,
+                  backgroundColor: scheme.surfaceContainerHighest,
                 ),
+              ),
             },
         ],
       ),

@@ -364,7 +364,7 @@
         },
         {
           "id": "c",
-          "text": "Restart API servers, then kube-scheduler, kube-controller-manager and kubelet",
+          "text": "Restart all API servers, and also restart kube-scheduler, kube-controller-manager and kubelet",
           "correct": true,
           "explanation": "Recommended so components don't use stale data."
         },

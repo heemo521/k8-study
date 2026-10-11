@@ -214,8 +214,12 @@ class SubjectInfo {
           : ExamInfo.fromJson(json['curriculum'], '$path.curriculum'),
       domains: _list(json, 'domains', path, Domain.fromJson),
       topicIds: _list(json, 'topics', path, _string),
-      sourceAllowlist:
-          _list(json, 'sourceAllowlist', path, AllowedSource.fromJson),
+      sourceAllowlist: _list(
+        json,
+        'sourceAllowlist',
+        path,
+        AllowedSource.fromJson,
+      ),
       attributions: _list(json, 'attributions', path, Notice.fromJson),
       trademarks: _list(json, 'trademarks', path, Notice.fromJson),
     );
@@ -251,20 +255,15 @@ sealed class NoteBlock {
       case 'table':
         return TableBlock(
           header: _list(json, 'header', path, _string),
-          rows: _list(
-            json,
-            'rows',
-            path,
-            (row, rowPath) {
-              if (row is! List) {
-                throw FormatException('$rowPath: expected list');
-              }
-              return [
-                for (var i = 0; i < row.length; i++)
-                  _string(row[i], '$rowPath[$i]'),
-              ];
-            },
-          ),
+          rows: _list(json, 'rows', path, (row, rowPath) {
+            if (row is! List) {
+              throw FormatException('$rowPath: expected list');
+            }
+            return [
+              for (var i = 0; i < row.length; i++)
+                _string(row[i], '$rowPath[$i]'),
+            ];
+          }),
         );
       default:
         throw FormatException('$path.type: unknown block type "$type"');
@@ -404,8 +403,10 @@ class Question {
   final int difficulty;
   final String? competencyId;
 
-  Set<String> get correctIds =>
-      {for (final o in options) if (o.correct) o.id};
+  Set<String> get correctIds => {
+    for (final o in options)
+      if (o.correct) o.id,
+  };
 
   static Question Function(dynamic, String) parser(String topicId) =>
       (raw, path) {
@@ -553,17 +554,17 @@ class ContentBundle {
     required this.subject,
     required List<Topic> topics,
     required this.practiceTests,
-  })  : topics = [
-          // Recommended study order from subject.json.
-          for (final id in subject.topicIds)
-            topics.firstWhere((t) => t.id == id),
-        ],
-        _topicsById = {for (final t in topics) t.id: t},
-        _domainsById = {for (final d in subject.domains) d.id: d},
-        _sourceTitles = {
-          for (final t in topics)
-            for (final s in t.sections) s.sourceUrl: s.sourceTitle,
-        };
+  }) : topics = [
+         // Recommended study order from subject.json.
+         for (final id in subject.topicIds)
+           topics.firstWhere((t) => t.id == id),
+       ],
+       _topicsById = {for (final t in topics) t.id: t},
+       _domainsById = {for (final d in subject.domains) d.id: d},
+       _sourceTitles = {
+         for (final t in topics)
+           for (final s in t.sections) s.sourceUrl: s.sourceTitle,
+       };
 
   final SubjectInfo subject;
 
@@ -623,8 +624,7 @@ class ContentBundle {
     return null;
   }
 
-  String? competencyText(String competencyId) =>
-      competency(competencyId)?.text;
+  String? competencyText(String competencyId) => competency(competencyId)?.text;
 
   /// Domain owning [competencyId].
   Domain? domainOfCompetency(String competencyId) {
@@ -642,7 +642,7 @@ class Catalog {
   final List<ContentBundle> subjects;
 
   ContentBundle subject(String? id) => subjects.firstWhere(
-        (s) => s.subject.id == id,
-        orElse: () => subjects.first,
-      );
+    (s) => s.subject.id == id,
+    orElse: () => subjects.first,
+  );
 }

@@ -4,17 +4,27 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-const textExtensions = ['.dart', '.html', '.js', '.json', '.yaml', '.md', '.mjs'];
+const textExtensions = [
+  '.dart',
+  '.html',
+  '.js',
+  '.json',
+  '.yaml',
+  '.md',
+  '.mjs',
+];
 
-Iterable<File> dartFiles(String dir) => Directory(dir)
-    .listSync(recursive: true)
-    .whereType<File>()
-    .where((f) => f.path.endsWith('.dart'));
+Iterable<File> dartFiles(String dir) =>
+    Directory(dir)
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.dart'));
 
 void main() {
   test('screens never import ad implementations or SDKs', () {
     final banned = RegExp(
-        r'''import\s+['"](package:google_mobile_ads|package:[^'"]*adsense|[^'"]*ads/impl/)''');
+      r'''import\s+['"](package:google_mobile_ads|package:[^'"]*adsense|[^'"]*ads/impl/)''',
+    );
     for (final f in dartFiles('lib/screens')) {
       expect(banned.hasMatch(f.readAsStringSync()), isFalse, reason: f.path);
     }
@@ -26,9 +36,15 @@ void main() {
   });
 
   test('web build never loads adsbygoogle.js', () {
-    for (final f in Directory('web').listSync(recursive: true).whereType<File>()) {
+    for (final f in Directory(
+      'web',
+    ).listSync(recursive: true).whereType<File>()) {
       if (!f.path.endsWith('.html') && !f.path.endsWith('.js')) continue;
-      expect(f.readAsStringSync(), isNot(contains('adsbygoogle')), reason: f.path);
+      expect(
+        f.readAsStringSync(),
+        isNot(contains('adsbygoogle')),
+        reason: f.path,
+      );
     }
   });
 
@@ -37,7 +53,9 @@ void main() {
     final appId = RegExp(r'ca-app-pub-\d+');
     for (final dir in ['lib', 'web', 'tool']) {
       if (!Directory(dir).existsSync()) continue;
-      for (final f in Directory(dir).listSync(recursive: true).whereType<File>()) {
+      for (final f in Directory(
+        dir,
+      ).listSync(recursive: true).whereType<File>()) {
         if (!textExtensions.any(f.path.endsWith)) continue;
         final text = f.readAsStringSync();
         for (final m in pubId.allMatches(text)) {

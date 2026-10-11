@@ -9,7 +9,8 @@ import 'package:material_ui/material_ui.dart';
 import 'test_app.dart';
 
 final adKey = find.byWidgetPredicate(
-    (w) => w.key is ValueKey && '${(w.key as ValueKey).value}'.startsWith('ad-'));
+  (w) => w.key is ValueKey && '${(w.key as ValueKey).value}'.startsWith('ad-'),
+);
 
 Future<void> scrollToEnd(WidgetTester tester) async {
   await tester.drag(find.byType(Scrollable).first, const Offset(0, -20000));
@@ -56,12 +57,14 @@ void main() {
     }
   });
 
-  testWidgets('interstitial shows on the 3rd completion, before results',
-      (tester) async {
+  testWidgets('interstitial shows on the 3rd completion, before results', (
+    tester,
+  ) async {
     await setPhoneViewport(tester);
     final h = await pumpApp(
       tester,
-      ads: (p) => PlaceholderAdsService(capStore: p, clock: FixedClock(testNow)),
+      ads: (p) =>
+          PlaceholderAdsService(capStore: p, clock: FixedClock(testNow)),
       initialLocation: '/topic/namespaces/quiz',
     );
     // Two completions already recorded.
@@ -70,8 +73,12 @@ void main() {
     for (var i = 0; i < 10; i++) {
       final view = tester.widget<QuestionView>(find.byType(QuestionView));
       final o = view.presented.question.options.firstWhere((o) => o.correct);
-      final f = find.descendant(
-          of: find.byType(QuestionView), matching: find.text(o.text)).first;
+      final f = find
+          .descendant(
+            of: find.byType(QuestionView),
+            matching: find.text(o.text),
+          )
+          .first;
       await tester.ensureVisible(f);
       await tester.pumpAndSettle();
       await tester.tap(f);

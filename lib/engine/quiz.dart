@@ -72,10 +72,11 @@ class QuizAttempt {
 
   int get correctCount => questions.where(correct).length;
 
-  int get percent => questions.isEmpty
-      ? 0
-      : (correctCount * 100 / questions.length).round();
+  int get percent =>
+      questions.isEmpty ? 0 : (correctCount * 100 / questions.length).round();
 
-  Set<String> get missedIds =>
-      {for (final p in questions) if (!correct(p)) p.question.id};
+  Set<String> get missedIds => {
+    for (final p in questions)
+      if (!correct(p)) p.question.id,
+  };
 }

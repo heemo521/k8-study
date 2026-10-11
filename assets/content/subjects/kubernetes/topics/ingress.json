@@ -169,8 +169,7 @@
             "**`.spec.defaultBackend`** handles requests that match no rule. If `.spec.rules` is empty, `.spec.defaultBackend` is **required**. If it isn't set, unmatched requests are handled however the controller decides.",
             "**Single Service:** an Ingress with only a default backend and no rules.",
             "**Simple fanout:** one host, several paths, each to a different Service. Keeps the number of load balancers down.",
-            "**Name-based virtual hosting:** several `host` rules on the same IP, routed by the Host header. A rule with no host catches everything else.",
-            "Some controllers need you to create a `default-http-backend` Service."
+            "**Name-based virtual hosting:** several `host` rules on the same IP, routed by the Host header. A rule with no host catches everything else."
           ]
         },
         {

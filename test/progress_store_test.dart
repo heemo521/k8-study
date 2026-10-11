@@ -15,8 +15,10 @@ class FixedClock implements Clock {
 
 Future<ProgressStore> store([Map<String, Object> initial = const {}]) async {
   SharedPreferences.setMockInitialValues(initial);
-  return ProgressStore(await SharedPreferences.getInstance(),
-      clock: FixedClock(DateTime(2026, 10, 11, 12)));
+  return ProgressStore(
+    await SharedPreferences.getInstance(),
+    clock: FixedClock(DateTime(2026, 10, 11, 12)),
+  );
 }
 
 void main() {
@@ -25,13 +27,15 @@ void main() {
     a.markSectionRead('ns', 'ns-a');
     a.setCardState('ns-fc-1', CardState(box: 3, dueAt: DateTime(2026, 10, 20)));
     a.recordQuiz('ns', 70, {'ns-q-1'});
-    a.recordPractice(PracticeRecord(
-      testId: 'mixed',
-      pct: 60,
-      perDomain: {'cluster-arch': const DomainScore(3, 5)},
-      durationSec: 90,
-      at: DateTime(2026, 10, 11),
-    ));
+    a.recordPractice(
+      PracticeRecord(
+        testId: 'mixed',
+        pct: 60,
+        perDomain: {'cluster-arch': const DomainScore(3, 5)},
+        durationSec: 90,
+        at: DateTime(2026, 10, 11),
+      ),
+    );
 
     final b = ProgressStore(await SharedPreferences.getInstance());
     expect(b.readSections('ns'), {'ns-a'});
@@ -57,8 +61,7 @@ void main() {
   test('corrupt JSON in one key resets only that key', () async {
     final s = await store({
       StorageKeys.notes: '{not json',
-      StorageKeys.quiz:
-          '{"t":{"attempts":1,"bestPct":80,"lastPct":80,"lastAt":"2026-10-01T00:00:00.000"}}',
+      StorageKeys.quiz: '{"t":{"attempts":1,"bestPct":80,"lastPct":80,"lastAt":"2026-10-01T00:00:00.000"}}',
     });
     expect(s.readSections('t'), isEmpty);
     expect(s.quizStats('t')!.bestPct, 80);
@@ -87,9 +90,15 @@ void main() {
   test('history keeps the newest 50', () async {
     final s = await store();
     for (var i = 0; i < 55; i++) {
-      s.recordPractice(PracticeRecord(
-          testId: 'mixed', pct: i, perDomain: const {}, durationSec: 1,
-          at: DateTime(2026, 10, 11)));
+      s.recordPractice(
+        PracticeRecord(
+          testId: 'mixed',
+          pct: i,
+          perDomain: const {},
+          durationSec: 1,
+          at: DateTime(2026, 10, 11),
+        ),
+      );
     }
     expect(s.practiceHistory.length, maxPracticeHistory);
     expect(s.practiceHistory.first.pct, 54);

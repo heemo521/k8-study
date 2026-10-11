@@ -80,7 +80,9 @@ class _OptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     var border = selected ? scheme.primary : scheme.outlineVariant;
-    Color? fill = selected ? scheme.primaryContainer.withValues(alpha: 0.4) : null;
+    Color? fill = selected
+        ? scheme.primaryContainer.withValues(alpha: 0.4)
+        : null;
     String? verdict;
     if (revealed) {
       if (option.correct) {
@@ -98,7 +100,9 @@ class _OptionTile extends StatelessWidget {
     }
     final icon = multi
         ? (selected ? Icons.check_box : Icons.check_box_outline_blank)
-        : (selected ? Icons.radio_button_checked : Icons.radio_button_unchecked);
+        : (selected
+              ? Icons.radio_button_checked
+              : Icons.radio_button_unchecked);
 
     return Semantics(
       button: !revealed,
@@ -126,22 +130,26 @@ class _OptionTile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        InlineText(option.text,
-                            style: Theme.of(context).textTheme.bodyLarge),
+                        InlineText(
+                          option.text,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
                         if (verdict != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
-                            child: Text(verdict,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelMedium
-                                    ?.copyWith(color: border)),
+                            child: Text(
+                              verdict,
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(color: border),
+                            ),
                           ),
                         if (revealed)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
-                            child: InlineText(option.explanation,
-                                style: Theme.of(context).textTheme.bodyMedium),
+                            child: InlineText(
+                              option.explanation,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
                           ),
                       ],
                     ),
@@ -169,29 +177,35 @@ class AttemptReview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < attempt.questions.length; i++)
-          Builder(builder: (context) {
-            final p = attempt.questions[i];
-            final ok = attempt.correct(p);
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ExpansionTile(
-                key: PageStorageKey('review-${p.question.id}'),
-                leading: Icon(ok ? Icons.check_circle : Icons.cancel,
+          Builder(
+            builder: (context) {
+              final p = attempt.questions[i];
+              final ok = attempt.correct(p);
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ExpansionTile(
+                  key: PageStorageKey('review-${p.question.id}'),
+                  leading: Icon(
+                    ok ? Icons.check_circle : Icons.cancel,
                     color: ok ? scheme.correct : scheme.wrong,
-                    semanticLabel: ok ? 'Correct' : 'Incorrect'),
-                title: InlineText('${i + 1}. ${p.question.stem}',
-                    style: Theme.of(context).textTheme.bodyMedium),
-                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                children: [
-                  QuestionView(
-                    presented: p,
-                    selected: attempt.answers[p.question.id] ?? const {},
-                    revealed: true,
+                    semanticLabel: ok ? 'Correct' : 'Incorrect',
                   ),
-                ],
-              ),
-            );
-          }),
+                  title: InlineText(
+                    '${i + 1}. ${p.question.stem}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  children: [
+                    QuestionView(
+                      presented: p,
+                      selected: attempt.answers[p.question.id] ?? const {},
+                      revealed: true,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
       ],
     );
   }
