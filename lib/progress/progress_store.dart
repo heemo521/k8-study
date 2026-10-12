@@ -29,6 +29,61 @@ abstract final class StorageKeys {
   static const answers = 'k8s.answers';
   static const recent = 'k8s.recent';
   static const activity = 'k8s.activity';
+  static const plans = 'k8s.plans';
+}
+
+/// One competency an exam showed as weak, with the exam's result for it.
+class GapItem {
+  const GapItem({
+    required this.competencyId,
+    required this.examCorrect,
+    required this.examTotal,
+  });
+
+  final String competencyId;
+  final int examCorrect;
+  final int examTotal;
+
+  Map<String, dynamic> toJson() => {
+    'c': competencyId,
+    'ok': examCorrect,
+    'n': examTotal,
+  };
+
+  factory GapItem.fromJson(Map<String, dynamic> j) => GapItem(
+    competencyId: j['c'] as String,
+    examCorrect: j['ok'] as int,
+    examTotal: j['n'] as int,
+  );
+}
+
+/// A study plan built from an exam result: the competencies to fix. Step
+/// completion and "fixed" are derived from other progress, not stored.
+class GapPlan {
+  const GapPlan({
+    required this.testId,
+    required this.createdAt,
+    required this.items,
+  });
+
+  final String testId;
+  final DateTime createdAt;
+  final List<GapItem> items;
+
+  Map<String, dynamic> toJson() => {
+    'test': testId,
+    'at': createdAt.toIso8601String(),
+    'items': [for (final i in items) i.toJson()],
+  };
+
+  factory GapPlan.fromJson(Map<String, dynamic> j) => GapPlan(
+    testId: j['test'] as String,
+    createdAt: DateTime.parse(j['at'] as String),
+    items: [
+      for (final i in j['items'] as List<dynamic>)
+        GapItem.fromJson(i as Map<String, dynamic>),
+    ],
+  );
 }
 
 /// Answer history for one question across quizzes, reviews and tests.
@@ -153,6 +208,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
 
   /// Per-day counts: {'yyyy-mm-dd': {'sections': n, 'cards': n, 'quizzes': n}}.
   Map<String, Map<String, int>> _activity = {};
+  Map<String, GapPlan> _plans = {};
 
   // ---- loading -------------------------------------------------------------
 
@@ -212,7 +268,13 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       },
   };
 
+  static Map<String, GapPlan> _parsePlans(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries)
+      e.key: GapPlan.fromJson(e.value as Map<String, dynamic>),
+  };
+
   static final Map<String, Object Function(dynamic)> _parsers = {
+    StorageKeys.plans: _parsePlans,
     StorageKeys.activity: _parseActivity,
     StorageKeys.notes: _parseNotes,
     StorageKeys.cards: _parseCards,
@@ -244,6 +306,28 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _answers = _read(StorageKeys.answers, {}, _parseAnswers);
     _recent = _read(StorageKeys.recent, {}, _parseRecent);
     _activity = _read(StorageKeys.activity, {}, _parseActivity);
+    _plans = _read(StorageKeys.plans, {}, _parsePlans);
+  }
+
+  // ---- gap plans -----------------------------------------------------------
+
+  /// The current gap plan for [subjectId], if any.
+  GapPlan? gapPlan(String subjectId) => _plans[subjectId];
+
+  void setGapPlan(String subjectId, GapPlan plan) {
+    _plans[subjectId] = plan;
+    _savePlans();
+  }
+
+  void clearGapPlan(String subjectId) {
+    if (_plans.remove(subjectId) != null) _savePlans();
+  }
+
+  void _savePlans() {
+    _write(StorageKeys.plans, {
+      for (final e in _plans.entries) e.key: e.value.toJson(),
+    });
+    notifyListeners();
   }
 
   /// Schema migrations. v1 is the first schema, so an unknown or missing
@@ -528,6 +612,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     StorageKeys.answers,
     StorageKeys.recent,
     StorageKeys.activity,
+    StorageKeys.plans,
     StorageKeys.settings,
   ];
 
@@ -596,9 +681,11 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       StorageKeys.answers,
       StorageKeys.recent,
       StorageKeys.activity,
+      StorageKeys.plans,
     ]) {
       await _prefs.remove(key);
     }
+    _plans = {};
     _answers = {};
     _recent = {};
     _activity = {};

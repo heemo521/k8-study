@@ -219,6 +219,11 @@ async function noHorizontalScroll(page) {
   await tap(page, 'Finish');
   check('practice per-domain breakdown', await hasText(page, 'By CKA domain'));
   await shot(page, '12-practice-results');
+  check('exam shows its gaps', await hasText(page, 'Your gaps'));
+  await tap(page, 'Build my gap plan', false);
+  for (let i = 0; i < 20 && !(await hasText(page, 'gaps fixed')); i++) await page.waitForTimeout(250);
+  check('gap plan built from the exam', await hasText(page, 'gaps fixed'));
+  await shot(page, '20-gap-plan');
 
   // ---- Second subject (Docker) ----------------------------------------------
   await go(page, '/');

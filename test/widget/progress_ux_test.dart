@@ -403,4 +403,47 @@ void main() {
     await pumpApp(tester, initialLocation: '/topic/namespaces/notes');
     expect(find.byKey(const ValueKey('listen')), findsNothing);
   });
+
+  testWidgets('exam -> gaps -> plan -> re-test, and the plan cards', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    await pumpApp(tester, initialLocation: '/progress');
+    // Before any exam, Progress invites one.
+    expect(find.byKey(const ValueKey('plan-prompt')), findsOneWidget);
+
+    final h = await pumpApp(tester, initialLocation: '/practice/cka-mock/run');
+    await tester.tap(find.text('Finish test'));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'confirm-finish');
+
+    // Unanswered questions count against the exam, so every tested
+    // competency is a gap.
+    expect(find.byKey(const ValueKey('exam-gaps')), findsOneWidget);
+    await tapKey(tester, 'build-plan');
+    final plan = h.progress.gapPlan('kubernetes')!;
+    expect(plan.items, isNotEmpty);
+    expect(find.text('0 of ${plan.items.length} gaps fixed'), findsOneWidget);
+    final first = plan.items.first.competencyId;
+    expect(find.byKey(ValueKey('plan-item-$first')), findsOneWidget);
+
+    await tapKey(tester, 'plan-retest');
+    expect(find.text('Re-test my gaps'), findsOneWidget);
+    await tester.tap(find.byType(CloseButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Leave'));
+    await tester.pumpAndSettle();
+
+    // Home shows the plan card while a plan is open.
+    await tester.tap(find.text('Learn'));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'plan-card');
+    expect(find.byKey(const ValueKey('plan-summary')), findsOneWidget);
+
+    // Discarding removes the plan, not the answers.
+    await tapKey(tester, 'plan-discard');
+    await tapKey(tester, 'confirm-discard');
+    expect(h.progress.gapPlan('kubernetes'), isNull);
+    expect(find.text('No gap plan yet'), findsOneWidget);
+  });
 }

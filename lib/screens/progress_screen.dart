@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
+import 'gap_plan_screen.dart';
 import '../content/models.dart';
 import '../engine/clock.dart';
 import '../progress/insights.dart';
@@ -86,6 +87,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
             ],
           ),
+
+          // ---- gap plan ------------------------------------------------------
+          heading('Gap plan'),
+          const GapPlanSummaryCard(promptExam: true),
 
           // ---- reviews -------------------------------------------------------
           heading('Review now'),

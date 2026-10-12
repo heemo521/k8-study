@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
+import 'gap_plan_screen.dart';
 import '../ads/ads_service.dart';
 import '../content/models.dart';
 import '../engine/clock.dart';
@@ -46,6 +47,10 @@ class TopicBrowserScreen extends StatelessWidget {
             const SizedBox(height: 12),
           ],
           _ContinueCard(content: content, progress: progress),
+          if (progress.gapPlan(content.subject.id) != null) ...[
+            const SizedBox(height: 12),
+            const GapPlanSummaryCard(),
+          ],
           if (due > 0 || missed > 0) ...[
             const SizedBox(height: 8),
             Wrap(

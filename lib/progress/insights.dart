@@ -1,6 +1,7 @@
 /// Derived views over progress: where the learner is, and where the gaps are.
 library;
 
+import 'gap_plan.dart';
 import '../content/models.dart';
 import '../engine/flashcards.dart' as fc;
 import '../engine/quiz.dart';
@@ -224,6 +225,8 @@ List<Question> reviewPool(
       return missedQuestions(content, p);
     case 'competency':
       return content.allQuestions.where((q) => q.competencyId == id).toList();
+    case 'plan':
+      return planPool(content, p);
     case 'domain':
       return content
           .topicsForDomain(id ?? '')
