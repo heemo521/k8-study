@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../content/models.dart';
 import 'diagram_view.dart';
 import 'inline_text.dart';
+import 'port_scene_view.dart';
 
 /// Renders one structured note block (spec §5.3).
 class NoteBlockView extends StatelessWidget {
@@ -46,6 +47,7 @@ class NoteBlockView extends StatelessWidget {
           rows: rows,
         ),
         DiagramBlock() => DiagramView(block: block as DiagramBlock),
+        SceneBlock() => PortSceneView(block: block as SceneBlock),
       },
     );
   }

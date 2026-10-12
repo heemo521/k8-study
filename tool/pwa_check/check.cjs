@@ -164,21 +164,27 @@ async function noHorizontalScroll(page) {
   await shot(page, '02-topic');
   await tap(page, '1. Study notes', false);
   await shot(page, '03-notes');
-  for (let i = 0; i < 60; i++) {
+  // One page per section: Next marks a page read; the last page is read by
+  // scrolling to its foot (or tapping Mark read).
+  const total = topic.sections.length;
+  for (let i = 0; i < 80; i++) {
+    if (await hasText(page, `${total}/${total}`)) break;
+    if ((await findIndex(page, 'Flashcards', true)) < 0) {
+      await tap(page, 'Next', true);
+      continue;
+    }
     const mark = await findIndex(page, 'Mark read', true);
     if (mark >= 0) {
       await page.locator('flt-semantics').nth(mark).click({ force: true });
       await page.waitForTimeout(250);
       continue;
     }
-    if ((await findIndex(page, 'Next: Flashcards', true)) >= 0) break;
     await scrollDown(page);
   }
-  const total = topic.sections.length;
   check('all note sections marked read', await waitText(page, `${total}/${total}`));
   await shot(page, '04-notes-end');
 
-  await tap(page, 'Next: Flashcards', false);
+  await tap(page, 'Flashcards', true);
   await shot(page, '05-flashcard');
   for (let i = 0; i < 40 && !(await hasText(page, 'Session done')); i++) {
     await tap(page, 'Show answer', true);
@@ -292,7 +298,7 @@ async function noHorizontalScroll(page) {
   await waitApp(page);
   check('offline reload renders the app', await waitText(page, 'K8 Study'));
   await go(page, '/topic/kubeadm/notes');
-  check('offline: topic notes render', await waitText(page, '1. Prepare the hosts'));
+  check('offline: topic notes render', await waitText(page, 'Prepare the hosts'));
   await shot(page, '14-offline-notes');
   await go(page, '/topic/architecture/notes');
   check('offline: animated diagram renders', await waitText(page, 'Diagram: How the components talk'));

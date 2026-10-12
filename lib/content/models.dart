@@ -267,6 +267,16 @@ sealed class NoteBlock {
         );
       case 'diagram':
         return DiagramBlock.fromJson(json, path);
+      case 'scene':
+        final scene = _field<String>(json, 'scene', path);
+        return SceneBlock(
+          scene: PortScene.values.firstWhere(
+            (k) => k.id == scene,
+            orElse: () =>
+                throw FormatException('$path.scene: unknown "$scene"'),
+          ),
+          caption: _field<String>(json, 'caption', path),
+        );
       default:
         throw FormatException('$path.type: unknown block type "$type"');
     }
@@ -296,6 +306,27 @@ class CalloutBlock extends NoteBlock {
   const CalloutBlock({required this.kind, required this.text});
   final CalloutKind kind;
   final String text;
+}
+
+/// A built-in Port of Kube illustration (drawn in code, so it works
+/// offline and follows the theme). [id] is the name used in content JSON.
+enum PortScene {
+  welcome('port-welcome'),
+  overview('port-overview'),
+  services('port-services'),
+  scope('port-scope'),
+  eras('shipping-eras'),
+  cast('port-cast');
+
+  const PortScene(this.id);
+  final String id;
+}
+
+/// A picture that gives a section a visual cue, with a one-line caption.
+class SceneBlock extends NoteBlock {
+  const SceneBlock({required this.scene, required this.caption});
+  final PortScene scene;
+  final String caption;
 }
 
 class TableBlock extends NoteBlock {

@@ -96,17 +96,20 @@ deep-linkable route.
 
 ### S3 Study Notes
 
-- One scrolling page, with sections rendered in order. Each section has:
+- One page per section: swipe, tap **Back** / **Next**, tap a page dot or use
+  the arrow keys to move between them. Each section page has:
   - a heading;
   - typed content blocks (§5.3): paragraph, bullet list, code (monospace,
-    horizontal scroll, copy button), key-point callout, and a table (max 3 columns);
+    horizontal scroll, copy button), key-point callout, a table (max 3 columns),
+    a step-by-step diagram, and a Port of Kube picture (`scene`, drawn in code so it
+    works offline, with a one-line caption);
   - a **"Source: <page title> ↗"** link at the foot of the section (opens kubernetes.io in a new tab).
-- A section is marked as read when its foot scrolls into view, or when the user
-  taps "Mark read". Read state is persisted.
+- A section is marked as read when its foot scrolls into view, when the user
+  moves on with **Next**, or when the user taps "Mark read". Read state is persisted.
 - Sticky top bar: topic title + section progress (e.g. "3/6").
-- End of page: "Next: Flashcards →".
+- On the last section page, **Next** becomes "Flashcards →".
 - Target length: ≤ 1,500 words per topic. Short sections, no walls of text.
-- Ad: one banner slot between section 2 and section 3, and none if the
+- Ad: one banner slot at the end of section 2's page, and none if the
   topic has fewer than 3 sections. Never more than one banner on screen (§9).
 
 ### S4 Flashcards

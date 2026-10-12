@@ -14,7 +14,17 @@ final adKey = find.byWidgetPredicate(
 );
 
 Future<void> scrollToEnd(WidgetTester tester) async {
-  await tester.drag(find.byType(Scrollable).first, const Offset(0, -20000));
+  // Notes are paged; the banner closes part 2.
+  final next = find.byKey(const ValueKey('notes-next'));
+  final paged = next.evaluate().isNotEmpty;
+  if (paged) {
+    await tester.tap(next);
+    await tester.pumpAndSettle();
+  }
+  final list = paged
+      ? find.byType(Scrollable).last
+      : find.byType(Scrollable).first;
+  await tester.drag(list, const Offset(0, -20000));
   await tester.pumpAndSettle();
 }
 

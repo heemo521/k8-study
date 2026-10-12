@@ -10,6 +10,9 @@ Every note section in the study app opens with a short "Port story" callout that
 - Don't repeat the section heading; set the scene, then make the point.
 - Gender-neutral characters; avoid names unless helpful.
 
+## Pictures
+A section can show a Port of Kube picture right after its story: a `scene` block, `{"type": "scene", "scene": "<id>", "caption": "..."}`. Pictures are drawn in code (`lib/widgets/port_scene_view.dart`), so they work offline and in dark mode. Available ids: `port-welcome` (the whole port), `port-overview` (control plane on shore, worker nodes on the water, a Pod outlined), `port-services` (self-healing, scaling, rollouts), `port-scope` (what Kubernetes leaves to you), `shipping-eras` (servers, VMs, containers), `port-cast` (the cast below as picture tiles). Captions are one plain sentence that ties the picture to the real terms; they count toward the word cap.
+
 ## Canonical cast (use these mappings, consistently)
 | Kubernetes | Port of Kube |
 |---|---|

@@ -67,17 +67,19 @@ void main() {
     await tapKey(tester, 'topic-card-$topicId');
     expect(find.text(topic.title), findsWidgets);
 
-    // S2 → S3: read every section (scrolling marks them; tap any leftovers).
+    // S2 → S3: one page per section; Next marks each page read.
     await tapKey(tester, 'step-notes');
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('next-flashcards')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    for (final s in topic.sections) {
-      final mark = find.byKey(ValueKey('mark-read-${s.id}'));
-      if (mark.evaluate().isNotEmpty) await tapKey(tester, 'mark-read-${s.id}');
+    for (var i = 0; i < topic.sections.length - 1; i++) {
+      expect(find.text(topic.sections[i].heading), findsOneWidget);
+      await tapKey(tester, 'notes-next');
+    }
+    final lastId = topic.sections.last.id;
+    final mark = find.byKey(ValueKey('mark-read-$lastId'));
+    if (mark.evaluate().isNotEmpty) {
+      // Scrolling the foot into view marks it; tap only if it is still there.
+      await tester.ensureVisible(mark);
+      await tester.pumpAndSettle();
+      if (mark.evaluate().isNotEmpty) await tapKey(tester, 'mark-read-$lastId');
     }
     expect(h.progress.notesComplete(topic), isTrue);
     expect(
