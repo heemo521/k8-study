@@ -335,75 +335,113 @@ class _ListenBar extends StatelessWidget {
     final rate = speech.rate;
     String label(double r) =>
         '${r.toStringAsFixed(r == r.roundToDouble() ? 0 : 2).replaceAll(RegExp(r'0$'), '')}×';
+
+    final info = Row(
+      children: [
+        Icon(Icons.graphic_eq, color: scheme.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                playing ? 'Reading aloud' : 'Paused',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelSmall,
+              ),
+              Text(
+                heading,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    final controls = [
+      IconButton(
+        key: const ValueKey('listen-prev'),
+        tooltip: 'Previous section',
+        icon: const Icon(Icons.skip_previous),
+        onPressed: () => speech.skip(-1),
+      ),
+      IconButton.filledTonal(
+        key: const ValueKey('listen-toggle'),
+        tooltip: playing ? 'Pause' : 'Resume',
+        icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+        onPressed: playing ? speech.pause : speech.resume,
+      ),
+      IconButton(
+        key: const ValueKey('listen-next'),
+        tooltip: 'Next section',
+        icon: const Icon(Icons.skip_next),
+        onPressed: () => speech.skip(1),
+      ),
+      TextButton(
+        key: const ValueKey('listen-rate'),
+        onPressed: () {
+          const rates = SpeechController.rates;
+          final i = rates.indexOf(rate);
+          speech.setRate(rates[(i + 1) % rates.length]);
+        },
+        child: Semantics(
+          label: 'Speed ${label(rate)}',
+          excludeSemantics: true,
+          child: Text(label(rate), maxLines: 1),
+        ),
+      ),
+      IconButton(
+        key: const ValueKey('listen-stop'),
+        tooltip: 'Stop',
+        icon: const Icon(Icons.close),
+        onPressed: speech.stop,
+      ),
+    ];
+
     return Material(
       key: const ValueKey('listen-bar'),
       color: scheme.surfaceContainer,
       elevation: 3,
       child: SafeArea(
         top: false,
-        child: PageWidth(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
-            child: Row(
-              children: [
-                Icon(Icons.graphic_eq, color: scheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        playing ? 'Reading aloud' : 'Paused',
-                        style: textTheme.labelSmall,
+        // heightFactor 1: as a bottom bar it must hug its content, not
+        // expand to the full screen height.
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: maxContentWidth),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+              // Phones: title on its own line, controls below, so the
+              // section name stays readable. Wider: one row.
+              child: LayoutBuilder(
+                builder: (context, c) => c.maxWidth < 520
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8, top: 2),
+                            child: info,
+                          ),
+                          Wrap(
+                            alignment: WrapAlignment.spaceEvenly,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: controls,
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(child: info),
+                          ...controls,
+                        ],
                       ),
-                      Text(
-                        heading,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  key: const ValueKey('listen-prev'),
-                  tooltip: 'Previous section',
-                  icon: const Icon(Icons.skip_previous),
-                  onPressed: () => speech.skip(-1),
-                ),
-                IconButton.filledTonal(
-                  key: const ValueKey('listen-toggle'),
-                  tooltip: playing ? 'Pause' : 'Resume',
-                  icon: Icon(playing ? Icons.pause : Icons.play_arrow),
-                  onPressed: playing ? speech.pause : speech.resume,
-                ),
-                IconButton(
-                  key: const ValueKey('listen-next'),
-                  tooltip: 'Next section',
-                  icon: const Icon(Icons.skip_next),
-                  onPressed: () => speech.skip(1),
-                ),
-                TextButton(
-                  key: const ValueKey('listen-rate'),
-                  onPressed: () {
-                    const rates = SpeechController.rates;
-                    final i = rates.indexOf(rate);
-                    speech.setRate(rates[(i + 1) % rates.length]);
-                  },
-                  child: Semantics(
-                    label: 'Speed ${label(rate)}',
-                    excludeSemantics: true,
-                    child: Text(label(rate)),
-                  ),
-                ),
-                IconButton(
-                  key: const ValueKey('listen-stop'),
-                  tooltip: 'Stop',
-                  icon: const Icon(Icons.close),
-                  onPressed: speech.stop,
-                ),
-              ],
+              ),
             ),
           ),
         ),

@@ -21,6 +21,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('listen-bar')), findsOneWidget);
       expect(tester.takeException(), isNull);
+      // A bottom bar, not a full-screen overlay.
+      final bar = tester.getRect(find.byKey(const ValueKey('listen-bar')));
+      expect(bar.height, lessThan(160 * scale));
+      expect(bar.bottom, 740);
     });
   }
 }
