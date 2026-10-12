@@ -233,7 +233,10 @@ class _QuizScreenState extends State<QuizScreen> {
             leading: CloseButton(onPressed: _confirmLeave),
             title: Text(_title, overflow: TextOverflow.ellipsis),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(34),
+              // Grows with the text size so large text isn't clipped.
+              preferredSize: Size.fromHeight(
+                14 + MediaQuery.textScalerOf(context).scale(20),
+              ),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Column(
@@ -245,15 +248,21 @@ class _QuizScreenState extends State<QuizScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Text(
-                          'Q ${_index + 1}/$total',
-                          key: const ValueKey('quiz-position'),
-                          style: Theme.of(context).textTheme.labelLarge,
+                        Flexible(
+                          child: Text(
+                            'Q ${_index + 1}/$total',
+                            key: const ValueKey('quiz-position'),
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
                         ),
                         const Spacer(),
-                        Text(
-                          'Score $score/$answered',
-                          style: Theme.of(context).textTheme.labelLarge,
+                        Flexible(
+                          child: Text(
+                            'Score $score/$answered',
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
                         ),
                       ],
                     ),

@@ -104,10 +104,14 @@ class StepChip extends StatelessWidget {
           children: [
             Icon(icon, size: 14, color: fg),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall
-                  ?.copyWith(color: fg),
+            // Flexible so large text sizes ellipsize instead of overflowing.
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall
+                    ?.copyWith(color: fg),
+              ),
             ),
           ],
         ),

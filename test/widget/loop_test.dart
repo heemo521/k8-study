@@ -206,4 +206,28 @@ void main() {
       expect(tester.takeException(), isNull, reason: path);
     }
   });
+
+  testWidgets('screens lay out at 360px with 200% text without overflow', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester, size: const Size(360, 740));
+    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    for (final path in [
+      '/',
+      '/topic/kubeadm',
+      '/topic/kubeadm/notes',
+      '/topic/kubeadm/cards',
+      '/topic/kubeadm/quiz',
+      '/practice',
+      '/practice/mixed/run',
+      '/progress',
+      '/progress/review?kind=missed',
+      '/search',
+      '/about',
+    ]) {
+      await pumpApp(tester, initialLocation: path);
+      expect(tester.takeException(), isNull, reason: path);
+    }
+  });
 }

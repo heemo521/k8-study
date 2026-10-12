@@ -25,7 +25,8 @@ class NotFoundView extends StatelessWidget {
       leading: BackButton(onPressed: () => context.go(backTo)),
     ),
     body: Center(
-      child: Padding(
+      // Scrolls rather than overflowing with large text sizes.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
