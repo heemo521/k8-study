@@ -28,7 +28,9 @@ class NoteBlockView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('•  ', style: body),
-                    Expanded(child: InlineText(item, style: body)),
+                    Expanded(
+                      child: InlineText(item, style: body, leadIn: true),
+                    ),
                   ],
                 ),
               ),
@@ -133,24 +135,35 @@ class _Callout extends StatelessWidget {
         scheme.onSecondaryContainer,
       ),
     };
+    final textTheme = Theme.of(context).textTheme;
+    // Colour, icon and a visible label let the eye triage callouts by kind
+    // without reading them.
     return Container(
-      padding: const EdgeInsets.all(12),
+      key: ValueKey('callout-${kind.name}'),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: fg, size: 20, semanticLabel: label),
-          const SizedBox(width: 10),
-          Expanded(
-            child: InlineText(
-              text,
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: fg),
-            ),
+          Row(
+            children: [
+              Icon(icon, color: fg, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                label.toUpperCase(),
+                style: textTheme.labelMedium?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 6),
+          InlineText(text, style: textTheme.bodyMedium?.copyWith(color: fg)),
         ],
       ),
     );

@@ -28,4 +28,25 @@ void main() {
       InlineSpan('<name> _x_ # y', InlineStyle.plain),
     ]);
   });
+
+  group('leadInLength', () {
+    test('short "Label: " prefix is a lead-in', () {
+      expect(leadInLength('CPU: `0.1` = `100m`'), 4);
+      expect(leadInLength('`storageClassName`: binds by class'), 19);
+    });
+
+    test('colon inside code is not a lead-in', () {
+      expect(leadInLength('Use `apiVersion: v2` for charts'), 0);
+    });
+
+    test('long prefix, existing bold, or no colon gives none', () {
+      expect(
+        leadInLength('A sentence that runs on well past forty characters: x'),
+        0,
+      );
+      expect(leadInLength('**Bold** already: x'), 0);
+      expect(leadInLength('Plain bullet text'), 0);
+      expect(leadInLength('ratio 1:2 here'), 0);
+    });
+  });
 }
