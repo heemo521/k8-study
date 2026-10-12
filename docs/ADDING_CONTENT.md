@@ -59,7 +59,7 @@ section cites exactly one page. Block types:
 | `p` | `text` | inline `` `code` `` and `**bold**` only |
 | `bullets` | `items` | |
 | `code` | `lang`, `text` | use `<placeholders>` and never realistic-looking invented values |
-| `callout` | `kind` (`key` · `exam` · `warn`), `text` | |
+| `callout` | `kind` (`key` · `exam` · `warn` · `story`), `text` | `story` opens a section with the Port of Kube analogy |
 | `table` | `header` (2–3 columns), `rows` | |
 | `diagram` | `title`, `width`, `height`, `nodes`, `edges?`, `steps?` | animated, see below |
 

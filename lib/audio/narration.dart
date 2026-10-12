@@ -22,6 +22,7 @@ Iterable<String> _sectionChunks(NoteSection section, int index) sync* {
           CalloutKind.key => 'Key point.',
           CalloutKind.exam => 'Exam tip.',
           CalloutKind.warn => 'Warning.',
+          CalloutKind.story => 'Port story.',
         }} $text',
       TableBlock(:final header, :final rows) => [
         for (final row in rows)
