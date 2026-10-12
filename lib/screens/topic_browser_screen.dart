@@ -149,7 +149,23 @@ class _ContinueCard extends StatelessWidget {
                     style: textTheme.labelLarge?.copyWith(color: fg),
                   ),
                 ),
-                if (progress.streak > 0)
+                Semantics(
+                  label: 'Level ${progress.level.level}, ${progress.xp} XP',
+                  excludeSemantics: true,
+                  child: Row(
+                    key: const ValueKey('level'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.star_rounded, size: 18, color: fg),
+                      Text(
+                        'Lv ${progress.level.level}',
+                        style: textTheme.labelLarge?.copyWith(color: fg),
+                      ),
+                    ],
+                  ),
+                ),
+                if (progress.streak > 0) ...[
+                  const SizedBox(width: 10),
                   Semantics(
                     label: '${progress.streak} day study streak',
                     excludeSemantics: true,
@@ -165,6 +181,7 @@ class _ContinueCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                ],
               ],
             ),
             if (_todaySummary(progress.today) case final today?)

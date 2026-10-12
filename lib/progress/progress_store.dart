@@ -14,6 +14,7 @@ import '../engine/clock.dart';
 import '../engine/flashcards.dart';
 import '../engine/practice.dart';
 import '../engine/quiz.dart';
+import 'rewards.dart';
 
 const schemaVersion = 1;
 const maxPracticeHistory = 50;
@@ -30,6 +31,7 @@ abstract final class StorageKeys {
   static const recent = 'k8s.recent';
   static const activity = 'k8s.activity';
   static const plans = 'k8s.plans';
+  static const rewards = 'k8s.rewards';
 }
 
 /// One competency an exam showed as weak, with the exam's result for it.
@@ -209,6 +211,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   /// Per-day counts: {'yyyy-mm-dd': {'sections': n, 'cards': n, 'quizzes': n}}.
   Map<String, Map<String, int>> _activity = {};
   Map<String, GapPlan> _plans = {};
+  RewardsState _rewards = RewardsState.initial;
 
   // ---- loading -------------------------------------------------------------
 
@@ -273,7 +276,11 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       e.key: GapPlan.fromJson(e.value as Map<String, dynamic>),
   };
 
+  static RewardsState _parseRewards(dynamic j) =>
+      RewardsState.fromJson(j as Map<String, dynamic>);
+
   static final Map<String, Object Function(dynamic)> _parsers = {
+    StorageKeys.rewards: _parseRewards,
     StorageKeys.plans: _parsePlans,
     StorageKeys.activity: _parseActivity,
     StorageKeys.notes: _parseNotes,
@@ -307,6 +314,50 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _recent = _read(StorageKeys.recent, {}, _parseRecent);
     _activity = _read(StorageKeys.activity, {}, _parseActivity);
     _plans = _read(StorageKeys.plans, {}, _parsePlans);
+    final rewards = _read<RewardsState?>(
+      StorageKeys.rewards,
+      null,
+      _parseRewards,
+    );
+    if (rewards != null) {
+      _rewards = rewards;
+    } else {
+      _rewards = _seedRewards();
+      _write(StorageKeys.rewards, _rewards.toJson());
+    }
+  }
+
+  /// Rewards for progress made before XP existed (or restored from a backup
+  /// without them): XP for what's already done, and the streak from the
+  /// daily activity log.
+  RewardsState _seedRewards() {
+    var xp = 0;
+    for (final s in _notes.values) {
+      xp += s.length * Xp.sectionRead;
+    }
+    xp += _cards.length * Xp.cardReviewed;
+    for (final a in _answers.values) {
+      xp +=
+          a.correct * Xp.correctAnswer + (a.seen - a.correct) * Xp.wrongAnswer;
+    }
+    xp +=
+        _quiz.values.where((q) => q.bestPct >= masteryPercent).length *
+        Xp.quizMastered;
+
+    final days = _activity.keys.toList()..sort();
+    if (days.isEmpty) return RewardsState(xp: xp);
+    var day = DateTime.parse(days.last);
+    var streak = 0;
+    while (_activity.containsKey(formatDate(day))) {
+      streak++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return RewardsState(
+      xp: xp,
+      streak: streak,
+      streakDay: days.last,
+      bestStreak: streak,
+    );
   }
 
   // ---- gap plans -----------------------------------------------------------
@@ -346,7 +397,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   void markSectionRead(String topicId, String sectionId) {
     final set = _notes.putIfAbsent(topicId, () => {});
     if (!set.add(sectionId)) return;
-    _bump('sections');
+    _bump('sections', xp: Xp.sectionRead);
     _write(StorageKeys.notes, {
       for (final e in _notes.entries) e.key: e.value.toList(),
     });
@@ -368,7 +419,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   CardState? cardState(String cardId) => _cards[cardId];
 
   void setCardState(String cardId, CardState state) {
-    _bump('cards');
+    _bump('cards', xp: Xp.cardReviewed);
     _cards[cardId] = state;
     _write(StorageKeys.cards, {
       for (final e in _cards.entries) e.key: e.value.toJson(),
@@ -388,8 +439,11 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   });
 
   /// A full quiz attempt finished: counts toward attempts and best score.
-  void recordQuiz(String topicId, int pct, Set<String> missed) {
+  /// Returns the bonus XP earned (for mastering the topic the first time).
+  int recordQuiz(String topicId, int pct, Set<String> missed) {
     final prev = _quiz[topicId];
+    final firstMastery =
+        pct >= masteryPercent && (prev?.bestPct ?? 0) < masteryPercent;
     _quiz[topicId] = QuizStats(
       attempts: (prev?.attempts ?? 0) + 1,
       bestPct: prev == null ? pct : (pct > prev.bestPct ? pct : prev.bestPct),
@@ -398,7 +452,10 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       missed: missed.toList(),
     );
     _saveQuiz();
+    final bonus = firstMastery ? Xp.quizMastered : 0;
+    if (bonus > 0) _saveRewards(_rewards.addXp(bonus));
     notifyListeners();
+    return bonus;
   }
 
   /// A "retry missed" run finished: only updates the missed set.
@@ -495,14 +552,15 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
 
   /// Records the answered questions of a finished attempt. Skipped ones
   /// (a practice test finished early) are no evidence either way, so they
-  /// don't count towards accuracy or gaps.
-  void recordAnswers(QuizAttempt attempt) {
-    _bump('quizzes');
+  /// don't count towards accuracy or gaps. Returns the XP earned.
+  int recordAnswers(QuizAttempt attempt) {
     final now = clock.now();
+    var xp = 0;
     for (final p in attempt.questions) {
       final id = p.question.id;
       if (!attempt.isAnswered(id)) continue;
       final ok = attempt.correct(p);
+      xp += ok ? Xp.correctAnswer : Xp.wrongAnswer;
       final prev = _answers[id];
       _answers[id] = AnswerStats(
         seen: (prev?.seen ?? 0) + 1,
@@ -514,7 +572,9 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _write(StorageKeys.answers, {
       for (final e in _answers.entries) e.key: e.value.toJson(),
     });
+    _bump('quizzes', xp: xp);
     notifyListeners();
+    return xp;
   }
 
   // ---- where the learner is ------------------------------------------------
@@ -569,7 +629,9 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
 
   static const _activityDays = 60;
 
-  void _bump(String kind) {
+  /// Logs a study action for today, keeps the streak going and awards [xp].
+  void _bump(String kind, {int xp = 0}) {
+    _saveRewards(_rewards.studiedOn(clock.now()).addXp(xp));
     final today = formatDate(clock.now());
     final day = _activity.putIfAbsent(today, () => {});
     day[kind] = (day[kind] ?? 0) + 1;
@@ -587,20 +649,24 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _activity[formatDate(clock.now())] ?? const <String, int>{},
   );
 
+  // ---- rewards -------------------------------------------------------------
+
+  void _saveRewards(RewardsState value) {
+    _rewards = value;
+    _write(StorageKeys.rewards, value.toJson());
+  }
+
+  /// Total XP earned.
+  int get xp => _rewards.xp;
+
+  LevelInfo get level => LevelInfo.fromXp(_rewards.xp);
+
   /// Consecutive days with any study activity, ending today — or yesterday,
   /// so the streak isn't shown as broken before today's first session.
-  int get streak {
-    var day = dateOnly(clock.now());
-    if (!_activity.containsKey(formatDate(day))) {
-      day = day.subtract(const Duration(days: 1));
-    }
-    var n = 0;
-    while (_activity.containsKey(formatDate(day))) {
-      n++;
-      day = day.subtract(const Duration(days: 1));
-    }
-    return n;
-  }
+  int get streak => _rewards.currentStreak(clock.now());
+
+  /// Longest streak so far.
+  int get bestStreak => _rewards.bestStreak;
 
   // ---- backup ----------------------------------------------------------------
 
@@ -613,6 +679,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     StorageKeys.recent,
     StorageKeys.activity,
     StorageKeys.plans,
+    StorageKeys.rewards,
     StorageKeys.settings,
   ];
 
@@ -682,9 +749,11 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       StorageKeys.recent,
       StorageKeys.activity,
       StorageKeys.plans,
+      StorageKeys.rewards,
     ]) {
       await _prefs.remove(key);
     }
+    _rewards = RewardsState.initial;
     _plans = {};
     _answers = {};
     _recent = {};
