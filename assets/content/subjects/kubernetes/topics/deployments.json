@@ -873,6 +873,66 @@
           "explanation": "The docs say you can't roll back while paused."
         }
       ]
+    },
+    {
+      "id": "deployments-cmd-01",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Scale the Deployment `nginx-deployment` to 10 replicas.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl scale deployment/nginx-deployment --replicas=10"
+      ],
+      "explanation": "`kubectl scale` sets the Deployment's replica count; the ReplicaSet then adds or removes Pods to match.",
+      "competencyId": "ws-rollouts"
+    },
+    {
+      "id": "deployments-cmd-02",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Update the container `nginx` in Deployment `nginx-deployment` to the image `nginx:1.16.1`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl set image deployment/nginx-deployment nginx=nginx:1.16.1"
+      ],
+      "explanation": "`kubectl set image` takes `<container>=<image>` pairs. Changing the Pod template image starts a rollout.",
+      "competencyId": "ws-rollouts"
+    },
+    {
+      "id": "deployments-cmd-03",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Check the progress of the rollout of `nginx-deployment`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl rollout status deployment/nginx-deployment"
+      ],
+      "explanation": "`kubectl rollout status` follows the rollout until it finishes or fails.",
+      "competencyId": "ws-rollouts"
+    },
+    {
+      "id": "deployments-cmd-04",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Roll `nginx-deployment` back to the previous revision.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl rollout undo deployment/nginx-deployment"
+      ],
+      "explanation": "`kubectl rollout undo` without a revision returns to the previous one.",
+      "competencyId": "ws-rollouts"
+    },
+    {
+      "id": "deployments-cmd-05",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Roll `nginx-deployment` back to revision 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl rollout undo deployment/nginx-deployment --to-revision=2"
+      ],
+      "explanation": "`--to-revision` picks a specific revision from `kubectl rollout history`.",
+      "competencyId": "ws-rollouts"
     }
   ]
 }

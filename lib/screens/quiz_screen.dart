@@ -36,6 +36,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int _index = 0;
   Set<String> _selected = {};
   bool _revealed = false;
+  bool _whyShown = false;
   bool _finishing = false;
 
   @override
@@ -45,6 +46,14 @@ class _QuizScreenState extends State<QuizScreen> {
     final progress = context.read<ProgressStore>();
     final random = context.read<Random>();
     switch (_spec) {
+      case TopicQuizSpec(:final topicId, warmup: true):
+        final topic = content.topic(topicId);
+        if (topic == null) return;
+        progress.markTopicVisited(content.subject.id, topicId);
+        _title = '${topic.title} · Warm-up';
+        _attempt = QuizAttempt(
+          drawWarmup(bank: topic.questions, random: random),
+        );
       case TopicQuizSpec(:final topicId, :final retryMissed):
         final topic = content.topic(topicId);
         if (topic == null) return;
@@ -106,6 +115,20 @@ class _QuizScreenState extends State<QuizScreen> {
 
   PresentedQuestion get _current => _attempt!.questions[_index];
 
+  /// Self-explanation prompt (spec §14.7): after a right answer to a harder
+  /// multiple-choice question, ask "why?" before showing the explanations.
+  bool get _askWhy =>
+      _revealed &&
+      !_isWarmup &&
+      _current.question.difficulty >= 2 &&
+      _current.question.type != QuestionType.command &&
+      _attempt!.correct(_current);
+
+  bool get _isWarmup {
+    final spec = _spec;
+    return spec is TopicQuizSpec && spec.warmup;
+  }
+
   /// Desktop shortcuts: 1–5 pick an option, Enter submits as sure (U as not
   /// sure) / continues.
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
@@ -158,6 +181,7 @@ class _QuizScreenState extends State<QuizScreen> {
         _index++;
         _selected = {};
         _revealed = false;
+        _whyShown = false;
       });
       return;
     }
@@ -168,6 +192,11 @@ class _QuizScreenState extends State<QuizScreen> {
     if (_finishing) return;
     _finishing = true;
     final attempt = _attempt!;
+    // A warm-up is a guess before studying: no evidence, no score, no ad.
+    if (_isWarmup) {
+      context.go(_spec.resultPath);
+      return;
+    }
     final progress = context.read<ProgressStore>();
     progress.recordAnswers(attempt);
     if (_spec case TopicQuizSpec(:final topicId, :final retryMissed)) {
@@ -305,8 +334,11 @@ class _QuizScreenState extends State<QuizScreen> {
                 presented: _current,
                 selected: _selected,
                 revealed: _revealed,
+                hideExplanations: _askWhy && !_whyShown,
                 onChanged: (s) => setState(() => _selected = s),
               ),
+              if (_askWhy && !_whyShown)
+                _WhyPrompt(onShow: () => setState(() => _whyShown = true)),
               const SizedBox(height: 16),
               if (!_revealed)
                 _ConfidenceButtons(
@@ -321,7 +353,13 @@ class _QuizScreenState extends State<QuizScreen> {
                 FilledButton(
                   key: const ValueKey('next'),
                   onPressed: _next,
-                  child: Text(_index + 1 < total ? 'Next' : 'See results'),
+                  child: Text(
+                    _index + 1 < total
+                        ? 'Next'
+                        : _isWarmup
+                        ? 'Start the notes'
+                        : 'See results',
+                  ),
                 ),
               ],
             ],
@@ -344,10 +382,13 @@ class _ConfidenceButtons extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'How sure are you?',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelLarge,
+        Semantics(
+          container: true,
+          child: Text(
+            'How sure are you?',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
         ),
         const SizedBox(height: 8),
         Row(
@@ -397,6 +438,45 @@ class _ConfidenceFeedback extends StatelessWidget {
       key: const ValueKey('confidence-feedback'),
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+    );
+  }
+}
+
+/// Asks the learner to explain a right answer before reading why.
+class _WhyPrompt extends StatelessWidget {
+  const _WhyPrompt({required this.onShow});
+
+  final VoidCallback onShow;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Card(
+      key: const ValueKey('why-prompt'),
+      margin: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Why is it right?', style: textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Explain it to yourself in one sentence, then check.',
+              style: textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const ValueKey('show-why'),
+                onPressed: onShow,
+                child: const Text('Show the explanation'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

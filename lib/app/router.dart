@@ -73,6 +73,7 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                             s.pathParameters['topicId']!,
                             retryMissed:
                                 s.uri.queryParameters['mode'] == 'missed',
+                            warmup: s.uri.queryParameters['mode'] == 'warmup',
                           ),
                         ),
                       ),

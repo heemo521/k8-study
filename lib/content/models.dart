@@ -523,7 +523,9 @@ class Flashcard {
       };
 }
 
-enum QuestionType { single, multi, truefalse }
+/// `command`: the learner types a command, graded against [Question.answers]
+/// (spec §14.5).
+enum QuestionType { single, multi, truefalse, command }
 
 class AnswerOption {
   const AnswerOption({
@@ -559,6 +561,8 @@ class Question {
     required this.sourceUrl,
     required this.difficulty,
     this.competencyId,
+    this.answers = const [],
+    this.explanation,
   });
 
   final String id;
@@ -570,6 +574,12 @@ class Question {
   final int difficulty;
   final String? competencyId;
 
+  /// `command` only: accepted commands, the first shown as the model answer.
+  final List<String> answers;
+
+  /// `command` only: why the model answer is right.
+  final String? explanation;
+
   Set<String> get correctIds => {
     for (final o in options)
       if (o.correct) o.id,
@@ -578,16 +588,25 @@ class Question {
   static Question Function(dynamic, String) parser(String topicId) =>
       (raw, path) {
         final json = _map(raw, path);
-        final type = _field<String>(json, 'type', path);
+        final typeName = _field<String>(json, 'type', path);
+        final type = QuestionType.values.firstWhere(
+          (t) => t.name == typeName,
+          orElse: () =>
+              throw FormatException('$path.type: unknown "$typeName"'),
+        );
+        final command = type == QuestionType.command;
         return Question(
           id: _field<String>(json, 'id', path),
           topicId: topicId,
-          type: QuestionType.values.firstWhere(
-            (t) => t.name == type,
-            orElse: () => throw FormatException('$path.type: unknown "$type"'),
-          ),
+          type: type,
           stem: _field<String>(json, 'stem', path),
-          options: _list(json, 'options', path, AnswerOption.fromJson),
+          options: command
+              ? const []
+              : _list(json, 'options', path, AnswerOption.fromJson),
+          answers: command ? _list(json, 'answers', path, _string) : const [],
+          explanation: command
+              ? _field<String>(json, 'explanation', path)
+              : null,
           sourceUrl: _field<String>(json, 'sourceUrl', path),
           difficulty: _field<int>(json, 'difficulty', path),
           competencyId: _optional<String>(json, 'competencyId', path),

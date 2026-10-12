@@ -16,11 +16,16 @@ class QuestionView extends StatelessWidget {
     required this.selected,
     required this.revealed,
     this.onChanged,
+    this.hideExplanations = false,
   });
 
   final PresentedQuestion presented;
   final Set<String> selected;
   final bool revealed;
+
+  /// After the reveal, hold back the explanations so the learner first
+  /// explains the answer to themselves (spec §14.7).
+  final bool hideExplanations;
   final ValueChanged<Set<String>>? onChanged;
 
   bool get _multi => presented.question.type == QuestionType.multi;
@@ -46,6 +51,30 @@ class QuestionView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final q = presented.question;
+    if (q.type == QuestionType.command) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Own node, so it isn't merged into the text field's label.
+          Semantics(
+            container: true,
+            child: InlineText(
+              q.stem,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _CommandAnswer(
+            key: ValueKey('command-${q.id}'),
+            question: q,
+            typed: selected.isEmpty ? '' : selected.first,
+            revealed: revealed,
+            onChanged: onChanged,
+          ),
+          if (revealed) SourceLink(url: q.sourceUrl),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -63,6 +92,7 @@ class QuestionView extends StatelessWidget {
               multi: _multi,
               selected: selected.contains(o.id),
               revealed: revealed,
+              showExplanation: revealed && !hideExplanations,
               onTap: () => _tap(o.id),
             ),
           ),
@@ -86,6 +116,7 @@ class _OptionTile extends StatelessWidget {
     required this.multi,
     required this.selected,
     required this.revealed,
+    required this.showExplanation,
     required this.onTap,
   });
 
@@ -94,6 +125,7 @@ class _OptionTile extends StatelessWidget {
   final bool multi;
   final bool selected;
   final bool revealed;
+  final bool showExplanation;
   final VoidCallback onTap;
 
   @override
@@ -171,7 +203,7 @@ class _OptionTile extends StatelessWidget {
                                   ?.copyWith(color: border),
                             ),
                           ),
-                        if (revealed)
+                        if (showExplanation)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: InlineText(
@@ -188,6 +220,113 @@ class _OptionTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+const _mono = TextStyle(
+  fontFamily: 'monospace',
+  fontFamilyFallback: ['Courier New', 'Courier'],
+);
+
+/// Typed answer for a `command` question (spec §14.5). Before reveal: a
+/// text field. After: the typed command marked right or wrong, the model
+/// answer and the explanation.
+class _CommandAnswer extends StatefulWidget {
+  const _CommandAnswer({
+    super.key,
+    required this.question,
+    required this.typed,
+    required this.revealed,
+    required this.onChanged,
+  });
+
+  final Question question;
+  final String typed;
+  final bool revealed;
+  final ValueChanged<Set<String>>? onChanged;
+
+  @override
+  State<_CommandAnswer> createState() => _CommandAnswerState();
+}
+
+class _CommandAnswerState extends State<_CommandAnswer> {
+  late final _controller = TextEditingController(text: widget.typed);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final q = widget.question;
+    if (!widget.revealed) {
+      return TextField(
+        key: const ValueKey('command-input'),
+        controller: _controller,
+        enabled: widget.onChanged != null,
+        autocorrect: false,
+        enableSuggestions: false,
+        textCapitalization: TextCapitalization.none,
+        keyboardType: TextInputType.visiblePassword,
+        style: textTheme.bodyLarge?.merge(_mono),
+        decoration: const InputDecoration(
+          labelText: 'Type the command',
+          hintText: 'kubectl …',
+          border: OutlineInputBorder(),
+        ),
+        onChanged: (text) =>
+            widget.onChanged?.call(text.trim().isEmpty ? {} : {text}),
+      );
+    }
+    final ok = isCorrect(q, {widget.typed});
+    final color = ok ? scheme.correct : scheme.wrong;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: ok ? scheme.correctContainer : scheme.wrongContainer,
+            border: Border.all(color: color, width: 2),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.typed.trim().isEmpty ? '(no answer)' : widget.typed,
+                  key: const ValueKey('command-typed'),
+                  style: textTheme.bodyLarge?.merge(_mono),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  ok ? 'Correct — your answer' : 'Your answer — incorrect',
+                  style: textTheme.labelMedium?.copyWith(color: color),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          q.answers.length > 1 ? 'Model answer (others accepted)' : 'Answer',
+          style: textTheme.labelLarge,
+        ),
+        const SizedBox(height: 4),
+        SelectableText(
+          q.answers.first,
+          key: const ValueKey('command-model'),
+          style: textTheme.bodyLarge?.merge(_mono),
+        ),
+        const SizedBox(height: 8),
+        InlineText(q.explanation ?? '', style: textTheme.bodyMedium),
+      ],
     );
   }
 }

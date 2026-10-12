@@ -186,11 +186,23 @@ async function noHorizontalScroll(page) {
 
   await tap(page, 'Next: Quiz', false);
   for (let i = 0; i < 10; i++) {
-    const text = await allText(page);
-    const q = topic.questions.find((x) => text.includes(strip(x.stem)));
-    if (!q) { check(`quiz question ${i + 1} identified`, false); break; }
-    const picks = i === 0 ? [q.options.find((o) => !o.correct)] : q.options.filter((o) => o.correct);
-    for (const o of picks) await tap(page, strip(o.text), false);
+    let text = '';
+    let q;
+    for (let k = 0; k < 15 && !q; k++) {
+      if (k) await page.waitForTimeout(300);
+      text = await allText(page);
+      q = topic.questions.find((x) => text.includes(strip(x.stem)));
+    }
+    if (!q) { check(`quiz question ${i + 1} identified`, false, text.replace(/\s+/g, ' ').slice(0, 300)); break; }
+    if (q.type === 'command') {
+      // Typed answer: focus the field, then type (wrong on the first question).
+      await page.locator('flt-semantics-host input').first().click({ force: true });
+      await page.keyboard.type(i === 0 ? 'kubectl version' : q.answers[0]);
+      await page.waitForTimeout(300);
+    } else {
+      const picks = i === 0 ? [q.options.find((o) => !o.correct)] : q.options.filter((o) => o.correct);
+      for (const o of picks) await tap(page, strip(o.text), false);
+    }
     if (i === 0) await shot(page, '07-quiz-question');
     await tap(page, 'Sure');
     if (i === 0) await shot(page, '08-quiz-feedback');

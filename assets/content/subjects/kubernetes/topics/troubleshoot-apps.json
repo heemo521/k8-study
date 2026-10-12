@@ -782,6 +782,53 @@
           "explanation": "That's for Pending Pods."
         }
       ]
+    },
+    {
+      "id": "troubleshoot-apps-cmd-01",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Show the logs of Pod `my-pod`.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl logs my-pod"
+      ],
+      "explanation": "`kubectl logs` prints a container's stdout and stderr.",
+      "competencyId": "ts-output-streams"
+    },
+    {
+      "id": "troubleshoot-apps-cmd-02",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Show the logs of the previous, crashed instance of the container in Pod `my-pod`.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl logs my-pod --previous"
+      ],
+      "explanation": "After a restart, the current container's logs may be empty; `--previous` shows the last terminated instance.",
+      "competencyId": "ts-output-streams"
+    },
+    {
+      "id": "troubleshoot-apps-cmd-03",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Show the logs of container `my-container` in the multi-container Pod `my-pod`.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl logs my-pod -c my-container"
+      ],
+      "explanation": "With more than one container, `-c` (`--container`) picks which container's logs to show.",
+      "competencyId": "ts-output-streams"
+    },
+    {
+      "id": "troubleshoot-apps-cmd-04",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Open an interactive `/bin/sh` shell in the single-container Pod `my-pod`.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl exec --stdin --tty my-pod -- /bin/sh"
+      ],
+      "explanation": "`--stdin --tty` (short: `-it`) attach your terminal; everything after `--` is the command run in the container."
     }
   ]
 }

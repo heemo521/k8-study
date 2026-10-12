@@ -2,7 +2,7 @@
 
 Mobile-friendly, interactive Kubernetes study guide, built to be better than the
 ad-spammy tutorial apps out there. It has 33 topics covering all five CKA domains
-(432 flashcards, 451 questions, 11 animated diagrams), quizzes, CKA-domain practice tests, and progress
+(432 flashcards, 473 questions including 22 typed `kubectl` commands, 11 animated diagrams), quizzes, CKA-domain practice tests, and progress
 tracking: it shows where you are and which competencies are your weakest.
 The content model is multi-subject: a **Docker** subject (4 topics, from the
 Apache-2.0 Docker docs) ships alongside Kubernetes, and others such as Linux can be

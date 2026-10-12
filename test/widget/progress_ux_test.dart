@@ -7,6 +7,7 @@ import 'package:k8_study/engine/flashcards.dart';
 import 'package:k8_study/engine/quiz.dart';
 import 'package:k8_study/progress/insights.dart';
 import 'package:k8_study/progress/progress_store.dart';
+import 'package:k8_study/screens/study_notes_screen.dart';
 import 'package:k8_study/widgets/question_view.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -188,6 +189,78 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Questions to review'), findsOneWidget);
     expect(find.text('Q 1/1'), findsOneWidget);
+  });
+
+  testWidgets('warm-up: 3 unscored questions, then the notes', (tester) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester, initialLocation: '/topic/namespaces');
+    await tapKey(tester, 'warmup-card');
+    expect(find.text('Q 1/3'), findsOneWidget);
+    for (var i = 0; i < 3; i++) {
+      final view = tester.widget<QuestionView>(find.byType(QuestionView));
+      final o = view.presented.question.options.first;
+      final f = find.descendant(
+        of: find.byType(QuestionView),
+        matching: find.text(o.text),
+      );
+      await tester.ensureVisible(f.first);
+      await tester.pumpAndSettle();
+      await tester.tap(f.first);
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'submit-unsure');
+      await tapKey(tester, 'next');
+    }
+    // Straight into the notes; nothing recorded.
+    expect(find.byType(StudyNotesScreen), findsOneWidget);
+    expect(h.progress.answerHistory, isEmpty);
+    expect(h.progress.quizStats('namespaces'), isNull);
+  });
+
+  testWidgets('a right answer to a harder question asks "why?" first', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    await pumpApp(tester, initialLocation: '/topic/deployments/quiz');
+    for (var i = 0; i < 10; i++) {
+      final q = tester
+          .widget<QuestionView>(find.byType(QuestionView))
+          .presented
+          .question;
+      if (q.type == QuestionType.command) {
+        await tester.enterText(
+          find.byKey(const ValueKey('command-input')),
+          q.answers.first,
+        );
+      } else {
+        for (final o in q.options.where((o) => o.correct)) {
+          final f = find.descendant(
+            of: find.byType(QuestionView),
+            matching: find.text(o.text),
+          );
+          await tester.ensureVisible(f.first);
+          await tester.pumpAndSettle();
+          await tester.tap(f.first);
+        }
+      }
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'submit');
+      final asks = q.difficulty >= 2 && q.type != QuestionType.command;
+      expect(
+        find.byKey(const ValueKey('why-prompt')),
+        asks ? findsOneWidget : findsNothing,
+        reason: q.id,
+      );
+      if (asks) {
+        final why = q.options.firstWhere((o) => o.correct).explanation;
+        expect(find.text(why), findsNothing);
+        await tapKey(tester, 'show-why');
+        expect(find.byKey(const ValueKey('why-prompt')), findsNothing);
+        expect(find.textContaining(why.split('`').first), findsWidgets);
+        return;
+      }
+      await tapKey(tester, 'next');
+    }
+    fail('no difficulty-2+ multiple-choice question was drawn');
   });
 
   testWidgets('search finds a note section and jumps to it', (tester) async {

@@ -714,6 +714,42 @@
           "explanation": "The page runs drain from a control plane node."
         }
       ]
+    },
+    {
+      "id": "cluster-upgrade-cmd-01",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Mark node `my-node` as unschedulable, without evicting the Pods already on it.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl cordon my-node"
+      ],
+      "explanation": "`cordon` only stops new Pods being scheduled; `drain` also evicts the existing ones.",
+      "competencyId": "ca-lifecycle"
+    },
+    {
+      "id": "cluster-upgrade-cmd-02",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Drain node `my-node` for maintenance, ignoring Pods managed by DaemonSets.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/",
+      "answers": [
+        "kubectl drain --ignore-daemonsets my-node"
+      ],
+      "explanation": "`drain` cordons the node and evicts its Pods. DaemonSet Pods would be recreated on the node, so `--ignore-daemonsets` skips them.",
+      "competencyId": "ca-lifecycle"
+    },
+    {
+      "id": "cluster-upgrade-cmd-03",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Maintenance on `my-node` is finished. Let new Pods be scheduled on it again.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl uncordon my-node"
+      ],
+      "explanation": "`uncordon` marks the node schedulable again.",
+      "competencyId": "ca-lifecycle"
     }
   ]
 }

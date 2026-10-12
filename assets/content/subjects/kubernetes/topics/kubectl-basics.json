@@ -814,6 +814,39 @@
           "explanation": "diff compares a file to the cluster and changes nothing."
         }
       ]
+    },
+    {
+      "id": "kubectl-basics-cmd-01",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "List the Pods in every namespace.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl get pods --all-namespaces"
+      ],
+      "explanation": "`--all-namespaces` (short: `-A`) lists across namespaces instead of only the current one."
+    },
+    {
+      "id": "kubectl-basics-cmd-02",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Create a Deployment named `nginx` that runs the image `nginx`.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl create deployment nginx --image=nginx"
+      ],
+      "explanation": "`kubectl create deployment` builds the Deployment imperatively, without writing a manifest."
+    },
+    {
+      "id": "kubectl-basics-cmd-03",
+      "type": "command",
+      "difficulty": 3,
+      "stem": "Write a manifest for a Pod `nginx` (image `nginx`) to `pod.yaml` without creating the Pod.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl run nginx --image=nginx --dry-run=client -o yaml > pod.yaml"
+      ],
+      "explanation": "`--dry-run=client` creates nothing; `-o yaml` prints the object, and `>` saves it as a starting manifest."
     }
   ]
 }

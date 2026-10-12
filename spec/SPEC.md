@@ -366,7 +366,9 @@ tested parser. Anything else renders literally.
   there, it is left out.
 - Values that change between versions are avoided, or phrased as "see the
   source page for current values".
-- Placeholders in commands use `<angle-brackets>`, never invented example values that look real.
+- Placeholders in commands use `<angle-brackets>`, never invented example values that look real
+  (Exception: `command` question stems may name scenario objects, see
+  §14.5.)
 - The PR that adds content includes a review checklist: one line per item,
   in the form `id → URL → where on the page`.
 
@@ -732,3 +734,58 @@ Each feature below comes from the audit in
   days."), using the earliest future due date across cards and questions.
 - The app never prompts for extra sessions on the same day beyond what is
   due.
+
+### 14.5 Typed-answer `command` questions
+
+- New question type `command`. The learner types a command and it is graded
+  against the accepted `answers`; the first is shown as the model answer.
+  This is practice in the exam's own format (typed `kubectl`), not
+  recognition.
+
+  ```jsonc
+  { "id": "deployments-cmd-01", "type": "command", "difficulty": 1,
+    "stem": "Scale the Deployment `nginx-deployment` to 10 replicas.",
+    "answers": ["kubectl scale deployment/nginx-deployment --replicas=10"],
+    "explanation": "…", "sourceUrl": "…", "competencyId": "ws-rollouts" }
+  ```
+
+  `options` is absent. `answers` (non-empty) and `explanation` are required.
+- **Grading** (`lib/engine/command_grading.dart`) compares the normalised
+  shape: positional words in order, plus flags as an unordered set.
+  Accepted equivalents: `k` for `kubectl`; a leading `$ ` prompt; short and
+  long flags (`-n`/`--namespace`, `-A`/`--all-namespaces`, `-it`/
+  `--stdin --tty`, …); `--flag=value` or `--flag value`; resource short
+  names and plurals (`deploy`, `deployments`); `type/name` or
+  `type name`; quotes around one word. Words after `--` must match
+  exactly. Anything else, such as a different name, value or verb, or a
+  missing flag, is wrong.
+- **UI**: a monospace field with no autocorrect. After the reveal it shows the
+  typed command (marked right or wrong), the model answer and the
+  explanation. Single-key shortcuts are off while the field has focus.
+- Command questions mix into topic quizzes, reviews and practice tests like
+  any other question.
+- **Authoring**: every accepted answer must appear on `sourceUrl`. Stems may
+  name scenario objects (a node, a Deployment), and the answer may use that
+  name where the page shows a placeholder. Prefer the page's own example
+  names. `content_test` checks that every accepted answer grades as correct.
+
+### 14.6 Warm-up before the notes
+
+- A topic that hasn't been started (no notes read, no cards, no quiz) shows a
+  **Warm-up: try 3 questions first** card on its hub
+  (`/topic/<id>/quiz?mode=warmup`).
+- It draws 3 multiple-choice questions, easiest first (no `command`
+  questions). Feedback is shown as usual.
+- Nothing is recorded: no answer history, no score, no ad. The last button
+  reads "Start the notes" and opens them.
+- Why: an attempt before studying, even a wrong one, makes the later
+  reading stick better (pretesting effect).
+
+### 14.7 "Why is it right?" prompt
+
+- In topic and review quizzes, a right answer to a multiple-choice question
+  with difficulty ≥ 2 shows the right/wrong marking but holds back the
+  explanations. A card asks the learner to explain the answer to themselves in
+  one sentence, then **Show the explanation**.
+- Not shown for wrong answers (they need the explanation now), `command`
+  questions or the warm-up. Next stays available, so it can be skipped.

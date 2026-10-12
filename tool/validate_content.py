@@ -185,6 +185,14 @@ def check_topic(path, subject, comp_ids, domain_ids, allow, errors):
         elif ty == "truefalse":
             if n != 1 or sorted(o.get("text") for o in opts) != ["False", "True"]:
                 err(f"{qid}: truefalse needs exactly True/False with 1 correct")
+        elif ty == "command":
+            answers = q.get("answers")
+            if opts:
+                err(f"{qid}: command takes no options")
+            if not answers or not all(isinstance(a, str) and a.strip() for a in answers):
+                err(f"{qid}: command needs non-empty answers")
+            if not q.get("explanation"):
+                err(f"{qid}: command needs an explanation")
         else:
             err(f"{qid}: bad type {ty}")
     return ids

@@ -837,6 +837,18 @@
           "explanation": "The Service name comes first, then the namespace."
         }
       ]
+    },
+    {
+      "id": "services-cmd-01",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Expose the Deployment `nginx` as a Service on port 80 that forwards to container port 8000.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/",
+      "answers": [
+        "kubectl expose deployment nginx --port=80 --target-port=8000"
+      ],
+      "explanation": "`--port` is the Service's port; `--target-port` is the port on the Pods traffic is sent to.",
+      "competencyId": "sn-service-types"
     }
   ]
 }

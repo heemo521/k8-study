@@ -4,8 +4,10 @@ library;
 import 'dart:math';
 
 import '../content/models.dart';
+import 'command_grading.dart';
 
 const quizLength = 10;
+const warmupLength = 3;
 
 /// Topic mastery threshold. An app-internal bar, not a CKA pass mark.
 const masteryPercent = 80;
@@ -32,8 +34,12 @@ PresentedQuestion present(Question q, Random random) {
 }
 
 /// Exact-set grading: single/truefalse need the one correct id, multi needs
-/// exactly the correct set (no partial credit).
+/// exactly the correct set (no partial credit). A command answer is the typed
+/// text as the only element, graded by [commandMatches].
 bool isCorrect(Question q, Set<String> selected) {
+  if (q.type == QuestionType.command) {
+    return selected.length == 1 && commandMatches(selected.first, q.answers);
+  }
   final correct = q.correctIds;
   return selected.length == correct.length && selected.containsAll(correct);
 }
@@ -52,6 +58,19 @@ List<PresentedQuestion> drawQuiz({
     ..shuffle(random);
   final picked = [...priority, ...rest].take(count).toList()..shuffle(random);
   return [for (final q in picked) present(q, random)];
+}
+
+/// Questions to try before reading the notes (spec §14.6): the easiest
+/// multiple-choice ones, since typing a command cold is a guess too far.
+List<PresentedQuestion> drawWarmup({
+  required List<Question> bank,
+  required Random random,
+  int count = warmupLength,
+}) {
+  final pool = bank.where((q) => q.type != QuestionType.command).toList()
+    ..shuffle(random)
+    ..sort((a, b) => a.difficulty.compareTo(b.difficulty));
+  return [for (final q in pool.take(count)) present(q, random)];
 }
 
 /// One run through a list of presented questions.
