@@ -248,7 +248,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Flexible(
+                        Expanded(
                           child: Text(
                             'Q ${_index + 1}/$total',
                             key: const ValueKey('quiz-position'),
@@ -256,10 +256,11 @@ class _QuizScreenState extends State<QuizScreen> {
                             style: Theme.of(context).textTheme.labelLarge,
                           ),
                         ),
-                        const Spacer(),
-                        Flexible(
+                        Expanded(
                           child: Text(
                             'Score $score/$answered',
+                            key: const ValueKey('quiz-score'),
+                            textAlign: TextAlign.end,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.labelLarge,
                           ),

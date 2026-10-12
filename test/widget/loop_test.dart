@@ -230,4 +230,15 @@ void main() {
       expect(tester.takeException(), isNull, reason: path);
     }
   });
+
+  testWidgets('quiz score sits at the right edge on wide screens', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester, size: const Size(1280, 800));
+    await pumpApp(tester, initialLocation: '/topic/kubeadm/quiz');
+    final score = tester.getRect(
+      find.text('Score 0/0', findRichText: true).first,
+    );
+    expect(score.right, greaterThan(1280 - 40));
+  });
 }
