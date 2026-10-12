@@ -255,6 +255,15 @@ async function noHorizontalScroll(page) {
   await go(page, '/topic/kubeadm/notes');
   check('offline: topic notes render', await hasText(page, '1. Prepare the hosts'));
   await shot(page, '14-offline-notes');
+  await go(page, '/topic/architecture/notes');
+  check('offline: animated diagram renders', await hasText(page, 'Diagram: How the components talk'));
+  await shot(page, '19-offline-diagram');
+  const fontCached = await page.evaluate(async () => {
+    const keys = await caches.keys();
+    const cache = await caches.open(keys.find((k) => k.startsWith('k8study-')));
+    return (await cache.keys()).some((r) => r.url.includes('Inter-Regular'));
+  });
+  check('offline: bundled font is precached', fontCached);
   await ctx.setOffline(false);
 
   check('no uncaught page errors', pageErrors.length === 0, pageErrors.join(' | '));
