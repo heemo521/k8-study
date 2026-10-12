@@ -1,0 +1,662 @@
+{
+  "id": "net-dns",
+  "title": "Domain Names & DNS",
+  "summary": "How names like developer.mozilla.org turn into IP addresses: domain structure, TLDs, DNS lookups, caching with TTLs, and DNS inside a cluster.",
+  "order": 3,
+  "domainIds": [
+    "net-web"
+  ],
+  "competencyIds": [
+    "net-dns"
+  ],
+  "prerequisites": [
+    "net-addresses"
+  ],
+  "estMinutes": 13,
+  "reviewedAt": "2026-10-12",
+  "sections": [
+    {
+      "id": "net-dns-why",
+      "heading": "Names instead of numbers",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name",
+      "sourceTitle": "What is a domain name? (MDN)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Nobody at the harbor remembers phone numbers; they change anyway when ships are moved. So people ask for a ship by name. First you check your own notebook. If the name isn't there, you ring the **port phone directory** (a DNS server), which reads you the current number. Then you place the call."
+        },
+        {
+          "type": "p",
+          "text": "Every computer on the Internet can be reached by a **public IP address**, but people find those numbers hard to remember, and they can **change**. A **domain name** is a human-readable address for a server instead."
+        },
+        {
+          "type": "p",
+          "text": "When you type a domain name into a browser:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "1. Your computer checks its **local DNS cache** (its memory of recent lookups). If the name is there, it uses that IP address.",
+            "2. If not, it asks a **DNS server**, whose job is to say which IP address matches each registered domain name.",
+            "3. With the IP address in hand, the browser talks to the web server."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "net-dns-dns",
+      "heading": "What DNS is",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/DNS",
+      "sourceTitle": "DNS (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The port phone directory is not one book in one office. Each harbor keeps its own section and points to the others, so no single desk holds everything. Most calls go from name to number. Occasionally someone has a number and asks whose it is; the directory answers that too."
+        },
+        {
+          "type": "p",
+          "text": "**DNS** (Domain Name System) is the Internet's naming system. It keeps a list of domain names and the resources linked to each, such as IP addresses. It is **hierarchical** (names are organized in levels) and **decentralized** (no single server holds it all)."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**DNS lookup**: turning a domain name into an IP address. This is its main job.",
+            "**Reverse DNS lookup** (rDNS): finding the domain name for an IP address."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "net-dns-structure",
+      "heading": "Reading a domain name",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name",
+      "sourceTitle": "What is a domain name? (MDN)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Harbor addresses are read from the end: country, then harbor, then dock. `developer.mozilla.org` works the same way, right to left. A company that holds a name can open as many sub-docks as it likes, such as `support` or `developer`, each with its own business."
+        },
+        {
+          "type": "p",
+          "text": "A domain name is made of parts called **labels**, separated by dots and **read from right to left**:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The last part is the **TLD** (top-level domain), such as `org`.",
+            "The label just before it is the **second-level domain** (SLD), such as `mozilla` in `mozilla.org`.",
+            "Anything further left is a **subdomain**, like `developer` in `developer.mozilla.org`. If you control a domain, you can create as many as you like.",
+            "Each label is **1 to 63 characters**: letters, digits and `-` (not first or last), and case doesn't matter."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "You never own a domain name. You pay a **registrar** for the right to use it for one or more years, and renew it."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-tld",
+      "heading": "Top-level domains",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TLD",
+      "sourceTitle": "TLD (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The broadest part of any harbor address is the region. Some regions are countries, with two-letter codes. Others are open to everyone, like `com`, and some are run by a sponsor that decides who gets in. A city authority (ICANN) picks who manages each region."
+        },
+        {
+          "type": "p",
+          "text": "The **TLD** is the most general level of DNS and the final part of a domain name. **ICANN** (Internet Corporation for Assigned Names and Numbers) picks the organization that manages each TLD."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Kind",
+            "What it is"
+          ],
+          "rows": [
+            [
+              "Country-code (ccTLD)",
+              "Two characters for a country or territory, such as `us`"
+            ],
+            [
+              "Generic (gTLD)",
+              "Three or more characters"
+            ],
+            [
+              "Unsponsored",
+              "Run under ICANN policy, such as `com` and `edu`"
+            ],
+            [
+              "Sponsored (sTLD)",
+              "A private organization decides who may use it"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "In `https://developer.mozilla.org`, all of `developer.mozilla.org` is the **fully-qualified domain name**; adding `https://` makes it a complete URL."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-ttl",
+      "heading": "Caching and TTL",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TTL",
+      "sourceTitle": "TTL (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Copying a page of the phone directory saves you a call next time, but numbers change. So every copied page is stamped **\"valid for N seconds\"** (TTL). After that, you throw it away and ask again. Parcels get a similar stamp: wander the harbor too long and they're discarded."
+        },
+        {
+          "type": "p",
+          "text": "**TTL** (Time To Live) means one of two things:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**For caching**: a number of **seconds** a requester may keep (cache) an answer. A **DNS** response carries one, and so can an HTTP response. When it runs out, the answer must be fetched again.",
+            "**For packets**: a hop count or expiry time after which a packet is dropped, so it can't roam the network forever."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "net-dns-k8s",
+      "heading": "DNS inside Kubernetes",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "sourceTitle": "DNS for Services and Pods (Kubernetes docs)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Inside the Kube harbor, every Service gets a directory entry too. Each yard (namespace) has its own section, so asking for `data` only searches your own yard. To reach a `data` desk in the `prod` yard, ask for `data.prod`. The cargo officer (`kubelet`) sets up each bay's directory settings."
+        },
+        {
+          "type": "p",
+          "text": "Kubernetes creates **DNS records** for Services and Pods, so apps can reach a Service by **name** instead of IP address."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A normal Service gets an **A** and/or **AAAA** record (for IPv4 and IPv6) named `<service>.<namespace>.svc.<cluster-domain>`, pointing at the Service's cluster IP.",
+            "A short name only searches the Pod's **own namespace**. A Pod in `test` asking for `data` won't find the `data` Service in `prod`; `data.prod` works.",
+            "The kubelet writes each Pod's `/etc/resolv.conf`. Its `search` list expands short names, so `data` may become `data.test.svc.cluster.local`."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "text": "nameserver <cluster-dns-ip>\nsearch <namespace>.svc.cluster.local svc.cluster.local cluster.local\noptions ndots:5"
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "net-dns-fc-01",
+      "front": "Why use domain names instead of IP addresses?",
+      "back": "IP addresses are hard for people to remember and can change. Domain names are human-readable.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name"
+    },
+    {
+      "id": "net-dns-fc-02",
+      "front": "Where does a computer look first when resolving a domain name?",
+      "back": "Its local DNS cache. If the name isn't there, it asks a DNS server.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name"
+    },
+    {
+      "id": "net-dns-fc-03",
+      "front": "In which direction is a domain name read?",
+      "back": "Right to left: TLD, then second-level domain, then subdomains.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name"
+    },
+    {
+      "id": "net-dns-fc-04",
+      "front": "How long can a domain name label be?",
+      "back": "1 to 63 characters: letters, digits and hyphens (not at the start or end).",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name"
+    },
+    {
+      "id": "net-dns-fc-05",
+      "front": "Can you buy a domain name outright?",
+      "back": "No. You pay a registrar for the right to use it for one or more years, and can renew.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name"
+    },
+    {
+      "id": "net-dns-fc-06",
+      "front": "What is DNS?",
+      "back": "The Domain Name System: a hierarchical, decentralized naming system mapping domain names to resources such as IP addresses.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/DNS"
+    },
+    {
+      "id": "net-dns-fc-07",
+      "front": "What is a reverse DNS lookup?",
+      "back": "Finding the domain name associated with an IP address.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/DNS"
+    },
+    {
+      "id": "net-dns-fc-08",
+      "front": "What is the TLD in developer.mozilla.org?",
+      "back": "`org`. `mozilla.org` is the second-level domain and `developer` a subdomain.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TLD"
+    },
+    {
+      "id": "net-dns-fc-09",
+      "front": "Who designates the organizations that manage TLDs?",
+      "back": "ICANN (Internet Corporation for Assigned Names and Numbers).",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TLD"
+    },
+    {
+      "id": "net-dns-fc-10",
+      "front": "What does TTL mean on a DNS answer?",
+      "back": "How many seconds the requester may cache it before fetching it again.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TTL"
+    },
+    {
+      "id": "net-dns-fc-11",
+      "front": "What DNS name does a normal Kubernetes Service get?",
+      "back": "`<service>.<namespace>.svc.<cluster-domain>`, an A/AAAA record pointing at its cluster IP.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    },
+    {
+      "id": "net-dns-fc-12",
+      "front": "A Pod in namespace test looks up `data`. Which namespace is searched?",
+      "back": "Only its own, `test`. To reach `data` in `prod`, use `data.prod`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "net-dns-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "You type a domain name your computer resolved a minute ago. Where does it most likely find the IP address?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "Its local DNS cache",
+          "correct": true,
+          "explanation": "The computer checks its cache before asking a DNS server."
+        },
+        {
+          "id": "b",
+          "text": "The registrar's website",
+          "correct": false,
+          "explanation": "Registrars keep registration details; they don't answer each lookup."
+        },
+        {
+          "id": "c",
+          "text": "The web server itself",
+          "correct": false,
+          "explanation": "You need the IP address before you can reach the server."
+        },
+        {
+          "id": "d",
+          "text": "A whois lookup",
+          "correct": false,
+          "explanation": "whois tells you who registered a name, not its current IP."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-02",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "In `support.mozilla.org`, what is `support`?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "A subdomain",
+          "correct": true,
+          "explanation": "Labels left of the second-level domain are subdomains."
+        },
+        {
+          "id": "b",
+          "text": "The TLD",
+          "correct": false,
+          "explanation": "The TLD is `org`, the last part."
+        },
+        {
+          "id": "c",
+          "text": "The second-level domain",
+          "correct": false,
+          "explanation": "That's `mozilla`, just before the TLD."
+        },
+        {
+          "id": "d",
+          "text": "The scheme",
+          "correct": false,
+          "explanation": "The scheme is part of a URL, such as `https`."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "Once you pay for a domain name, you own it forever.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "You pay for the right to use it for one or more years and must renew."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: you never own it; you rent the right to use it."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which are valid domain name labels? Select 2.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "97",
+          "correct": true,
+          "explanation": "Digits alone are allowed."
+        },
+        {
+          "id": "b",
+          "text": "hello-strange-person-16-how-are-you",
+          "correct": true,
+          "explanation": "Letters, digits and inner hyphens are allowed."
+        },
+        {
+          "id": "c",
+          "text": "-start",
+          "correct": false,
+          "explanation": "A hyphen may not be the first character."
+        },
+        {
+          "id": "d",
+          "text": "under_score",
+          "correct": false,
+          "explanation": "Only letters, digits and `-` are allowed."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-05",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "What is the main job of DNS?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/DNS",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "Translating domain names into IP addresses",
+          "correct": true,
+          "explanation": "That's a DNS lookup."
+        },
+        {
+          "id": "b",
+          "text": "Encrypting web traffic",
+          "correct": false,
+          "explanation": "That's TLS."
+        },
+        {
+          "id": "c",
+          "text": "Routing packets between networks",
+          "correct": false,
+          "explanation": "That's what routers do."
+        },
+        {
+          "id": "d",
+          "text": "Assigning MAC addresses",
+          "correct": false,
+          "explanation": "MAC addresses come from the manufacturer or software, not DNS."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "You have an IP address from a log and want the domain name behind it. What is that called?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/DNS",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "A reverse DNS lookup",
+          "correct": true,
+          "explanation": "Reverse DNS (rDNS) maps an IP address back to a name."
+        },
+        {
+          "id": "b",
+          "text": "A DNS lookup",
+          "correct": false,
+          "explanation": "A normal lookup goes from name to IP."
+        },
+        {
+          "id": "c",
+          "text": "A TTL check",
+          "correct": false,
+          "explanation": "TTL is about how long an answer may be cached."
+        },
+        {
+          "id": "d",
+          "text": "A TCP handshake",
+          "correct": false,
+          "explanation": "That opens a connection; it doesn't look up names."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-07",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "DNS is a single central database run by one server.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/DNS",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "DNS is decentralized."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: DNS is hierarchical and decentralized."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-08",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Which is a country-code TLD?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TLD",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "us",
+          "correct": true,
+          "explanation": "ccTLDs are two characters for a country or territory."
+        },
+        {
+          "id": "b",
+          "text": "com",
+          "correct": false,
+          "explanation": "`com` is an unsponsored generic TLD."
+        },
+        {
+          "id": "c",
+          "text": "edu",
+          "correct": false,
+          "explanation": "`edu` is an unsponsored TLD run under ICANN policy."
+        },
+        {
+          "id": "d",
+          "text": "mozilla",
+          "correct": false,
+          "explanation": "That's a second-level domain."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "A DNS answer has a TTL of 300. What does that mean?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TTL",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "The requester may cache it for 300 seconds",
+          "correct": true,
+          "explanation": "TTL on cached data is a time in seconds."
+        },
+        {
+          "id": "b",
+          "text": "It took 300 ms to resolve",
+          "correct": false,
+          "explanation": "TTL isn't a measure of lookup time."
+        },
+        {
+          "id": "c",
+          "text": "It passed through 300 routers",
+          "correct": false,
+          "explanation": "Hop counts are the packet meaning of TTL, not a DNS answer's."
+        },
+        {
+          "id": "d",
+          "text": "The domain expires in 300 days",
+          "correct": false,
+          "explanation": "Registration periods aren't set by TTL."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-10",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "TTL can refer to which of these? Select 2.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TTL",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "How long cached data such as a DNS answer stays valid",
+          "correct": true,
+          "explanation": "That's the caching meaning."
+        },
+        {
+          "id": "b",
+          "text": "A packet's lifetime in hops or time before it's dropped",
+          "correct": true,
+          "explanation": "That's the networking meaning."
+        },
+        {
+          "id": "c",
+          "text": "How long a TCP handshake may take",
+          "correct": false,
+          "explanation": "TTL isn't a handshake timeout."
+        },
+        {
+          "id": "d",
+          "text": "How long a domain registration lasts",
+          "correct": false,
+          "explanation": "That's set with the registrar."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "A Pod in namespace `test` must reach Service `data` in namespace `prod`. Which name works?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "data.prod",
+          "correct": true,
+          "explanation": "Adding the namespace finds the Service in `prod`."
+        },
+        {
+          "id": "b",
+          "text": "data",
+          "correct": false,
+          "explanation": "A bare name only searches the Pod's own `test` namespace."
+        },
+        {
+          "id": "c",
+          "text": "prod.data",
+          "correct": false,
+          "explanation": "The Service name comes first, then the namespace."
+        },
+        {
+          "id": "d",
+          "text": "data.test",
+          "correct": false,
+          "explanation": "That points at the `test` namespace."
+        }
+      ]
+    },
+    {
+      "id": "net-dns-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "Who writes a Pod's `/etc/resolv.conf`?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
+      "competencyId": "net-dns",
+      "options": [
+        {
+          "id": "a",
+          "text": "The kubelet",
+          "correct": true,
+          "explanation": "kubelet configures each Pod's DNS settings."
+        },
+        {
+          "id": "b",
+          "text": "The Pod's application",
+          "correct": false,
+          "explanation": "The app reads it; kubelet writes it."
+        },
+        {
+          "id": "c",
+          "text": "kube-proxy",
+          "correct": false,
+          "explanation": "kube-proxy handles Service traffic, not DNS config."
+        },
+        {
+          "id": "d",
+          "text": "The cloud provider",
+          "correct": false,
+          "explanation": "It's set per Pod on the node by kubelet."
+        }
+      ]
+    }
+  ]
+}

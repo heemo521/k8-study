@@ -5,7 +5,9 @@ ad-spammy tutorial apps out there. It has 33 topics covering all five CKA domain
 (432 flashcards, 473 questions including 22 typed `kubectl` commands, 11 animated diagrams), quizzes, CKA-domain practice tests, and progress
 tracking: it shows where you are and which competencies are your weakest.
 The content model is multi-subject: a **Docker** subject (4 topics, from the
-Apache-2.0 Docker docs) ships alongside Kubernetes, and others such as Linux can be
+Apache-2.0 Docker docs) and a **Networking** subject (4 plain-English topics on
+addresses, TCP/UDP, DNS and HTTP, from CC BY-SA MDN Web Docs) ship alongside
+Kubernetes, and others such as Linux can be
 added as data with `python3 tool/new_subject.py`. It ships as an installable PWA and goes native only
 when the web version earns it.
 
