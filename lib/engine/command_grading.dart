@@ -1,4 +1,4 @@
-/// Grading for typed `command` questions (spec §14.5). Pure Dart.
+/// Grading for typed `command` questions (spec §15.5). Pure Dart.
 ///
 /// A typed command matches an accepted answer when both normalise to the
 /// same shape: the same positional words in order, and the same set of

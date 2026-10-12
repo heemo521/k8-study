@@ -1,4 +1,4 @@
-/// Spaced review of questions (spec §14.2). Questions enter the schedule
+/// Spaced review of questions (spec §15.2). Questions enter the schedule
 /// when answered wrong or unsure, then follow the flashcard Leitner
 /// intervals until answered right *and* sure.
 library;

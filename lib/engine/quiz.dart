@@ -60,7 +60,7 @@ List<PresentedQuestion> drawQuiz({
   return [for (final q in picked) present(q, random)];
 }
 
-/// Questions to try before reading the notes (spec §14.6): the easiest
+/// Questions to try before reading the notes (spec §15.6): the easiest
 /// multiple-choice ones, since typing a command cold is a guess too far.
 List<PresentedQuestion> drawWarmup({
   required List<Question> bank,
@@ -80,7 +80,7 @@ class QuizAttempt {
   final List<PresentedQuestion> questions;
   final Map<String, Set<String>> answers = {};
 
-  /// Questions answered with "Not sure" (spec §14.1).
+  /// Questions answered with "Not sure" (spec §15.1).
   final Set<String> unsure = {};
 
   void answer(String questionId, Set<String> selected, {bool sure = true}) {

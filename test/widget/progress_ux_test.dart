@@ -468,6 +468,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('streak')), findsOneWidget);
     expect(find.text('Today: 1 section'), findsOneWidget);
+    expect(find.text('Lv 1'), findsOneWidget);
   });
 
   testWidgets('multi-select questions show how many to pick', (tester) async {

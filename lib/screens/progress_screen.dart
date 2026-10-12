@@ -9,6 +9,7 @@ import '../engine/clock.dart';
 import '../progress/insights.dart';
 import '../progress/progress_store.dart';
 import '../widgets/page_body.dart';
+import '../widgets/rewards_view.dart';
 import '../widgets/topic_status.dart';
 
 /// S10 — where you stand and where the gaps are: readiness by domain, weakest
@@ -87,6 +88,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          const RewardsCard(),
 
           // ---- gap plan ------------------------------------------------------
           heading('Gap plan'),

@@ -22,6 +22,11 @@
       "sourceTitle": "Network Policies",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Out of the box, any bay can phone any other bay. **Fences and gate passes** (NetworkPolicy) change that, controlling who may connect by address and port (layer 3 or 4). Passes name allowed bays, company yards (namespaces) or address ranges (IP blocks). A bay can always reach itself, and its own ship can always reach it. But the fences only exist if the road contractor (network plugin) knows how to build them."
+        },
+        {
           "type": "p",
           "text": "A NetworkPolicy controls traffic at the **IP address or port level (OSI layer 3 or 4)** for TCP, UDP and SCTP. It applies to connections that have a selected Pod on one or both ends."
         },
@@ -143,6 +148,11 @@
       "sourceTitle": "Network Policies",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A bay with no policy is open both ways. Once any policy selects it for incoming traffic, it is **fenced in**: only listed callers get through, plus its own ship, and replies to allowed calls flow automatically. Outgoing works the same way. There are no \"keep out\" signs, only passes, and passes simply add up, so order never matters. For bay A to reach bay B, A's outgoing pass and B's incoming pass must both allow it."
+        },
+        {
           "type": "bullets",
           "items": [
             "By default a Pod is **non-isolated** for both ingress and egress: all connections are allowed.",
@@ -166,6 +176,11 @@
       "sourceTitle": "Network Policies",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A policy form starts with which bays it guards (`podSelector`); an empty selector `{}` guards every bay in the yard. `policyTypes` says whether it fences incoming, outgoing or both. Each incoming rule lets a caller through only if both its origin (`from`) and door (`ports`) match; outgoing rules match `to` plus `ports`. A rule can open a run of doors with `endPort`, if the contractor supports it."
+        },
+        {
           "type": "code",
           "lang": "yaml",
           "text": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: <policy-name>\n  namespace: <namespace>\nspec:\n  podSelector:\n    matchLabels:\n      <key>: <value>       # Pods this policy applies to\n  policyTypes:\n  - Ingress\n  - Egress\n  ingress:\n  - from:\n    - ipBlock:\n        cidr: <cidr>\n        except:\n        - <cidr>\n    - namespaceSelector:\n        matchLabels:\n          <key>: <value>\n    - podSelector:\n        matchLabels:\n          <key>: <value>\n    ports:\n    - protocol: TCP\n      port: <port>\n  egress:\n  - to:\n    - ipBlock:\n        cidr: <cidr>\n    ports:\n    - protocol: TCP\n      port: <port>"
@@ -187,6 +202,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
       "sourceTitle": "Network Policies",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Passes can name callers several ways: tagged bays in this yard (`podSelector`), every bay in tagged yards (`namespaceSelector`), or address ranges (`ipBlock`) for visitors from outside the port. Combine yard and bay tags in **one** entry and both must match (AND). List them as **two** entries and either will do (OR). Yards are picked by tag, never by name, but every yard carries a fixed name tag `kubernetes.io/metadata.name`."
+        },
         {
           "type": "table",
           "header": [
@@ -233,6 +253,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
       "sourceTitle": "Network Policies",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "With no policies, a yard is wide open. A common first move is a yard-wide fence: select every bay (`podSelector: {}`), list the directions, and add no rules, so nothing passes. Careful: fencing all outgoing calls also blocks calls to the port phone directory (DNS), so add a pass for that. An \"allow everything\" pass for one direction means no other policy can close it."
+        },
         {
           "type": "p",
           "text": "With no policies in a namespace, all ingress and egress is allowed. These namespace-wide policies all use `podSelector: {}`:"
@@ -289,6 +314,11 @@
       "sourceTitle": "Declare Network Policy",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Try it in the yard. Start an `nginx` contract and phone it from a temporary `busybox` bay: it answers. Now post a pass saying only bays tagged `access=true` may call bays tagged `app=nginx`. The untagged busybox's call now times out. Start a new busybox with `--labels=\"access=true\"` and it gets through. Plugins that can build these fences include Calico, Cilium, Antrea and Kube-router."
+        },
+        {
           "type": "p",
           "text": "Plugins with NetworkPolicy support include Antrea, Calico, Cilium and Kube-router."
         },
@@ -323,6 +353,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
       "sourceTitle": "Network Policies",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Fences have gaps. Full blocking is only promised for TCP, UDP and SCTP calls. Passes cover the whole bay, every container in it. A brand-new bay may start before its fence goes up, and whether calls already in progress get cut is up to the contractor. Bays wired straight into the ship (hostNetwork) are a grey area. And you cannot post \"keep out\" signs, fence port phone numbers by name, or log calls."
+        },
         {
           "type": "bullets",
           "items": [

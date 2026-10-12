@@ -115,7 +115,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   PresentedQuestion get _current => _attempt!.questions[_index];
 
-  /// Self-explanation prompt (spec §14.7): after a right answer to a harder
+  /// Self-explanation prompt (spec §15.7): after a right answer to a harder
   /// multiple-choice question, ask "why?" before showing the explanations.
   bool get _askWhy =>
       _revealed &&
@@ -198,17 +198,18 @@ class _QuizScreenState extends State<QuizScreen> {
       return;
     }
     final progress = context.read<ProgressStore>();
-    progress.recordAnswers(attempt);
+    var xp = progress.recordAnswers(attempt);
     if (_spec case TopicQuizSpec(:final topicId, :final retryMissed)) {
       if (retryMissed) {
         progress.recordRetryMissed(topicId, attempt.missedIds);
       } else {
-        progress.recordQuiz(topicId, attempt.percent, attempt.missedIds);
+        xp += progress.recordQuiz(topicId, attempt.percent, attempt.missedIds);
       }
     }
     context.read<SessionStore>().lastQuiz = QuizResult(
       spec: _spec,
       attempt: attempt,
+      xpEarned: xp,
     );
     // Interstitial (if any) shows before the results screen renders.
     await context.read<AdsService>().maybeShowInterstitial(
@@ -370,7 +371,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 }
 
-/// Submit with a confidence rating (spec §14.1): "Sure" or "Not sure".
+/// Submit with a confidence rating (spec §15.1): "Sure" or "Not sure".
 class _ConfidenceButtons extends StatelessWidget {
   const _ConfidenceButtons({required this.enabled, required this.onSubmit});
 

@@ -46,7 +46,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   ).length;
 
   /// After a topic's cards: its quiz. After the due-card review: the due
-  /// questions, if any (spec §14.3).
+  /// questions, if any (spec §15.3).
   String get _nextPath => !_allDue
       ? '/topic/${widget.topicId}/quiz'
       : _dueQuestions > 0

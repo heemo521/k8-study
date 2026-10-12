@@ -24,7 +24,7 @@ class TopicQuizSpec extends QuizSpec {
   /// Only questions missed last time; doesn't count toward best score.
   final bool retryMissed;
 
-  /// A few questions before the notes (spec §14.6): nothing is recorded,
+  /// A few questions before the notes (spec §15.6): nothing is recorded,
   /// and it leads straight into the notes.
   final bool warmup;
 

@@ -22,6 +22,11 @@
       "sourceTitle": "Upgrading kubeadm clusters",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The port is refitted one minor version at a time, never skipping one. Order matters: the main harbor office first, then the other offices one by one, then the ships one or a few at a time so enough cargo keeps moving. Back up what matters, turn off swap, and move bays off each ship before upgrading its cargo officer (`kubelet`). Every container restarts afterwards. Point the parts depot (`pkgs.k8s.io`) at the target release first."
+        },
+        {
           "type": "bullets",
           "items": [
             "Upgrade **one minor version at a time** (e.g. 1.36.x → 1.37.x). Skipping minor versions is unsupported. Patch upgrades within a minor (1.37.x → 1.37.y) follow the same steps.",
@@ -129,6 +134,11 @@
       "sourceTitle": "Upgrading kubeadm clusters",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "At the main office (one holding `admin.conf`), upgrade only the crew's blueprints (`kubeadm`) first, then ask `kubeadm upgrade plan` what's possible. `kubeadm upgrade apply` checks the port is healthy, enforces version rules, rebuilds the office desks (rolling back on failure), refreshes the directory and switchboard (CoreDNS, kube-proxy) and renews its seals. The road contractor (CNI) is upgraded separately, by hand. **SUCCESS!** means only the office is done; its cargo officer comes next."
+        },
+        {
           "type": "p",
           "text": "Pick a control plane node that has `/etc/kubernetes/admin.conf`."
         },
@@ -160,6 +170,11 @@
       "sourceTitle": "Upgrading kubeadm clusters",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The remaining offices follow the same routine with one swap: `kubeadm upgrade node` instead of `apply`. It fetches the port's plans (ClusterConfiguration) from the cluster and rebuilds this office's desks and its cargo officer's settings. No need to re-plan, or redo the roads if the CNI sits on every ship (DaemonSet). Since v1.28 the directory and switchboard add-ons wait until the last office is finished."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "sudo kubeadm upgrade node"
@@ -182,6 +197,11 @@
       "sourceTitle": "Upgrading kubeadm clusters",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "With an office's desks refitted, its cargo officer gets upgraded too. Move the bays off (`kubectl drain`), unhold and install the new `kubelet` and `kubectl`, hold them again, then reload and restart the officer. Check the officer is back at their post with `systemctl status kubelet`, and lift the \"no new cargo\" flag with `kubectl uncordon`. When every ship is done, `kubectl get nodes` shows **Ready** and the new version."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "kubectl drain <node-to-drain> --ignore-daemonsets\n\nsudo apt-mark unhold kubelet kubectl && \\\nsudo apt-get update && sudo apt-get install -y kubelet='<version>-*' kubectl='<version>-*' && \\\nsudo apt-mark hold kubelet kubectl\n\nsudo systemctl daemon-reload\nsudo systemctl restart kubelet\n\nkubectl uncordon <node-to-uncordon>"
@@ -201,6 +221,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/",
       "sourceTitle": "Upgrading Linux nodes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Only once the offices are refitted do the cargo ships take their turn, one or a few at a time. On each: upgrade the blueprints (`kubeadm`) and the radio (`kubectl`, kept within one minor of the front desk), run `kubeadm upgrade node` to refresh the officer's settings, move the bays off from an office, upgrade and restart the cargo officer (`kubelet`), then lift the flag from an office with `kubectl uncordon`."
+        },
         {
           "type": "p",
           "text": "Upgrade the control plane before the workers. Then, on each worker (one or a few at a time):"
@@ -224,6 +249,11 @@
       "sourceTitle": "Safely Drain a Node",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Clearing a ship (`kubectl drain`) asks bays to leave politely, so containers stop gracefully, and it honours each contract's minimum-crew promise (PodDisruptionBudget). Lifeboats (DaemonSet Pods) stay put, since they'd only be recreated, hence `--ignore-daemonsets`. The ship keeps its \"no new cargo\" flag until you `kubectl uncordon` it. Bays holding a permit for that flag, or assigned directly with `nodeName`, can still land. Several ships can be cleared in parallel."
+        },
+        {
           "type": "bullets",
           "items": [
             "`kubectl drain` evicts Pods so their containers terminate gracefully, and it respects your **PodDisruptionBudgets**.",
@@ -241,6 +271,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
       "sourceTitle": "Upgrading kubeadm clusters",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Refit went wrong? No panic. `kubeadm upgrade` is safe to run again, and `apply --force` at the same version also recovers from a bad state. The crew stashes copies under `/etc/kubernetes/tmp`: one of the local ledger (restore into `/var/lib/etcd`) and one of the office desk manifests (restore into `/etc/kubernetes/manifests`). Nobody clears these copies away automatically, so tidy them up yourself."
+        },
         {
           "type": "bullets",
           "items": [

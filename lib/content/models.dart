@@ -289,7 +289,8 @@ class CodeBlock extends NoteBlock {
   final String text;
 }
 
-enum CalloutKind { key, exam, warn }
+/// [story] is the analogy narrative that opens a section (Port of Kube).
+enum CalloutKind { key, exam, warn, story }
 
 class CalloutBlock extends NoteBlock {
   const CalloutBlock({required this.kind, required this.text});
@@ -524,7 +525,7 @@ class Flashcard {
 }
 
 /// `command`: the learner types a command, graded against [Question.answers]
-/// (spec §14.5).
+/// (spec §15.5).
 enum QuestionType { single, multi, truefalse, command }
 
 class AnswerOption {
@@ -640,7 +641,7 @@ class LabStep {
   }
 }
 
-/// A guided hands-on scenario (spec §14.8): a sequence of typed commands
+/// A guided hands-on scenario (spec §15.8): a sequence of typed commands
 /// whose guidance fades with each completed run.
 class Lab {
   const Lab({

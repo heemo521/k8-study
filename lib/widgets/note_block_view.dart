@@ -126,6 +126,12 @@ class _Callout extends StatelessWidget {
         scheme.errorContainer,
         scheme.onErrorContainer,
       ),
+      CalloutKind.story => (
+        Icons.directions_boat_outlined,
+        'Port story',
+        scheme.secondaryContainer,
+        scheme.onSecondaryContainer,
+      ),
     };
     return Container(
       padding: const EdgeInsets.all(12),

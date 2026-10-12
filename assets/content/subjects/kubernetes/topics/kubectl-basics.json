@@ -20,6 +20,11 @@
       "sourceTitle": "Command line tool (kubectl)",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Your radio to the front desk (`kubectl`) uses one fixed call pattern: action, cargo type, name, extras. Say the type loosely (`pods`, `pod` or `po` all work), but spell names exactly. Leave out the name and you mean every item of that type. Extras you say on air beat the defaults. The radio reads its settings from a codebook in your home folder unless you point it elsewhere, and `kubectl api-resources` reads out every type and its nickname."
+        },
+        {
           "type": "p",
           "text": "kubectl talks to the control plane through the Kubernetes API. Every command follows one shape:"
         },
@@ -94,6 +99,11 @@
       "sourceTitle": "Command line tool (kubectl)",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The front desk normally answers in plain speech. Ask for a different report format with `-o`: `wide` adds columns like which ship a bay sits on, `yaml` or `json` reads back the whole form, `jsonpath` or `custom-columns` picks just the fields you want, and `name` gives only names. You can sort the list, filter by field, or keep the line open (`-w`). A quick list (`get`) is short; a full briefing (`describe`) may take several calls."
+        },
+        {
           "type": "p",
           "text": "Plain human-readable text is the default. Add `-o` (or `--output`) to change it."
         },
@@ -144,6 +154,11 @@
       "sourceTitle": "Kubernetes Object Management",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "There are three ways to place orders. Shout one over the radio (imperative command): fast, but nothing is written down. Hand over a form and say \"create\" or \"replace\" (imperative config): `replace` swaps the whole order, wiping anything changed since. Or drop a folder of forms in the tray (`kubectl apply`): the desk works out what to add, change or remove, touching only the differences. Preview with `kubectl diff`. Pick one way per order; mixing them causes chaos."
+        },
+        {
           "type": "table",
           "header": [
             "Technique",
@@ -191,6 +206,11 @@
       "sourceTitle": "kubectl Quick Reference",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Nobody at the port writes forms from memory. Ask the front desk for a blank, pre-filled draft without sending anything (`--dry-run=client -o yaml`), save it, fix the fields you need, then file it with `kubectl apply -f`. Unsure what a box means? The form guide (`kubectl explain`) tells you. Forms can be YAML or JSON, and you can even read one straight over the radio (`apply -f -`). On a timed exam, this habit saves you."
+        },
+        {
           "type": "p",
           "text": "Rather than typing YAML from memory, let kubectl write a starting manifest, edit it, then apply it."
         },
@@ -221,6 +241,11 @@
       "sourceTitle": "Organizing Cluster Access Using kubeconfig Files",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Your radio carries a codebook (kubeconfig) listing ports, staff identities, yards and passwords. A preset channel (context) bundles one port, one yard and one identity, and the radio uses the current preset unless told otherwise. You can stack several codebooks (`KUBECONFIG`); the first book to set an entry wins. Name one book (`--kubeconfig`) and the radio reads only that. Only load codebooks you trust: a crafted one can run harmful code."
+        },
+        {
           "type": "p",
           "text": "A **kubeconfig** file holds clusters, users, namespaces and authentication details. The name is generic: no file actually has to be called kubeconfig."
         },
@@ -249,6 +274,11 @@
       "sourceTitle": "kubectl Quick Reference",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Before giving orders, check which port your radio is tuned to. `kubectl config get-contexts` lists your preset channels, `current-context` shows the one in use, and `use-context` switches. You can also set a default yard for the current preset. On the exam, switch to the named channel first and confirm it: sending perfect orders to the wrong port earns nothing. Need every yard at once? Add `-A`."
+        },
+        {
           "type": "code",
           "lang": "bash",
           "text": "kubectl config view                      # merged settings\nkubectl config get-contexts              # list contexts\nkubectl config current-context           # show current one\nkubectl config use-context <context>     # switch\nkubectl config set-context --current --namespace=<namespace>"
@@ -273,6 +303,11 @@
       "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
       "sourceTitle": "kubectl Quick Reference",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Seasoned dock hands keep radio shortcuts: a short call sign (`alias k=kubectl`) and auto-complete. They listen to a container's chatter (`logs -f`), even from its previous run (`--previous`), step inside it (`exec`), run a private line from their desk to a bay (`port-forward`), tag bays, resize a contract (`scale`), undo a bad upgrade (`rollout undo`), and check the gauges (`top`). Turning up radio detail (`--v=6`, `--v=8`) reveals exactly what was sent."
+        },
         {
           "type": "code",
           "lang": "bash",

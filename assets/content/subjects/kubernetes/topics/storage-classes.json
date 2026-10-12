@@ -22,6 +22,11 @@
       "sourceTitle": "Storage Classes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Instead of pre-building every warehouse unit, the port keeps a **warehouse rental catalog** (StorageClass). Each entry describes a kind of storage, maybe faster or better backed up; the port doesn't care what it means. Tenants pick an entry **by name**, so name it well. The entry's builder (`provisioner`), options (`parameters`) and reclaim policy are used whenever a unit must be built on demand."
+        },
+        {
           "type": "p",
           "text": "A StorageClass describes a **class** of storage an admin offers, such as a quality-of-service level or backup policy. Kubernetes doesn't care what the classes mean. Users pick one **by name**, so the name matters."
         },
@@ -43,6 +48,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/storage-classes/",
       "sourceTitle": "Storage Classes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Each catalog entry must name its builder (`provisioner`): built-in ones start with `kubernetes.io`, outside ones run separately. Builder-specific options go in `parameters`. Units built from the entry are torn down on release unless the entry says Retain. `allowVolumeExpansion` lets tenants grow, never shrink, a unit. An entry using `kubernetes.io/no-provisioner` builds nothing but still delays binding."
+        },
         {
           "type": "table",
           "header": [
@@ -89,6 +99,11 @@
       "sourceTitle": "Storage Classes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "When should a unit be assigned? **Immediate** builds or picks one as soon as the request arrives, before knowing which ship the bay will sail on, which can strand the bay if the unit is unreachable from some ships. **WaitForFirstConsumer** waits until a bay needs it, then picks a unit fitting where the load planner places that bay. Skip `nodeName` here; it bypasses the planner and the request stays Pending."
+        },
+        {
           "type": "bullets",
           "items": [
             "**Immediate**: binding and provisioning happen as soon as the PVC is created, without knowing where the Pod will run. With topology-constrained storage (not reachable from every node) this can leave Pods **unschedulable**.",
@@ -110,6 +125,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/",
       "sourceTitle": "Dynamic Volume Provisioning",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Without the catalog, admins order storage from the provider and then file a unit for it. With it, units are built **on demand**: the tenant writes the catalog entry's name in the request (`storageClassName`), the builder creates storage plus a unit, and the two are paired. With the default Delete policy, ending the rental destroys the storage. A default entry plus the `DefaultStorageClass` admission controller covers requests that name none."
+        },
         {
           "type": "p",
           "text": "Without it, admins must create storage at the provider and then a PV for it. With it, storage is created **on demand** when a user creates a PVC."
@@ -137,6 +157,11 @@
       "sourceTitle": "Storage Classes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A rental request that names no catalog entry gets the **default** one. If several entries claim default, the newest wins, but aim for one. If no default exists, the request waits with its label blank, and gets filled in later once a default appears. A request that explicitly says `storageClassName: \"\"` is never filled in; it only rents unlabelled units."
+        },
+        {
           "type": "bullets",
           "items": [
             "A PVC with **no** `storageClassName` gets the default StorageClass.",
@@ -153,6 +178,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/",
       "sourceTitle": "Change the default StorageClass",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Your installer may ship a default catalog entry you dislike, and deleting it may fail because an addon manager re-creates it. Instead, move the \"default\" stamp: patch the old entry's `storageclass.kubernetes.io/is-default-class` annotation to `false`, then the new one to `true`. Only `true` counts. Check with `kubectl get storageclass`, where the winner shows \"(default)\"."
+        },
         {
           "type": "p",
           "text": "Your installer may create a default class that doesn't suit you (too expensive, for example). Deleting it may not work, because an addon manager can re-create it. Change the annotation instead."
@@ -182,6 +212,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
       "sourceTitle": "Persistent Volumes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Need a bigger unit? If its catalog entry allows growth (`allowVolumeExpansion: true`), just edit the rental request to ask for more. The existing unit is enlarged; no new unit is built. The file system must be XFS, Ext3 or Ext4, and resizing finishes when a bay uses it. Don't touch the unit's own capacity by hand, or the clerk assumes the work is done and nothing grows."
+        },
         {
           "type": "bullets",
           "items": [

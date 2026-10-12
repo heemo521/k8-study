@@ -22,6 +22,11 @@
       "sourceTitle": "Installing kubeadm",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Before the construction crew (`kubeadm`) starts, every ship must pass inspection: a compatible Linux hull, 2 GB or more of RAM, 2 or more CPUs on office ships, radio contact between all of them, and the required ports open. Each ship needs its own unique hostname, MAC address and `product_uuid`, so none get confused. The cargo officer (`kubelet`) refuses to start if it spots swap, unless told to tolerate it with `failSwapOn: false`."
+        },
+        {
           "type": "bullets",
           "items": [
             "A compatible Linux host (Debian- or Red Hat-based, or without a package manager).",
@@ -54,6 +59,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
       "sourceTitle": "Installing kubeadm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every ship needs a crane that fits the standard crane socket (CRI). If you don't say which crane, the crew checks the known sockets; finding none, or several, it stops and asks you to choose with `--cri-socket`. containerd and CRI-O plug straight in. The Docker crane doesn't fit the socket, so it needs an adapter, `cri-dockerd`, ever since built-in Docker support left the `kubelet` in v1.24."
+        },
         {
           "type": "p",
           "text": "Each node needs a runtime that implements the **CRI** (Container Runtime Interface). If you don't specify one, kubeadm looks for known socket endpoints. If it finds none, or more than one, it throws an error and asks you to choose one with `--cri-socket`."
@@ -92,6 +102,11 @@
       "sourceTitle": "Container Runtimes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Next comes some ship wiring. Linux won't pass traffic between its network interfaces by default, so switch on forwarding with `net.ipv4.ip_forward = 1`. Then the cargo officer (`kubelet`) and the crane (container runtime) must agree on one power-budget system (cgroup driver): **cgroupfs** or **systemd**. With systemd as the init system, or cgroup v2, both use systemd. In newer releases the officer may read the choice straight from the crane."
+        },
+        {
           "type": "bullets",
           "items": [
             "Linux doesn't route IPv4 packets between interfaces by default. Enable it with `net.ipv4.ip_forward = 1` in `/etc/sysctl.d/k8s.conf` followed by `sudo sysctl --system`.",
@@ -112,6 +127,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/",
       "sourceTitle": "Installing kubeadm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every ship gets three tools: the crew's blueprints (`kubeadm`), a cargo officer (`kubelet`) and a radio to the front desk (`kubectl`). The crew doesn't look after the officer or the radio, so keep their versions matched; the officer may be one minor version behind the front desk, never newer. Fetch them from `pkgs.k8s.io`, then `apt-mark hold` them so routine upgrades skip them. Until the port is built, the officer stuck in a restart loop is expected."
+        },
         {
           "type": "bullets",
           "items": [
@@ -144,6 +164,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
       "sourceTitle": "Creating a cluster with kubeadm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Now the crew builds the harbor office with `kubeadm init`: inspections first, then the office desks, giving a minimum viable port that follows best practice. Planning more offices later? Set a shared front-desk address (`--control-plane-endpoint`) now, because it can't be added afterwards. Copy `admin.conf` to give your radio (`kubectl`) its keys. Keep the printed `kubeadm join` slip secret, since its token lets anyone add ships, and lock `super-admin.conf` away."
+        },
         {
           "type": "p",
           "text": "kubeadm builds a **minimum viable cluster** that follows best practices and can pass the Kubernetes Conformance tests. It also supports lifecycle tasks such as bootstrap tokens and cluster upgrades."
@@ -208,6 +233,11 @@
       "sourceTitle": "Creating a cluster with kubeadm",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The office stands, but the port has no roads yet. You must hire one road contractor (a CNI Pod network add-on) so bays can reach each other; the port phone directory (CoreDNS) won't open until the roads exist. Only one road network per port, its addresses mustn't overlap the host network, and it must respect badges (RBAC). Wait until CoreDNS is Running before inviting ships to join."
+        },
+        {
           "type": "p",
           "text": "You **must** deploy a CNI-based Pod network add-on so Pods can talk to each other. **CoreDNS will not start** until a network is installed."
         },
@@ -233,6 +263,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
       "sourceTitle": "Creating a cluster with kubeadm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Ships join by presenting the `kubeadm join` slip: a token plus a fingerprint of the office's certificate. Office ships fly a \"no cargo\" sign (the `control-plane:NoSchedule` taint); on a one-ship port, take it down so bays can land. Retiring a ship? Move its bays off (`kubectl drain`), have the crew run `kubeadm reset` on it (which leaves the switchboard rules behind), then strike it from the books with `kubectl delete node`."
+        },
         {
           "type": "code",
           "lang": "shell",
@@ -264,6 +299,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/",
       "sourceTitle": "Creating a cluster with kubeadm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The crew's blueprint version sets the rules. The harbor office may match it or be one minor version older; cargo officers (`kubelet`) may lag up to three. New ships join with the same blueprint version last used to build or upgrade, and upgrades step at most one minor ahead. One warning: a single office means a single master ledger (`etcd`). Lose that ship and you may lose data, so photocopy `/var/lib/etcd` into the safe regularly."
+        },
         {
           "type": "table",
           "header": [

@@ -23,6 +23,11 @@
       "sourceTitle": "Operating etcd clusters for Kubernetes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Everything the port knows about itself is written in the master ledger (`etcd`). Lose every harbor office, and a photocopy in the safe is how you recover. That copy holds every secret too, so lock it with encryption. Anyone who can open the ledger effectively owns the port; ideally only the front desk (`kube-apiserver`) ever touches it. And always photocopy the ledger before upgrading it."
+        },
+        {
           "type": "bullets",
           "items": [
             "etcd is the key-value store that holds **all** Kubernetes objects.",
@@ -40,6 +45,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
       "sourceTitle": "Operating etcd clusters for Kubernetes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Two clerks handle the ledger. `etcdctl` works over the radio with a running ledger: reading entries, cluster admin, checking health, taking `snapshot save` copies. `etcdutl` works directly on the paper files: restoring copies, checking their status, defragmenting and migrating. You may need both. The radio clerk's old restore and status commands are deprecated since etcd v3.5.x, so hand those jobs to `etcdutl`."
+        },
         {
           "type": "table",
           "header": [
@@ -73,6 +83,11 @@
       "sourceTitle": "Operating etcd clusters for Kubernetes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "To photocopy a live ledger, radio a keeper with `etcdctl snapshot save`; it doesn't slow the keeper down. A guarded ledger wants three ID papers: the trusted CA (`--cacert`), your cert (`--cert`) and key (`--key`), plus its address (`--endpoints`) and `ETCDCTL_API=3`. Find those papers in the etcd Pod's description. Alternatives: copy `member/snap/db` from a data directory no etcd process is using, or snapshot the whole storage volume."
+        },
+        {
           "type": "p",
           "text": "Use `etcdctl snapshot save` against a live member. Taking it doesn't affect the member's performance. Against a TLS-secured etcd you pass the endpoint and the client certificates:"
         },
@@ -104,6 +119,11 @@
       "sourceTitle": "Operating etcd clusters for Kubernetes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A photocopy only helps if it's readable. Ask `etcdutl snapshot status` to print a table: the copy's fingerprint (**HASH**), its point in history (**REVISION**), how many entries it holds (**TOTAL KEYS**) and its size (**TOTAL SIZE**). The older `etcdctl` command still prints the table but grumbles that it is deprecated, so reach for `etcdutl`."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "etcdutl --write-out=table snapshot status snapshot.db"
@@ -120,6 +140,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
       "sourceTitle": "Operating etcd clusters for Kubernetes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Rebuilding from the photocopy needs a quiet office. Close every front desk (API server), restore all ledger instances, then reopen; also restart the planner, supervisors and cargo officers so nobody works from stale notes. `etcdutl snapshot restore` creates a fresh ledger folder named by `--data-dir`. Reusing the old folder? Stop etcd and delete it first. New folder? Point the etcd manifest's `hostPath` at it and restart. Copies restore across patch versions."
+        },
         {
           "type": "callout",
           "kind": "warn",
@@ -148,6 +173,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/",
       "sourceTitle": "Operating etcd clusters for Kubernetes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The ledger is kept by a committee of keepers, always an odd number; five is recommended for production, and growing from three to five is a sensible step. More keepers means more availability but slower work, not more space. If a majority are lost for good, the ledger freezes: running bays keep going, but nothing new is scheduled and nothing changes. Replace failed keepers promptly, one at a time: `member remove`, then `member add`."
+        },
         {
           "type": "bullets",
           "items": [

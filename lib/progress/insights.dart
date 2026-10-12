@@ -198,7 +198,7 @@ List<Topic> weakTopics(ContentBundle content, ProgressStore p) =>
       ..sort((a, b) => p.topicProgress(a).compareTo(p.topicProgress(b)));
 
 /// Questions due in the review schedule: answered wrong or unsure, brought
-/// back on a spaced schedule (spec §14.2). Earliest due first.
+/// back on a spaced schedule (spec §15.2). Earliest due first.
 List<Question> dueQuestions(
   ContentBundle content,
   ProgressStore p,
@@ -273,7 +273,7 @@ DateTime? nextReviewDate(ContentBundle content, ProgressStore p, DateTime now) {
   return next;
 }
 
-/// End-of-session nudge (spec §14.4): spacing beats one long session.
+/// End-of-session nudge (spec §15.4): spacing beats one long session.
 String? comeBackText(ContentBundle content, ProgressStore p, DateTime now) {
   final next = nextReviewDate(content, p, now);
   if (next == null) return null;

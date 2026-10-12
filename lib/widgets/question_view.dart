@@ -24,7 +24,7 @@ class QuestionView extends StatelessWidget {
   final bool revealed;
 
   /// After the reveal, hold back the explanations so the learner first
-  /// explains the answer to themselves (spec §14.7).
+  /// explains the answer to themselves (spec §15.7).
   final bool hideExplanations;
   final ValueChanged<Set<String>>? onChanged;
 
@@ -229,7 +229,7 @@ const _mono = TextStyle(
   fontFamilyFallback: ['Courier New', 'Courier'],
 );
 
-/// Typed answer for a `command` question (spec §14.5). Before reveal: a
+/// Typed answer for a `command` question (spec §15.5). Before reveal: a
 /// text field. After: the typed command marked right or wrong, the model
 /// answer and the explanation.
 class _CommandAnswer extends StatefulWidget {

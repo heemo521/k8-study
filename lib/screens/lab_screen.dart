@@ -17,7 +17,7 @@ const _mono = TextStyle(
   fontFamilyFallback: ['Courier New', 'Courier'],
 );
 
-/// Guided lab (spec §14.8): type each step's command. The first run shows
+/// Guided lab (spec §15.8): type each step's command. The first run shows
 /// every command, the second only how each starts, later runs nothing.
 class LabScreen extends StatefulWidget {
   const LabScreen({super.key, required this.topicId, required this.labId});

@@ -23,6 +23,11 @@
       "sourceTitle": "docker container run",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "You order the crane to stamp a container from a template and start it (`docker run`), fetching the template first if needed. Name it with `--name` or get a random one. `-d` sends it off in the background; `-it` lets you climb inside. It runs only while its main worker (root process) does. Parked containers keep their contents, so `docker start` resumes them. `--rm` scraps it on exit, and can't be combined with a `--restart` policy."
+        },
+        {
           "type": "p",
           "text": "`docker run` (alias of `docker container run`) creates a new container from an image and starts it, pulling the image first if it isn't present. Usage: `docker run [OPTIONS] IMAGE [COMMAND] [ARG...]`."
         },
@@ -77,6 +82,11 @@
       "sourceTitle": "Publishing and exposing ports",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Your containers sit behind the dock fence, so outsiders can't reach them. Publishing a port cuts a **numbered hatch** in the fence that forwards to a door on the container (`-p 8080:80`, host first). An `EXPOSE` note on the template only documents a door; it opens no hatch. `-P` cuts hatches for every exposed door at random numbers, shown in `docker ps`. Careful: a hatch with no host IP faces every road, so use `127.0.0.1:` to keep databases private."
+        },
+        {
           "type": "p",
           "text": "Containers are isolated, so you can't reach their apps directly. Publishing a port at container creation sets up a forwarding rule from a host port to a container port with `-p` (`--publish`)."
         },
@@ -107,6 +117,11 @@
       "sourceTitle": "Overriding container defaults",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Your order slip can change a container's usual job. Hand it notes with `-e` or a whole stack with `--env-file`. Containers can load as much as they like by default, so set a weight cap with `--memory` and a share of crane time with `--cpus` (0.5 = half a core), then watch the gauges (`docker stats`). Words after the template name replace its startup command. Two identical databases? Same container door, different fence hatch."
+        },
+        {
           "type": "p",
           "text": "A container runs the program its image is configured with, but `docker run` flags let you change ports, environment, resources and the command itself."
         },
@@ -136,6 +151,11 @@
       "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/ls/",
       "sourceTitle": "docker container ls",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The **dock roster** (`docker ps`, also `docker container ls`) shows only containers that are running. Add `-a` to include parked ones, `-q` for just the ID numbers, and `-f` to filter by things like `status=exited` or the template they came from (`ancestor`). `-s` shows how much each container's scratch layer weighs. A container's status is always one of: created, restarting, running, removing, paused, exited or dead."
+        },
         {
           "type": "p",
           "text": "`docker ps` is an alias of `docker container ls` (also `docker container list` and `docker container ps`). By default it shows only running containers."
@@ -182,6 +202,11 @@
       "sourceTitle": "docker container logs",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every container keeps a **logbook** of what it says out loud. `docker logs` hands you the pages written so far. Want to watch new lines as they're written? Add `-f` to keep following both output streams. Only need the last few entries? `-n` trims it. `-t` stamps each line with a time, and `--since 42m` starts the reading from a point in time, relative or absolute."
+        },
+        {
           "type": "p",
           "text": "`docker logs <container>` fetches the logs that exist when you run it. Add flags to stream or trim them."
         },
@@ -198,6 +223,11 @@
       "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/exec/",
       "sourceTitle": "docker container exec",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Need something done inside a running container? Send a **new worker** in with `docker exec`; they start in its default work area. `-it` gives you an interactive shell, `-d` lets them work in the background, `-e` hands them extra notes, and `-w` points them to another room. They need a real tool to run, so a chain like `echo a && echo b` goes inside `sh -c`. No entry while the container is paused; no return after a restart."
+        },
         {
           "type": "p",
           "text": "`docker exec` runs a **new** command inside a running container, in its default working directory."
@@ -224,6 +254,11 @@
       "sourceTitle": "docker container stop",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Stopping a container is a two-step whistle. `docker stop` first sends the main worker a polite **SIGTERM**, then after a grace period a hard **SIGKILL**. You can swap the first signal via `STOPSIGNAL` in the packing instructions, `--stop-signal` on `docker run`, or `-s` on `docker stop`. `-t` sets how many seconds to wait, with `-1` meaning forever. By default the operator waits **10 seconds** on Linux, 30 on Windows."
+        },
+        {
           "type": "bullets",
           "items": [
             "`docker stop <container>` sends the main process **SIGTERM**, then **SIGKILL** after a grace period.",
@@ -239,6 +274,11 @@
       "sourceUrl": "https://docs.docker.com/engine/network/",
       "sourceTitle": "Networking overview",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Containers on your dock talk over **dock roads** (networks). With no choice, they share the default bridge road, where they can reach the outside but must find each other by slot number (IP), **not by name**. Build your own road (`docker network create`) and a **name board** (embedded DNS at `127.0.0.11`) lets them call each other by container name. Other road types: `host` (no fence at all), `none` (sealed off), and `overlay` (linking several docks)."
+        },
         {
           "type": "bullets",
           "items": [

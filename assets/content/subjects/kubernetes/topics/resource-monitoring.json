@@ -22,6 +22,11 @@
       "sourceTitle": "Tools for Monitoring Resources",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The port doesn't insist on one gauge maker. The basic option is the ship gauges (`metrics-server`), which ask each cargo officer (`kubelet`) for CPU and memory and keep short-term readings in memory, enough for adding bays (HPA) and `kubectl top`. For richer readings you hire your own monitoring firm, ideally speaking OpenMetrics, whose adapter answers on the custom or external metrics APIs. You can run both."
+        },
+        {
           "type": "p",
           "text": "Kubernetes doesn't depend on one monitoring tool. On a new cluster you pick a **resource metrics pipeline**, a **full metrics pipeline**, or both."
         },
@@ -73,6 +78,11 @@
       "sourceTitle": "Resource metrics pipeline",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Readings travel upward: from the crane (container runtime) to a meter built into the cargo officer (cAdvisor, reading cgroups), to the officer (`kubelet`), to the ship gauges (`metrics-server`), then through the front desk as the Metrics API to HPA, VPA and `kubectl top`. None of this exists by default: you deploy metrics-server, enable the aggregation layer and register the `metrics.k8s.io` APIService."
+        },
+        {
           "type": "p",
           "text": "Data flows from the node up to the API server, and from there to its consumers:"
         },
@@ -110,6 +120,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
       "sourceTitle": "Resource metrics pipeline",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "You can radio the front desk for raw gauge readings with `kubectl get --raw`. A ship answers with a `NodeMetrics` slip, a bay with `PodMetrics` listing each container. CPU is average use over a time `window`, in cpu units. Memory is the working set: a snapshot of what can't be freed under pressure. These are only the minimum the autoscalers need; for more, add a second pipeline."
+        },
         {
           "type": "code",
           "lang": "shell",
@@ -153,6 +168,11 @@
       "sourceTitle": "kubectl Quick Reference",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "For a quick glance at the gauges, `kubectl top` shows current CPU and memory for every ship or bay, or per container with `--containers`. When a task asks which bay is the heaviest user, sort with `--sort-by=cpu` or `memory`, name the yard with `-n` if one is given, and write the answer exactly where the task asks."
+        },
+        {
           "type": "p",
           "text": "Quick commands for current node and Pod CPU/memory usage:"
         },
@@ -174,6 +194,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/troubleshooting-kubeadm/",
       "sourceTitle": "Troubleshooting kubeadm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "On a port built by the construction crew (`kubeadm`), each cargo officer carries a homemade ID card (a self-signed serving certificate), so the ship gauges (`metrics-server`) may reject it with an `x509` error. Telling the gauges to skip the check (`--kubelet-insecure-tls`) works, but not in production. The secure fix is to give the officers properly signed serving certificates."
+        },
         {
           "type": "bullets",
           "items": [

@@ -59,7 +59,7 @@ section cites exactly one page. Block types:
 | `p` | `text` | inline `` `code` `` and `**bold**` only |
 | `bullets` | `items` | |
 | `code` | `lang`, `text` | use `<placeholders>` and never realistic-looking invented values |
-| `callout` | `kind` (`key` · `exam` · `warn`), `text` | |
+| `callout` | `kind` (`key` · `exam` · `warn` · `story`), `text` | `story` opens a section with the Port of Kube analogy |
 | `table` | `header` (2–3 columns), `rows` | |
 | `diagram` | `title`, `width`, `height`, `nodes`, `edges?`, `steps?` | animated, see below |
 
@@ -83,7 +83,7 @@ scales to the screen).
 - `truefalse`: options exactly `True` / `False`.
 - `command`: no `options`; instead `answers` (accepted commands, first shown as
   the model answer) and `explanation`. The learner types the command; grading
-  accepts equivalent flag order and short/long forms (spec §14.5). Every
+  accepts equivalent flag order and short/long forms (spec §15.5). Every
   answer must appear on the source page; scenario names may fill in a page's
   placeholder.
 - Every option needs an `explanation`, including correct ones.

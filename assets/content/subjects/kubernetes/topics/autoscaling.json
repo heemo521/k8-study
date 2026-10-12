@@ -22,6 +22,11 @@
       "sourceTitle": "Autoscaling Workloads",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "When cargo piles up, the port can respond two ways: open more bays (**horizontal**) or give each bay a bigger slot (**vertical**). The add-more-bays clerk (HPA) is built into the harbor office. The bigger-slots clerk (VPA) is an add-on that also needs ship gauges (Metrics Server). Other helpers exist: one sizes crews to the fleet's size, another (KEDA) reacts to queues or a timetable. If bays alone aren't enough, charter more ships (node autoscaling)."
+        },
+        {
           "type": "p",
           "text": "**Horizontal** scaling changes the number of replicas. **Vertical** scaling changes the CPU and memory given to each replica. Manually, you scale horizontally with kubectl and vertically by patching the workload's resource definition."
         },
@@ -70,6 +75,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
       "sourceTitle": "Horizontal Pod Autoscaling",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every 15 seconds, the add-more-bays clerk (HPA) in the harbor office reads the ship gauges, compares busyness to the target and does the arithmetic: twice as busy as wanted means twice the bays. Busyness is measured against each bay's declared weight, so a bay with no declared CPU gives no reading. Wobbles within 10% are ignored, and cutting bays waits out a five-minute calm-down window. A one-per-ship lifeboat (DaemonSet) can't be scaled at all."
+        },
         {
           "type": "p",
           "text": "The HPA controller runs in the control plane as a loop, every **15 seconds** by default (`--horizontal-pod-autoscaler-sync-period` on kube-controller-manager). It finds the target via `scaleTargetRef`, selects its Pods by the target's selector, reads metrics, and sets the target's replicas through its `scale` subresource."
@@ -201,6 +211,11 @@
       "sourceTitle": "HorizontalPodAutoscaler Walkthrough",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "To try it, first install the ship gauges (Metrics Server), which collect readings from each cargo officer, and make sure bays declare CPU. Then radio `kubectl autoscale deployment <name> --cpu=50% --min=1 --max=10` and watch the clerk's board with `kubectl get hpa --watch`. Its status lights say whether it can scale, whether it can compute, and whether min or max is holding it back. New bays appear within a minute or so and leave a few minutes after the rush."
+        },
+        {
           "type": "p",
           "text": "Prerequisite: a cluster with **Metrics Server** deployed. It collects resource metrics from the kubelets and exposes them through the Kubernetes API. On minikube: `minikube addons enable metrics-server`. The target Pods should set CPU requests."
         },
@@ -248,6 +263,11 @@
       "sourceTitle": "HorizontalPodAutoscaler Walkthrough",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The newer order form (`autoscaling/v2`) swaps the single CPU box for a list of **metrics**. The clerk can watch CPU or memory as a percent of declared weight or as a raw amount, a custom gauge averaged across bays, a reading from another object in the yard such as the main gate (Ingress), or even a queue outside the port. File the form with `kubectl create -f` instead of the quick radio command."
+        },
+        {
           "type": "code",
           "lang": "yaml",
           "text": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: <name>\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: <deployment>\n  minReplicas: 1\n  maxReplicas: 10\n  metrics:\n  - type: Resource\n    resource:\n      name: cpu\n      target:\n        type: Utilization\n        averageUtilization: 50"
@@ -271,6 +291,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
       "sourceTitle": "Horizontal Pod Autoscaling",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "You can also tell the clerk how fast to move, with separate rules for growing (`scaleUp`) and shrinking (`scaleDown`). By default it grows fast, doubling or adding four bays every 15 seconds, while shrinking waits out a five-minute calm-down window. With several rules, the most generous wins unless you pick `Min`, and `Disabled` stops one direction. One trap: remove the bay count from the contract itself (`spec.replicas`), or every re-filing resets it and the bays flap."
+        },
         {
           "type": "p",
           "text": "In autoscaling/v2, `spec.behavior.scaleUp` and `spec.behavior.scaleDown` control the rate of change separately. Only set what you need; the rest keeps the defaults."

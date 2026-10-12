@@ -37,29 +37,29 @@ Dunlosky et al. 2013), and "I recognise it, so I know it".
 
 ## 2. Audit: how k8-study measures up
 
-Status after the v1.2 changes (spec §14):
+Status after the v1.2 changes (spec §15):
 
 | Principle | Status | Where |
 |-----------|--------|-------|
 | Retrieval practice | ✅ Strong | Flashcards (flip before reveal), quizzes, practice tests, typed commands |
-| Spacing | ✅ Strong | Leitner flashcards; wrong or unsure answers re-scheduled on the same intervals (§14.2) |
-| Interleaving | ✅ Good | Today's review mixes due cards and questions across topics (§14.3); practice tests mix domains |
-| Feedback | ✅ Good | Per-option explanations; confident mistakes called out (§14.1) |
-| Metacognition | ✅ Good | Sure / Not sure on every answer; lucky guesses still count as gaps (§14.1) |
-| Generation / pretesting | ✅ Good | Warm-up questions before a topic's notes (§14.6) |
-| Self-explanation | ✅ Good | "Why is it right?" before explanations on harder questions (§14.7) |
-| Worked examples → fading | ✅ Good | Guided labs: worked → partly guided → on your own (§14.8) |
-| Transfer (hands-on) | 🟡 Better | Typed `kubectl` answers and labs (§14.5, §14.8); a real cluster is still needed for full practice |
+| Spacing | ✅ Strong | Leitner flashcards; wrong or unsure answers re-scheduled on the same intervals (§15.2) |
+| Interleaving | ✅ Good | Today's review mixes due cards and questions across topics (§15.3); practice tests mix domains |
+| Feedback | ✅ Good | Per-option explanations; confident mistakes called out (§15.1) |
+| Metacognition | ✅ Good | Sure / Not sure on every answer; lucky guesses still count as gaps (§15.1) |
+| Generation / pretesting | ✅ Good | Warm-up questions before a topic's notes (§15.6) |
+| Self-explanation | ✅ Good | "Why is it right?" before explanations on harder questions (§15.7) |
+| Worked examples → fading | ✅ Good | Guided labs: worked → partly guided → on your own (§15.8) |
+| Transfer (hands-on) | 🟡 Better | Typed `kubectl` answers and labs (§15.5, §15.8); a real cluster is still needed for full practice |
 | Deliberate practice | ✅ Good | Missed-first draws, gap plan, competency reviews |
 | Mastery learning | ✅ Good | 80% mastery threshold, gap plan per competency |
 | Dual coding | ✅ Good | Animated step-through diagrams |
 | Cognitive load | ✅ Good | Structured note blocks, short sections |
-| Short sessions & sleep | ✅ Good | 20-card cap; "next review tomorrow" nudges (§14.4) |
+| Short sessions & sleep | ✅ Good | 20-card cap; "next review tomorrow" nudges (§15.4) |
 | Flashcard self-grading honesty | 🟡 Risk | "Got it" is still self-judged; the study guide below says to recall fully before flipping |
 
 ## 3. Recommendations (ranked by impact ÷ effort)
 
-All eight are now implemented (spec §14.1–14.8). Kept here as the rationale.
+All eight are now implemented (spec §15.1–15.8). Kept here as the rationale.
 
 1. **Typed-answer questions** *(transfer, generation — high impact)*. New
    question type `command`: the learner types a `kubectl`/YAML answer; graded by

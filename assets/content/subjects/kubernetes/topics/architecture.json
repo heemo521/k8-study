@@ -21,6 +21,11 @@
       "sourceTitle": "Cluster Architecture",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Welcome to the **Port of Kube**. The harbor office (control plane) makes the big decisions, like where new cargo goes, and reacts to whatever happens on the water. The fleet of cargo ships (nodes) carries the bays (Pods) that hold your application, and a port needs at least one ship. If a shipping contract asks for more bays than exist, the office starts another. Busy ports spread the office and the fleet across several sites so one failure sinks nothing."
+        },
+        {
           "type": "p",
           "text": "A cluster is a **control plane** plus a set of worker machines called **nodes**. Nodes run the Pods that make up your application. Every cluster needs at least one worker node to run Pods."
         },
@@ -236,6 +241,11 @@
       "sourceTitle": "Cluster Architecture",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Step inside the harbor office. The front desk (`kube-apiserver`) takes every order, and you can open extra desks when queues grow. Behind it sits the master ledger (`etcd`), so keep a copy safe. The load planner (`kube-scheduler`) finds a ship with room for each unplaced bay, weighing cargo needs, rules and neighbours. Supervisors (`kube-controller-manager`) share one room. The liaison to the city (`cloud-controller-manager`) only shows up when a cloud provider is involved."
+        },
+        {
           "type": "table",
           "header": [
             "Component",
@@ -283,6 +293,11 @@
       "sourceTitle": "Cluster Architecture",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Now board a cargo ship. The cargo officer (`kubelet`) checks that every container listed in its bay orders is running and healthy, but ignores cargo the port never sent. The crane (container runtime) lifts containers in and out; any crane that fits the standard socket (CRI), such as containerd or CRI-O, will do. The switchboard operator (`kube-proxy`) keeps the phone routing for Services, though some road contractors handle that themselves, leaving the ship with no operator at all."
+        },
+        {
           "type": "table",
           "header": [
             "Component",
@@ -321,6 +336,11 @@
       "sourceTitle": "Cluster Architecture",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A port runs better with a few shared services, set up in the port's own utility yard (`kube-system`). The port phone directory (cluster DNS) is in every container's lookup list. A control room window (Dashboard) lets you manage and troubleshoot. Gauges record container readings over time, a central logbook archive keeps every container's logs, and the road contractor (network plugin, following CNI) hands each bay its phone number and connects the bays to one another."
+        },
+        {
           "type": "p",
           "text": "Addons use Kubernetes resources (DaemonSets, Deployments, and so on) to provide cluster-level features. Their namespaced resources belong in the `kube-system` namespace."
         },
@@ -343,6 +363,11 @@
       "sourceTitle": "Communication between Nodes and the Control Plane",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every message in the port runs through the front desk (`kube-apiserver`), like spokes into a hub. Ships call in over a secure, checked line (HTTPS, usually 443). Bays use a robot crew badge (service account) that carries the desk's certificate and a token. The desk calls a cargo officer back for logs, attaching, or port-forwarding, but doesn't check the officer's ID unless told to (`--kubelet-certificate-authority`). Old secret tunnels (SSH) are retired; a newer courier line (Konnectivity) replaces them."
+        },
+        {
           "type": "p",
           "text": "Kubernetes uses a **hub-and-spoke** API pattern. All API usage from nodes and their Pods terminates at the API server; the other control plane components do not expose remote services."
         },
@@ -364,6 +389,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/architecture/nodes/",
       "sourceTitle": "Nodes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A new ship usually signs itself in at the front desk (kubelet self-registration), though staff can add it by hand. Each ship keeps sending check-in slips (Leases in `kube-node-lease`) and status updates. Go silent, and the supervisors mark the ship `Unknown`. Flagging a ship \"no new cargo\" (`kubectl cordon`) stops new bays from landing there but leaves current ones alone. Lifeboats (DaemonSet Pods) ignore that flag and stay aboard."
+        },
         {
           "type": "p",
           "text": "A node joins the API server in one of two ways: the kubelet **self-registers** (the preferred pattern, enabled by `--register-node`, which defaults to true), or someone adds a Node object manually."
@@ -395,6 +425,11 @@
       "sourceUrl": "https://kubernetes.io/docs/reference/networking/ports-and-protocols/",
       "sourceTitle": "Ports and Protocols",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every office in the port has a default door number. The front desk answers at 6443, the ledger room at 2379-2380, and each ship's cargo officer at 10250. The load planner sits at 10259, the supervisors at 10257, and the switchboard at 10256. Numbered gates on every ship (NodePort) use 30000-32767. These are only defaults: some ports move the front desk to 443 or put a greeter in front of it."
+        },
         {
           "type": "table",
           "header": [
@@ -453,6 +488,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/architecture/",
       "sourceTitle": "Cluster Architecture",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Not every port builds its harbor office the same way. Some put each office worker in a dedicated building of their own (traditional). Some have a ship's cargo officer look after the office staff like any other bay (static Pods, the way the construction crew `kubeadm` does it). Some house the office aboard the fleet it runs (self-hosted). And some let the city run the harbor office for you (managed service). Each building crew lays things out its own way."
+        },
         {
           "type": "table",
           "header": [

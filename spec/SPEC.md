@@ -368,7 +368,7 @@ tested parser. Anything else renders literally.
   source page for current values".
 - Placeholders in commands use `<angle-brackets>`, never invented example values that look real
   (Exception: `command` question stems may name scenario objects, see
-  §14.5.)
+  §15.5.)
 - The PR that adds content includes a review checklist: one line per item,
   in the form `id → URL → where on the page`.
 
@@ -387,6 +387,8 @@ tested parser. Anything else renders literally.
 | `k8s.practice` | `[ { testId, pct, perDomain: {domainId: {correct,total}}, durationSec, at } ]` (max 50, oldest dropped) |
 | `k8s.ads` | `{ quizzesSinceInterstitial, lastInterstitialAt }` |
 | `k8s.settings` | `{ practiceTimerOn }` |
+| `k8s.rewards` | `{ xp, streak, day: last study date, best }` (XP, daily streak; see §14) |
+| `k8s.labs` | `{ labId: completed runs }` (guided-lab fading; see §15.8) |
 
 - Content-version changes: entries for ids that no longer exist are ignored, not crashed on.
 - Topic **complete** = all sections read **and** quiz best score ≥ 80%.
@@ -679,12 +681,28 @@ assets/content/subjects/<id>/topics/*.json
 - **Due-card session** (`/progress/cards`) reviews every due flashcard in the
   subject in one Leitner session.
 
-## 14. v1.2 — learning-science features
+## 14. Gamification: XP and daily streak
+
+- **XP** is earned for studying: 10 per note section read (first time), 2 per
+  flashcard reviewed, 5 per question answered correctly and 1 per wrong answer
+  (any quiz, review or practice test; skipped questions earn nothing), and a
+  50 XP bonus the first time a topic quiz reaches mastery.
+- **Levels**: level N needs 100 × N XP to reach N + 1 (100, 200, 300…).
+- **Daily streak**: consecutive days with any study activity. It still shows
+  on the day after the last session and resets after a missed day. It is
+  stored in `k8s.rewards`, so it isn't capped by the 60-day activity log, and
+  the best streak is kept.
+- Existing progress is credited once when `k8s.rewards` is missing (first run
+  after the update, or a backup without it).
+- Shown on the continue card (level and streak), the Progress screen (level
+  bar, XP to next level, streak and best) and quiz/practice results (+XP).
+
+## 15. Learning-science features
 
 Each feature below comes from the audit in
 [`docs/LEARNING.md`](../docs/LEARNING.md).
 
-### 14.1 Confidence rating
+### 15.1 Confidence rating
 
 - Topic and review quizzes submit with **Sure** or **Not sure** instead of a
   single Submit. Desktop: Enter = Sure, U = Not sure.
@@ -702,7 +720,7 @@ Each feature below comes from the audit in
 - Practice tests don't ask for a rating, since they simulate the exam. Their
   answers count as sure.
 
-### 14.2 Spaced review of questions
+### 15.2 Spaced review of questions
 
 - Questions get a review slot (box 1–5 and due date, stored as `box`/`due` in
   `k8s.answers`) using the flashcard intervals (§7.1):
@@ -716,7 +734,7 @@ Each feature below comes from the audit in
   questions, earliest first. The review quiz (`kind=missed`) prioritises
   confident mistakes.
 
-### 14.3 Today's review (interleaved)
+### 15.3 Today's review (interleaved)
 
 - Home shows a **Today's review** card when any flashcards or questions are
   due. It shows both counts, links to each, and has a **Start today's review**
@@ -727,7 +745,7 @@ Each feature below comes from the audit in
 - Both steps draw across every topic and shuffle, so practice is mixed
   instead of grouped by topic.
 
-### 14.4 Session nudges
+### 15.4 Session nudges
 
 - The end of a due-card session and the results of a review quiz show when
   the next review is due ("Next review tomorrow." / "Next review in N
@@ -735,7 +753,7 @@ Each feature below comes from the audit in
 - The app never prompts for extra sessions on the same day beyond what is
   due.
 
-### 14.5 Typed-answer `command` questions
+### 15.5 Typed-answer `command` questions
 
 - New question type `command`. The learner types a command and it is graded
   against the accepted `answers`; the first is shown as the model answer.
@@ -769,7 +787,7 @@ Each feature below comes from the audit in
   name where the page shows a placeholder. Prefer the page's own example
   names. `content_test` checks that every accepted answer grades as correct.
 
-### 14.6 Warm-up before the notes
+### 15.6 Warm-up before the notes
 
 - A topic that hasn't been started (no notes read, no cards, no quiz) shows a
   **Warm-up: try 3 questions first** card on its hub
@@ -781,7 +799,7 @@ Each feature below comes from the audit in
 - Why: an attempt before studying, even a wrong one, makes the later
   reading stick better (pretesting effect).
 
-### 14.7 "Why is it right?" prompt
+### 15.7 "Why is it right?" prompt
 
 - In topic and review quizzes, a right answer to a multiple-choice question
   with difficulty ≥ 2 shows the right/wrong marking but holds back the
@@ -790,7 +808,7 @@ Each feature below comes from the audit in
 - Not shown for wrong answers (they need the explanation now), `command`
   questions or the warm-up. Next stays available, so it can be skipped.
 
-### 14.8 Guided labs with fading
+### 15.8 Guided labs with fading
 
 - A topic may have `labs`: a scenario and an ordered list of steps, each a
   `prompt`, accepted `answers` and an `explanation`.
@@ -802,7 +820,7 @@ Each feature below comes from the audit in
   ```
 
 - The topic hub lists them under **Hands-on labs** (`/topic/<id>/lab/<labId>`).
-- Each step is typed and checked with the §14.5 grading. A wrong answer can be
+- Each step is typed and checked with the §15.5 grading. A wrong answer can be
   retried, or the answer shown. After a right (or shown) answer the
   explanation appears and the lab moves on.
 - **Fading** by completed runs (`k8s.labs`: lab id → runs, included in
@@ -812,4 +830,4 @@ Each feature below comes from the audit in
   - run 3 and later, *On your own*: the prompt only.
 - The lab asks the learner to run each command in their own practice cluster.
   The app checks the typed command, not the cluster.
-- Authoring follows §14.5: every answer appears on `sourceUrl`.
+- Authoring follows §15.5: every answer appears on `sourceUrl`.

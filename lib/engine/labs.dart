@@ -1,4 +1,4 @@
-/// Guided labs with fading guidance (spec §14.8). Pure Dart.
+/// Guided labs with fading guidance (spec §15.8). Pure Dart.
 library;
 
 /// How much help a lab run gives: the full command, its start, or none.
