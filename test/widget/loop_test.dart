@@ -1,6 +1,7 @@
 // Done-criteria §11.1/§11.4: one full study → flashcards → quiz loop at a
 // 390×844 phone viewport, with progress persisted.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:k8_study/progress/insights.dart';
 import 'package:k8_study/progress/progress_store.dart';
 import 'package:k8_study/widgets/question_view.dart';
 import 'package:material_ui/material_ui.dart';
@@ -159,6 +160,20 @@ void main() {
     expect(
       h.progress.practiceHistory.single.perDomain['cluster-arch']!.total,
       test.questionCount,
+    );
+    // Skipped questions score as wrong but aren't recorded as evidence.
+    expect(
+      find.textContaining('${test.questionCount - 1} unanswered'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('review-missed-after-test')),
+      findsNothing,
+    );
+    expect(missedQuestions(h.content, h.progress), isEmpty);
+    expect(
+      h.progress.answerStats(view.presented.question.id)?.lastCorrect,
+      isTrue,
     );
   });
 

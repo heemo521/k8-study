@@ -96,5 +96,6 @@ void main() {
     expect(attempt.correctCount, 2);
     expect(attempt.percent, 50);
     expect(attempt.missedIds, {'c', 'd'});
+    expect(attempt.unansweredCount, 1);
   });
 }

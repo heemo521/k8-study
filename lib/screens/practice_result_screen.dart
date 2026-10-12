@@ -30,10 +30,12 @@ class PracticeResultScreen extends StatelessWidget {
     final minutes = result.duration.inMinutes;
     final seconds = result.duration.inSeconds % 60;
 
-    // Topics with at least one miss, worst first.
+    // Topics with at least one wrong answer, worst first. Skipped questions
+    // aren't evidence of a weak spot.
+    final unanswered = attempt.unansweredCount;
     final missesByTopic = <String, int>{};
     for (final p in attempt.questions) {
-      if (!attempt.correct(p)) {
+      if (attempt.isAnswered(p.question.id) && !attempt.correct(p)) {
         missesByTopic[p.question.topicId] =
             (missesByTopic[p.question.topicId] ?? 0) + 1;
       }
@@ -56,6 +58,7 @@ class PracticeResultScreen extends StatelessWidget {
           ),
           Text(
             '${attempt.correctCount} of ${attempt.questions.length} correct · '
+            '${unanswered > 0 ? '$unanswered unanswered · ' : ''}'
             '${minutes}m ${seconds}s',
             style: textTheme.titleMedium,
             textAlign: TextAlign.center,
@@ -102,7 +105,7 @@ class PracticeResultScreen extends StatelessWidget {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(content.topic(e.key)?.title ?? e.key),
-                subtitle: Text('${e.value} missed'),
+                subtitle: Text('${e.value} wrong'),
                 trailing: const Text('Review notes'),
                 onTap: () => context.go('/topic/${e.key}/notes'),
               ),
@@ -113,7 +116,7 @@ class PracticeResultScreen extends StatelessWidget {
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
-              if (attempt.missedIds.isNotEmpty)
+              if (weak.isNotEmpty)
                 FilledButton.icon(
                   key: const ValueKey('review-missed-after-test'),
                   onPressed: () => context.go('/progress/review?kind=missed'),

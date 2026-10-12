@@ -75,6 +75,9 @@ class QuizAttempt {
   int get percent =>
       questions.isEmpty ? 0 : (correctCount * 100 / questions.length).round();
 
+  int get unansweredCount =>
+      questions.where((p) => !isAnswered(p.question.id)).length;
+
   Set<String> get missedIds => {
     for (final p in questions)
       if (!correct(p)) p.question.id,

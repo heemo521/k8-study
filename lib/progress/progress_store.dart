@@ -403,12 +403,15 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
 
   Map<String, AnswerStats> get answerHistory => Map.unmodifiable(_answers);
 
-  /// Records every question in a finished attempt (unanswered = wrong).
+  /// Records the answered questions of a finished attempt. Skipped ones
+  /// (a practice test finished early) are no evidence either way, so they
+  /// don't count towards accuracy or gaps.
   void recordAnswers(QuizAttempt attempt) {
     _bump('quizzes');
     final now = clock.now();
     for (final p in attempt.questions) {
       final id = p.question.id;
+      if (!attempt.isAnswered(id)) continue;
       final ok = attempt.correct(p);
       final prev = _answers[id];
       _answers[id] = AnswerStats(

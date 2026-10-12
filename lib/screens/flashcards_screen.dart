@@ -194,6 +194,7 @@ class _CardView extends StatelessWidget {
     final card = session.current;
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final keys = MediaQuery.sizeOf(context).width >= 600;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -252,11 +253,12 @@ class _CardView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        // Keyboard hints only where a keyboard is likely (as in quizzes).
         if (!flipped)
           FilledButton(
             key: const ValueKey('flip'),
             onPressed: onFlip,
-            child: const Text('Show answer (Space)'),
+            child: Text(keys ? 'Show answer (Space)' : 'Show answer'),
           )
         else
           Row(
@@ -265,7 +267,7 @@ class _CardView extends StatelessWidget {
                 child: OutlinedButton(
                   key: const ValueKey('again'),
                   onPressed: () => onAnswer(false),
-                  child: const Text('Again (1)'),
+                  child: Text(keys ? 'Again (1)' : 'Again'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -273,7 +275,7 @@ class _CardView extends StatelessWidget {
                 child: FilledButton(
                   key: const ValueKey('got-it'),
                   onPressed: () => onAnswer(true),
-                  child: const Text('Got it (2)'),
+                  child: Text(keys ? 'Got it (2)' : 'Got it'),
                 ),
               ),
             ],

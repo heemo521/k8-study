@@ -60,7 +60,10 @@ void main() {
   test('competency gaps: answered-wrong competency ranks first', () async {
     final p = await fresh();
     final q = content.allQuestions.firstWhere((q) => q.competencyId != null);
-    p.recordAnswers(QuizAttempt([PresentedQuestion(q, q.options)]));
+    p.recordAnswers(
+      QuizAttempt([PresentedQuestion(q, q.options)])
+        ..answer(q.id, {q.options.firstWhere((o) => !o.correct).id}),
+    );
     final gaps = competencyGaps(content, p);
     expect(gaps.first.competency.id, q.competencyId);
     expect(gaps.first.accuracy, 0);
@@ -70,6 +73,14 @@ void main() {
       reviewPool(content, p, kind: 'competency', id: q.competencyId),
       contains(q),
     );
+  });
+
+  test('skipped questions are not recorded as evidence', () async {
+    final p = await fresh();
+    final q = content.allQuestions.first;
+    p.recordAnswers(QuizAttempt([PresentedQuestion(q, q.options)]));
+    expect(p.answerStats(q.id), isNull);
+    expect(missedQuestions(content, p), isEmpty);
   });
 
   test('domain readiness covers every domain with topics', () async {

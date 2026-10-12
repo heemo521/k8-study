@@ -125,9 +125,7 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
   }
 
   Future<void> _confirmFinish() async {
-    final unanswered = _attempt!.questions
-        .where((p) => !_attempt!.isAnswered(p.question.id))
-        .length;
+    final unanswered = _attempt!.unansweredCount;
     if (unanswered > 0) {
       final ok = await showDialog<bool>(
         context: context,
@@ -135,7 +133,8 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
           title: const Text('Finish the test?'),
           content: Text(
             '$unanswered unanswered '
-            '${unanswered == 1 ? 'question' : 'questions'} will be marked wrong.',
+            '${unanswered == 1 ? 'question scores' : 'questions score'} as wrong and '
+            "won't count towards your gaps.",
           ),
           actions: [
             TextButton(

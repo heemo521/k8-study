@@ -202,14 +202,27 @@ class AttemptReview extends StatelessWidget {
             builder: (context) {
               final p = attempt.questions[i];
               final ok = attempt.correct(p);
+              final skipped = !attempt.isAnswered(p.question.id);
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ExpansionTile(
                   key: PageStorageKey('review-${p.question.id}'),
                   leading: Icon(
-                    ok ? Icons.check_circle : Icons.cancel,
-                    color: ok ? scheme.correct : scheme.wrong,
-                    semanticLabel: ok ? 'Correct' : 'Incorrect',
+                    skipped
+                        ? Icons.remove_circle_outline
+                        : ok
+                        ? Icons.check_circle
+                        : Icons.cancel,
+                    color: skipped
+                        ? scheme.outline
+                        : ok
+                        ? scheme.correct
+                        : scheme.wrong,
+                    semanticLabel: skipped
+                        ? 'Not answered'
+                        : ok
+                        ? 'Correct'
+                        : 'Incorrect',
                   ),
                   title: InlineText(
                     '${i + 1}. ${p.question.stem}',

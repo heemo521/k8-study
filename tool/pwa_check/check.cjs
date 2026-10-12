@@ -169,9 +169,9 @@ async function noHorizontalScroll(page) {
   await tap(page, 'Next: Flashcards', false);
   await shot(page, '05-flashcard');
   for (let i = 0; i < 40 && !(await hasText(page, 'Session done')); i++) {
-    await tap(page, 'Show answer (Space)', false);
+    await tap(page, 'Show answer', true);
     if (i === 0) await shot(page, '06-flashcard-back');
-    await tap(page, 'Got it (2)', false);
+    await tap(page, 'Got it', true);
   }
   check('flashcard session completed', await hasText(page, 'Session done'));
 

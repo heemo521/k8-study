@@ -59,7 +59,10 @@ void main() {
     final attempt = QuizAttempt([
       for (final q in questions) PresentedQuestion(q, q.options),
     ]);
-    h.progress.recordAnswers(attempt); // nothing answered = all wrong
+    for (final q in questions) {
+      attempt.answer(q.id, {q.options.firstWhere((o) => !o.correct).id});
+    }
+    h.progress.recordAnswers(attempt);
     await tester.pumpAndSettle();
 
     final tile = find.byKey(ValueKey('gap-${target.competency.id}'));
@@ -84,7 +87,10 @@ void main() {
     await setPhoneViewport(tester);
     final h = await pumpApp(tester);
     final q = h.content.topics.first.questions.first;
-    h.progress.recordAnswers(QuizAttempt([PresentedQuestion(q, q.options)]));
+    h.progress.recordAnswers(
+      QuizAttempt([PresentedQuestion(q, q.options)])
+        ..answer(q.id, {q.options.firstWhere((o) => !o.correct).id}),
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('chip-missed')), findsOneWidget);
     await tapKey(tester, 'chip-missed');

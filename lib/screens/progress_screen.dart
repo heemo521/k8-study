@@ -371,7 +371,7 @@ class _DomainRow extends StatelessWidget {
                   ),
                   if (r.domain.weightPercent != null)
                     Text(
-                      '${r.domain.weightPercent}%',
+                      '${r.domain.weightPercent}% of ${examName ?? 'exam'}',
                       style: textTheme.labelMedium,
                     ),
                 ],
