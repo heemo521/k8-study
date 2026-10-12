@@ -58,3 +58,24 @@ List<InlineSpan> parseInline(String input) {
   flushPlain();
   return spans;
 }
+
+/// Length of a bullet's "Label:" lead-in (including the colon), or 0.
+///
+/// A lead-in is a short prefix (at most [maxLength] characters) ending in
+/// `": "`, outside any `` `code` `` span, on a bullet that doesn't already
+/// open with **bold**. Rendering it bold makes bullets skimmable.
+int leadInLength(String text, {int maxLength = 40}) {
+  if (text.startsWith('**')) return 0;
+  var inCode = false;
+  for (var i = 0; i < text.length && i <= maxLength; i++) {
+    final c = text[i];
+    if (c == '`') {
+      inCode = !inCode;
+    } else if (c == '*' && text.startsWith('**', i)) {
+      return 0;
+    } else if (!inCode && c == ':' && text.startsWith(': ', i)) {
+      return i == 0 ? 0 : i + 1;
+    }
+  }
+  return 0;
+}

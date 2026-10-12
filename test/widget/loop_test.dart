@@ -187,6 +187,16 @@ void main() {
     expect(find.byKey(const ValueKey('practice-score')), findsOneWidget);
   });
 
+  testWidgets('notes text is selectable and callouts show their kind', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    await pumpApp(tester, initialLocation: '/topic/architecture/notes');
+    expect(find.byType(SelectionArea), findsOneWidget);
+    expect(find.byKey(const ValueKey('callout-story')), findsWidgets);
+    expect(find.text('PORT STORY'), findsWidgets);
+  });
+
   testWidgets('every top-level screen lays out at 360px without overflow', (
     tester,
   ) async {
