@@ -76,7 +76,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(topic.title),
-        leading: BackButton(onPressed: () => context.go('/')),
+        leading: BackButton(
+          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+        ),
       ),
       body: PageList(
         children: [
@@ -115,7 +117,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                         size: 18,
                       ),
                       label: Text(pre.title),
-                      onPressed: () => context.go('/topic/${pre.id}'),
+                      // Pushed, so Back returns to this topic.
+                      onPressed: () => context.push('/topic/${pre.id}'),
                     ),
               ],
             ),
