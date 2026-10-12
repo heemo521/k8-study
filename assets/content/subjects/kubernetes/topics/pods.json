@@ -29,23 +29,23 @@
         },
         {
           "type": "p",
-          "text": "A Pod is the **smallest deployable unit** in Kubernetes: one or more containers that share network and storage, plus a spec saying how to run them. Its containers are always placed on the same node and scheduled together."
+          "text": "A Pod is a **wrapper around one or more containers**. Kubernetes never runs a container on its own; it always runs it inside a Pod. It is the smallest thing Kubernetes knows how to start, stop and replace."
         },
         {
           "type": "bullets",
           "items": [
-            "**One container per Pod** is the most common pattern; Kubernetes manages the Pod, not the container.",
-            "Put several containers in one Pod only when they are tightly coupled. Don't do it for replication: run more Pods instead.",
-            "Each Pod gets its own IP address. Its containers share the network namespace, so they reach each other on `localhost` and must not clash on ports.",
-            "Volumes declared in the Pod are visible to every container in it.",
-            "You rarely create bare Pods. Use a workload resource such as a Deployment, Job or StatefulSet, whose controller replaces failed Pods.",
-            "A Pod is an environment, not a process. Restarting a container is not the same as restarting the Pod."
+            "Most Pods hold **one container**. Add a second only when the two truly need each other, like an app and a helper that reads its logs.",
+            "Need more copies of your app? Run **more Pods**, not more containers per Pod.",
+            "Each Pod gets **its own IP address**. Its containers share it, so they reach each other on `localhost` and can't use the same port.",
+            "Storage attached to a Pod (a **volume**) is shared by all its containers.",
+            "A Pod's containers always run together on **one machine** (a node).",
+            "You rarely create Pods by hand. A **Deployment** (or Job, StatefulSet) creates them and replaces any that die."
           ]
         },
         {
           "type": "callout",
           "kind": "warn",
-          "text": "Most of a running Pod is immutable. Updates may only change `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds`, `spec.terminationGracePeriodSeconds`, `spec.tolerations` (add only) and `spec.schedulingGates`."
+          "text": "A running Pod can barely be changed. Mainly you can swap a container's **image**. Full list: `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds`, `spec.terminationGracePeriodSeconds`, `spec.tolerations` (add only), `spec.schedulingGates`. Anything else: recreate the Pod."
         }
       ]
     },
@@ -62,17 +62,17 @@
         },
         {
           "type": "p",
-          "text": "Init containers live in the `initContainers` field and run **before** the app containers. Use them for setup tools or to wait for a dependency."
+          "text": "Init containers are **setup steps that run before your app starts**, such as waiting for a database. Each does one job and exits. Your app starts only after all of them finish. They go under `initContainers` in the Pod's YAML."
         },
         {
           "type": "bullets",
           "items": [
-            "They always run to completion, **one at a time, in order**. Each must succeed before the next starts.",
-            "On failure the kubelet keeps restarting the init container. If the Pod's `restartPolicy` is `Never`, the whole Pod is marked failed instead.",
-            "Regular init containers don't support `lifecycle`, `livenessProbe`, `readinessProbe` or `startupProbe`.",
-            "While they run the Pod stays `Pending`, its `Initialized` condition is false and `kubectl get` shows a status like `Init:0/2`.",
-            "If the Pod restarts, every init container runs again, so make their code idempotent.",
-            "Check one with `kubectl logs <pod> -c <init-container>`."
+            "They run **one at a time, in order**. Each must succeed before the next starts.",
+            "A failed one is **retried** by the kubelet (the agent on each node that runs containers). With `restartPolicy: Never`, the whole Pod fails instead.",
+            "Meanwhile the Pod stays `Pending`, and `kubectl get pods` shows progress like `Init:0/2` (0 of 2 steps done).",
+            "If the Pod restarts, **all steps run again**, so make them safe to repeat.",
+            "They can't have health checks (`livenessProbe`, `readinessProbe`, `startupProbe`) or `lifecycle` hooks: they're meant to finish.",
+            "Read one's logs with `kubectl logs <pod> -c <init-container>`."
           ]
         },
         {
@@ -95,17 +95,16 @@
         },
         {
           "type": "p",
-          "text": "A native sidecar is an entry in `initContainers` with `restartPolicy: Always`. Instead of exiting, it keeps running for the Pod's whole life, alongside the app (stable since v1.33)."
+          "text": "A sidecar is a **helper that runs next to your app the whole time**, such as a log shipper. You write it as an init container with `restartPolicy: Always`, meaning \"keep running, don't exit\" (stable since v1.33)."
         },
         {
           "type": "bullets",
           "items": [
-            "It starts in init order. The next init container waits until the sidecar has started (or its `startupProbe` passes).",
-            "It supports probes. A sidecar's `readinessProbe` feeds into whether the Pod is ready.",
-            "It can be restarted on its own without touching the main container.",
-            "At shutdown, sidecars stop **after** the main containers, in reverse order of declaration.",
-            "A sidecar does not stop a Job from completing once the main container finishes.",
-            "Typical uses: logging, monitoring, security or data sync."
+            "It **starts before** your app, then keeps running. The next init container waits until it has started (or its `startupProbe` passes).",
+            "It **can have health checks**. If its readiness check fails, the Pod counts as not ready.",
+            "It can restart alone without touching your app.",
+            "At shutdown it stops **after** your app; several sidecars stop in reverse order.",
+            "In a Job it **doesn't block completion**: the Job ends when the main container does."
           ]
         },
         {
@@ -127,41 +126,45 @@
           "text": "Every bay has a status on the harbor office board. **Pending**: booked, waiting for a ship or for cargo to arrive. **Running**: at sea. **Succeeded**: delivered. **Failed**: something went wrong for good. **Unknown**: the ship has gone quiet on the radio. A bay never moves to another ship. If its ship sinks, the office books a brand-new bay somewhere else."
         },
         {
+          "type": "p",
+          "text": "A **phase** is a one-word summary of a Pod's life. There are five."
+        },
+        {
           "type": "table",
           "header": [
             "Phase",
-            "Meaning"
+            "Plain meaning"
           ],
           "rows": [
             [
               "Pending",
-              "Accepted, but containers not ready to run yet (includes scheduling and image pulls)"
+              "Accepted but not running yet: still finding a node or downloading images"
             ],
             [
               "Running",
-              "Bound to a node, all containers created, at least one running, starting or restarting"
+              "On a node, and at least one container is running, starting or restarting"
             ],
             [
               "Succeeded",
-              "All containers exited successfully and won't restart"
+              "Every container finished successfully and won't restart"
             ],
             [
               "Failed",
-              "All containers terminated, at least one in failure"
+              "Every container has stopped, and at least one failed"
             ],
             [
               "Unknown",
-              "The Pod's state couldn't be obtained, usually a node communication problem"
+              "Kubernetes can't get the Pod's state, usually because it can't reach the node"
             ]
           ]
         },
         {
           "type": "bullets",
           "items": [
-            "Each container is **Waiting**, **Running** or **Terminated**. `kubectl describe pod <name-of-pod>` shows them, with a reason or exit code.",
-            "`CrashLoopBackOff` and `Terminating` are kubectl display statuses, not phases.",
-            "A Pod is scheduled once. It is never moved to another node; a controller creates a new Pod with a new UID instead.",
-            "Graceful termination defaults to **30 seconds** (`terminationGracePeriodSeconds`). The kubelet sends TERM, then KILL when time runs out."
+            "Each container also has a state: **Waiting**, **Running** or **Terminated**. `kubectl describe pod <name-of-pod>` shows it with a reason or exit code.",
+            "`CrashLoopBackOff` and `Terminating` are kubectl labels, not phases. `CrashLoopBackOff` means \"keeps crashing, waiting before the next restart\".",
+            "A Pod never moves node. If its node dies, a controller (e.g. a Deployment) makes a **new** Pod elsewhere.",
+            "On delete, containers get **30 seconds** to stop cleanly (`terminationGracePeriodSeconds`): a polite stop signal (TERM), then a forced kill (KILL)."
           ]
         },
         {
@@ -173,7 +176,7 @@
     },
     {
       "id": "pods-restart",
-      "heading": "restartPolicy and back-off",
+      "heading": "Restarts (restartPolicy) and back-off",
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
       "sourceTitle": "Pod Lifecycle",
       "blocks": [
@@ -184,14 +187,14 @@
         },
         {
           "type": "p",
-          "text": "The Pod-level `restartPolicy` covers app containers and regular init containers. It takes `Always` (the default), `OnFailure` or `Never`."
+          "text": "When a container stops, `restartPolicy` decides whether it starts again: `Always` (default), `OnFailure` or `Never`. Exit code 0 means it finished fine; anything else means it crashed."
         },
         {
           "type": "table",
           "header": [
             "Policy",
-            "Exit 0",
-            "Non-zero exit"
+            "Finished OK (exit 0)",
+            "Crashed (non-zero exit)"
           ],
           "rows": [
             [
@@ -214,18 +217,18 @@
         {
           "type": "bullets",
           "items": [
-            "Deployments allow only `Always`. Jobs usually use `OnFailure` or `Never`.",
-            "Sidecars ignore the Pod policy because their own container-level `restartPolicy` is `Always`.",
-            "Restarts use exponential back-off: 10s, 20s, 40s and so on, capped at 300 seconds (5 minutes).",
-            "After a container runs cleanly for 10 minutes, the back-off timer resets.",
-            "Restart policy only covers replacement containers inside the same Pod, on the same node."
+            "Deployments (apps that run forever) allow only `Always`. Jobs (tasks that finish) use `OnFailure` or `Never`.",
+            "A container that keeps crashing waits **longer each time**: 10s, 20s, 40s and so on, up to 5 minutes (300s). That wait is the \"back-off\" in `CrashLoopBackOff`.",
+            "After 10 minutes without a crash, the wait resets.",
+            "Restarts happen **in the same Pod, on the same node**. Replacing a Pod is a controller's job.",
+            "Sidecars ignore this: they have their own `restartPolicy: Always`."
           ]
         }
       ]
     },
     {
       "id": "pods-probes",
-      "heading": "Liveness, readiness and startup probes",
+      "heading": "Health checks: liveness, readiness and startup probes",
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
       "sourceTitle": "Liveness, Readiness, and Startup Probes",
       "blocks": [
@@ -235,34 +238,41 @@
           "text": "Inspectors walk the deck with three questions. **Startup**: \"Has this slow unit finished warming up?\" (the other inspectors wait until it has). **Liveness**: \"Is it still working?\" If not, it is restarted. **Readiness**: \"Can it take deliveries right now?\" If not, it is taken off the delivery list for a while, but left alone."
         },
         {
+          "type": "p",
+          "text": "A **probe** is a health check Kubernetes runs on a container over and over. Each kind answers a different question."
+        },
+        {
           "type": "table",
           "header": [
             "Probe",
-            "On failure"
+            "Question",
+            "If it fails"
           ],
           "rows": [
             [
               "livenessProbe",
-              "kubelet kills the container; restartPolicy applies"
+              "Still working, or stuck?",
+              "Container killed; restartPolicy applies"
             ],
             [
               "readinessProbe",
-              "Container marked not ready; Pod removed from Service endpoints. Runs for the whole lifecycle"
+              "Can it take traffic now?",
+              "Removed from its Service (no traffic) but keeps running. Checked all its life"
             ],
             [
               "startupProbe",
-              "kubelet kills the container. Liveness and readiness wait until it succeeds"
+              "Finished starting up?",
+              "Container killed. Liveness and readiness wait for it"
             ]
           ]
         },
         {
           "type": "bullets",
           "items": [
-            "Each probe uses exactly one mechanism: `exec` (exit code 0), `httpGet` (status 200 to 399), `tcpSocket` (port open) or `grpc` (response SERVING).",
-            "Defaults: `initialDelaySeconds` 0, `periodSeconds` 10, `timeoutSeconds` 1, `successThreshold` 1, `failureThreshold` 3.",
-            "`successThreshold` must be 1 for liveness and startup probes.",
-            "Liveness doesn't wait for readiness. Delay it with `initialDelaySeconds` or a startup probe.",
-            "A container with no probe of a given kind counts as Success for it."
+            "Ways to check: run a command (`exec`, exit 0), call a URL (`httpGet`, status 200 to 399), open a port (`tcpSocket`) or gRPC (`grpc`, SERVING).",
+            "Defaults: every **10s** (`periodSeconds`), **1s** to answer (`timeoutSeconds`), act after **3 fails** (`failureThreshold`), no delay (`initialDelaySeconds` 0), one pass is enough (`successThreshold` 1, must be 1 for liveness and startup).",
+            "Liveness starts checking right away, even mid-boot. Give a slow app a startup probe: `failureThreshold` 30 x `periodSeconds` 10 allows 5 minutes.",
+            "No probe of a kind = that check always passes."
           ]
         },
         {
@@ -273,7 +283,7 @@
         {
           "type": "callout",
           "kind": "warn",
-          "text": "A badly designed liveness probe can cause cascading failures by restarting containers under load. It should only fail when the app truly can't recover, such as a deadlock."
+          "text": "A liveness check that fails just because the app is busy causes restarts that make overload worse. Only fail it when the app can't recover, such as a deadlock."
         }
       ]
     },
@@ -290,17 +300,16 @@
         },
         {
           "type": "p",
-          "text": "A static Pod is defined by a manifest file on one node and run directly by that node's kubelet. Set `staticPodPath: <the directory>` in the kubelet config, e.g. `/etc/kubernetes/manifests`."
+          "text": "Normally kubectl asks the API server for a Pod and Kubernetes picks a node. A **static Pod** skips that: put a YAML file in a folder on one node and its kubelet (local agent) runs it. The folder is `staticPodPath` in the kubelet config, usually `/etc/kubernetes/manifests`."
         },
         {
           "type": "bullets",
           "items": [
-            "The kubelet rescans the directory and creates or removes Pods as files appear or disappear.",
-            "The API server shows a **mirror Pod**, named in the example as `static-web-my-node1` (Pod name plus node). Labels are copied to it.",
-            "`kubectl delete pod` on the mirror Pod doesn't stop the static Pod.",
-            "Files starting with a dot are skipped, but extensions are not filtered. A `.backup` copy in that directory also gets run.",
-            "On the node, inspect with `crictl ps` and `crictl logs <container_id>`.",
-            "The `--pod-manifest-path` kubelet flag is the deprecated alternative; `--manifest-url` / `staticPodURL` loads a manifest from a URL."
+            "Add a file and the Pod starts; remove it and the Pod stops.",
+            "kubectl shows a read-only copy, a **mirror Pod**, named Pod plus node (e.g. `static-web-my-node1`).",
+            "`kubectl delete pod` on the mirror doesn't stop it: the kubelet still owns it.",
+            "Every file there runs, whatever its extension (only dot-files are skipped). A `.backup` copy runs too.",
+            "On the node, use `crictl ps` and `crictl logs <container_id>`."
           ]
         },
         {
