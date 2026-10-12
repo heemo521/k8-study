@@ -22,6 +22,11 @@
       "sourceTitle": "Gateway API",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some ports outgrow the old main gate and install the **newer gate system** (Gateway API). It is not built into the harbor office: you add its new kinds of forms to the ledger (CRDs) or follow your installer's steps. Many contractors build it, so the same forms work at many ports, though each has its own quirks worth reading about."
+        },
+        {
           "type": "p",
           "text": "Gateway API is a family of API kinds for **dynamic infrastructure provisioning** and **advanced traffic routing**. It is an **add-on**: Kubernetes doesn't implement it natively."
         },
@@ -42,6 +47,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
       "sourceTitle": "Gateway API",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The new gate system is organised around who does what. The **city** (infrastructure provider) supplies gate types for many ports, the **port authority** (cluster operator) sets policy and access, and **tenants** (application developers) configure their own apps. Each role gets its own forms. Fancy routing, like matching on headers or splitting traffic by weight, is built in rather than scribbled on sticky notes as with the old gate."
+        },
         {
           "type": "table",
           "header": [
@@ -80,6 +90,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
       "sourceTitle": "Gateway API",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Picture the pieces: a **gate design** (GatewayClass) run by a contractor, an actual **gate** built from it (Gateway), and **tenant route cards** (HTTPRoute, GRPCRoute) that map visitors to port phone numbers (Services). Each gate follows exactly one design. Route cards attach to a gate, and the gate can choose which cards it accepts, so both sides must agree before visitors flow."
+        },
         {
           "type": "table",
           "header": [
@@ -230,6 +245,11 @@
       "sourceTitle": "Gateway API",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The city files a gate design whose `controllerName` tells a contractor \"this one's yours\". The port authority then builds a gate citing that design (`gatewayClassName`) and opens doors (listeners), each with a name, protocol and port. If you don't assign an address, the contractor gives the gate one. By default a gate only accepts route cards from its own company yard (namespace); `allowedRoutes` opens it to others."
+        },
+        {
           "type": "code",
           "lang": "yaml",
           "text": "apiVersion: gateway.networking.k8s.io/v1\nkind: GatewayClass\nmetadata:\n  name: <class-name>\nspec:\n  controllerName: <controller-name>\n---\napiVersion: gateway.networking.k8s.io/v1\nkind: Gateway\nmetadata:\n  name: <gateway-name>\n  namespace: <namespace>\nspec:\n  gatewayClassName: <class-name>\n  listeners:\n  - name: http\n    protocol: HTTP\n    port: 80\n    hostname: \"<host>\"\n    allowedRoutes:\n      namespaces:\n        from: Same"
@@ -256,6 +276,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
       "sourceTitle": "Gateway API",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A tenant fills in a route card (HTTPRoute) that names its gate (`parentRefs`), the host names and paths it handles (`hostnames`, `matches`), and where visitors go (`backendRefs`). Filing the card reconfigures the gate itself. A gRPC route card works the same way. The card only counts if the gate is real, the gate's design exists, and the door's `allowedRoutes` admits the tenant's yard."
+        },
         {
           "type": "code",
           "lang": "yaml",
@@ -284,6 +309,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/gateway/",
       "sourceTitle": "Gateway API",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A visitor looks up the host in the city directory and gets the gate's address. At the gate, the attendant (a reverse proxy) reads the visitor's Host header, finds the matching route card, optionally checks headers or path, optionally adjusts the visitor's paperwork (headers), then sends them to one or more destinations. Ports moving from the old main gate must convert their old rulebooks once; there is no old-gate form here."
+        },
         {
           "type": "p",
           "text": "For a Gateway implemented as a reverse proxy, an HTTP request goes like this:"

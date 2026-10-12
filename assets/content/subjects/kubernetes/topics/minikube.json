@@ -17,6 +17,11 @@
       "sourceTitle": "Learning environment",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Before you run a real port, you practise. First get your radio to the front desk (`kubectl`). Then pick a training ground: a port made of containers on your own dock (kind), a one-ship training harbor on your desk (`minikube`), or a harbor in your browser with nothing to install. The construction crew that builds full multi-site ports (`kubeadm`) is far more work, so start small."
+        },
+        {
           "type": "p",
           "text": "First install **kubectl**, the command-line tool for talking to a cluster. Then choose a place to experiment:"
         },
@@ -59,6 +64,11 @@
       "sourceTitle": "minikube start",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Your desk harbor still needs room to float. Give it at least 2 CPUs, 2 GB of free memory, 20 GB of disk, an internet connection, and something to hold the ship, such as Docker, Podman, QEMU, KVM, Hyper-V, VirtualBox or VMware. Remember it is a training harbor for learning and development, not a working port for real cargo."
+        },
+        {
           "type": "bullets",
           "items": [
             "2 CPUs or more",
@@ -81,6 +91,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
       "sourceTitle": "Hello Minikube",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Run `minikube start` and a single ship appears that also houses the harbor office (control plane plus worker in one). Real ports usually keep the office on separate ships. Check in with `minikube status`: the host, the cargo officer (`kubelet`) and the front desk (`apiserver`) should say Running, and your radio codebook (kubeconfig) Configured. Want a window into the port? `minikube dashboard` opens it."
+        },
         {
           "type": "code",
           "lang": "shell",
@@ -108,6 +123,11 @@
       "sourceTitle": "minikube start",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "With the harbor afloat, radio the front desk: `kubectl get po -A` lists every bay in every yard. Forgot your radio? minikube can lend a matching one (`minikube kubectl --`). To reach public entrances (LoadBalancer Services), open a temporary causeway (`minikube tunnel`) in another window and read the EXTERNAL-IP. Or run a private line straight to a Service with `kubectl port-forward`."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "kubectl get po -A\n\n# no kubectl installed? minikube can fetch a matching one\nminikube kubectl -- get po -A"
@@ -127,6 +147,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tutorials/hello-minikube/",
       "sourceTitle": "Hello Minikube",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Sign your first shipping contract (`kubectl create deployment hello-node`) for a test container that answers on port 8080. Check the contract, its bays, the events and the logs. A bay's phone number only works inside the port, so give it a fixed port phone number (Service) with a public entrance (`--type=LoadBalancer`). In a cloud port the city builds that entrance; in your desk harbor, `minikube service hello-node` opens it. Expose 8080, since nothing else answers."
+        },
         {
           "type": "code",
           "lang": "shell",
@@ -157,6 +182,11 @@
       "sourceTitle": "Hello Minikube",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Your desk harbor comes with optional extras you can switch on. `minikube addons list` shows them. Enable the ship gauges (`metrics-server`) and they appear in the utility yard (`kube-system`). Then `kubectl top pods` reads each bay's gauges. If the reply says the Metrics API isn't available, the gauges are still warming up; wait a moment. Switch them off again with `addons disable`."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "minikube addons list\nminikube addons enable metrics-server\nkubectl get pod,svc -n kube-system\nkubectl top pods\nminikube addons disable metrics-server"
@@ -173,6 +203,11 @@
       "sourceUrl": "https://minikube.sigs.k8s.io/docs/start/",
       "sourceTitle": "minikube start",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "When training is over, you control the harbor. Pause it (`minikube pause`) without disturbing the cargo, then unpause. Stop it to halt everything, or delete every training harbor with `minikube delete --all`. Need a second harbor? Start one under its own name (`-p`). Want more memory? Change the setting and restart. And tidy up your first contract and phone number with `kubectl delete deployment` and `kubectl delete service`."
+        },
         {
           "type": "table",
           "header": [

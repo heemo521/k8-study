@@ -22,6 +22,11 @@
       "sourceTitle": "Services, Load Balancing, and Networking",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "In the Port of Kube, every bay gets its **own phone number** (Pod IP), unique across the whole port. Containers in a bay share one line and talk over the bay intercom (`localhost`). Any bay can dial any other bay directly, on the same ship or another, with no operator relaying the call and no number swapping (no NAT). A fixed port phone number (a Service) gives coming-and-going bays a stable contact, and fences (NetworkPolicy) control who may call whom."
+        },
+        {
           "type": "bullets",
           "items": [
             "Every Pod gets its **own IP address**, unique across the whole cluster.",
@@ -44,6 +49,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/networking/",
       "sourceTitle": "Cluster Networking",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Picture the alternative: every crew on a shared ship haggling over socket numbers, with numbers reshuffled all day. At port scale that's chaos. So the port splits the job four ways. Containers in one bay use the intercom. Bays reach each other over the port network built by the contractor (the network plugin). And anyone, inside the port or arriving from outside, who wants a service dials a fixed port phone number (a Service)."
+        },
         {
           "type": "table",
           "header": [
@@ -81,6 +91,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/",
       "sourceTitle": "Services, Load Balancing, and Networking",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The harbor office writes the rules but hires others to build. The ship's crane (container runtime) wires each bay's phone line. A contractor (the CNI plugin) builds the roads and radio network between bays, and usually the fences too. The ship's switchboard operator (`kube-proxy`) forwards calls to port numbers. Public entrances come from gate builders or the city. If your contractor doesn't build fences, NetworkPolicy signs still go up, but they stop nobody."
+        },
         {
           "type": "p",
           "text": "Kubernetes defines the APIs, but most of the networking is done by external components."
@@ -128,6 +143,11 @@
       "sourceTitle": "Cluster Networking",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The port keeps three **numbering plans** that must never overlap: bay numbers, handed out by the network contractor; port phone numbers (Services), issued by the front desk (`kube-apiserver`); and ship numbers, set by the cargo officer or the liaison to the city. A port can use IPv4, IPv6 or both; with both, everyone must agree which family comes first. The office only counts numbers written on the official forms, whatever else a line might have."
+        },
+        {
           "type": "p",
           "text": "Pods, Services and Nodes need **non-overlapping** IP ranges, each handed out by a different component:"
         },
@@ -169,6 +189,11 @@
       "sourceTitle": "Network Plugins",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "No port runs without a road-and-radio contractor (a CNI plugin) that meets the standard (spec v0.4.0 or later, v1.0.0 recommended). On each ship, the crane (the container runtime, such as containerd) calls the contractor, not the cargo officer; that changed in v1.24. The contractor's work orders live in `/etc/cni/net.d` and its tools in `/opt/cni/bin`. If bays on one ship have no network, check those two shelves first."
+        },
+        {
           "type": "bullets",
           "items": [
             "A **CNI plugin is required** to implement the network model. Pick one compatible with your cluster.",
@@ -209,6 +234,11 @@
       "sourceUrl": "https://kubernetes.io/docs/reference/networking/virtual-ips/",
       "sourceTitle": "Virtual IPs and Service Proxies",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "On every ship, a switchboard operator (`kube-proxy`) watches the port numbers and the bays behind them (Services and EndpointSlices), then wires the ship so a call to a port number reaches a real bay. It handles every kind of number except pure directory redirects (ExternalName). The wiring style can be `iptables` (the default, picking a bay at random), the newer `nftables`, or the deprecated `ipvs`. Port numbers come from a range set at the front desk."
+        },
         {
           "type": "p",
           "text": "**kube-proxy** runs on every node (unless replaced by another component). It watches **Service and EndpointSlice** objects and programs node rules that catch traffic sent to a Service's `clusterIP` and port and send it on to a backend. It handles every Service type **except ExternalName**."

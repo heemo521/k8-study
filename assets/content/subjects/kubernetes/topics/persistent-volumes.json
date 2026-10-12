@@ -23,6 +23,11 @@
       "sourceTitle": "Persistent Volumes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Lockers vanish with a bay, so for lasting cargo the port rents **warehouse units** (PersistentVolumes). A unit belongs to the whole port, like a ship, while a **rental request** (PersistentVolumeClaim) is filed inside one company yard and consumes a unit, like a bay. The unit records how it is built (NFS, cloud disk); tenants only see their request. Bays can only use requests from their own yard."
+        },
+        {
           "type": "p",
           "text": "The PersistentVolume subsystem separates **how storage is provided** from **how it is consumed**."
         },
@@ -168,6 +173,11 @@
       "sourceTitle": "Persistent Volumes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Units appear two ways: the admin builds them in advance (static), or the warehouse rental catalog builds one when no unit fits (dynamic). A clerk then pairs each request with one unit, exclusively, and you get at least the size you asked for. If nothing fits, the request waits. When a request is torn up, the unit's reclaim policy decides its fate. Units or requests still in use can't be removed early; they sit `Terminating`."
+        },
+        {
           "type": "bullets",
           "items": [
             "**Static provisioning**: an admin pre-creates PVs that describe real storage.",
@@ -191,6 +201,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
       "sourceTitle": "Persistent Volumes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Each unit lists the ways it can be opened. **RWO**: read-write from one ship, though several bays on that ship can share it. **ROX**: read-only from many ships. **RWX**: read-write from many ships. **RWOP**: read-write by a single bay in the whole port. A unit is opened one way at a time. These modes mostly help match requests to units; only RWOP truly guards writes."
+        },
         {
           "type": "table",
           "header": [
@@ -234,6 +249,11 @@
       "sourceTitle": "Persistent Volumes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "When a tenant ends a rental, the unit's reclaim policy kicks in. **Retain**: the unit stays, marked Released, until an admin clears it out. **Delete**: the unit and the storage behind it are demolished. **Recycle** (deprecated): a quick sweep, then it's rentable again. Units built on demand by the rental catalog copy its policy, which defaults to Delete."
+        },
+        {
           "type": "table",
           "header": [
             "Policy",
@@ -273,6 +293,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
       "sourceTitle": "Persistent Volumes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A unit's spec sheet lists its size (`capacity.storage`, the only resource you can set), its open modes, its reclaim policy and its catalog label (`storageClassName`). A labelled unit only rents to requests asking for that label; an unlabelled one only to requests asking for none. `volumeMode: Block` hands over a raw device instead of a folder. The unit's status board shows Available, Bound, Released or Failed."
+        },
         {
           "type": "code",
           "lang": "yaml",
@@ -321,6 +346,11 @@
       "sourceTitle": "Persistent Volumes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A rental request names a size, open modes and a catalog label, and the bay simply cites the request by name (`claimName`). Add a `selector` to narrow which units qualify, though then the catalog can't build one on demand. `volumeName` reserves a specific unit; if someone else has it, you wait. `storageClassName: \"\"` means \"unlabelled units only\", while leaving it unset lets the default catalog apply."
+        },
+        {
           "type": "code",
           "lang": "yaml",
           "text": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: <pvc-name>\nspec:\n  accessModes:\n  - ReadWriteOnce\n  volumeMode: Filesystem\n  resources:\n    requests:\n      storage: <size>\n  storageClassName: <class>\n---\n# in the Pod spec\nvolumes:\n- name: <volume-name>\n  persistentVolumeClaim:\n    claimName: <pvc-name>"
@@ -342,6 +372,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/",
       "sourceTitle": "Configure a Pod to Use a PersistentVolume for Storage",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Walk through it on a one-ship port. The admin builds a 10Gi unit labelled `manual`; it shows Available. You file a 3Gi request with the same label, and the unit flips to Bound, your request now holding the full 10Gi. A bay mounts the request, never naming the unit. To tidy up, remove the bay, then the request, then the unit."
+        },
         {
           "type": "p",
           "text": "The official tutorial (single-node cluster) shows the full static flow. hostPath PVs are for development and testing only."

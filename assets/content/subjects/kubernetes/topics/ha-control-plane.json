@@ -22,6 +22,11 @@
       "sourceTitle": "Options for Highly Available Topology",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A busy port runs several harbor offices, each with its own front desk, load planner and supervisors, and ships reach them through a traffic marshal (load balancer). The question is where the master ledger (`etcd`) lives. **Stacked**: each office keeps its own copy and consults only that one; simpler, but losing an office loses a copy too. **External**: copies live in separate records buildings serving every office; sturdier, but twice the buildings. `kubeadm` stacks by default."
+        },
+        {
           "type": "p",
           "text": "In both topologies every control plane node runs kube-apiserver, kube-scheduler and kube-controller-manager, and worker nodes reach the API servers through a **load balancer**. The difference is where etcd lives."
         },
@@ -76,6 +81,11 @@
       "sourceTitle": "Creating Highly Available Clusters with kubeadm",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The traffic marshal (load balancer) needs a name in the city directory (DNS), not just a bare address. It forwards callers to every healthy office, checking each by knocking on the front-desk door, port **6443**. Its address must always match the office address in the crew's plans (`ControlPlaneEndpoint`). Test before opening: \"connection refused\" is fine while no office exists yet, but a timeout means the marshal can't reach the office."
+        },
+        {
           "type": "bullets",
           "items": [
             "Give the load balancer a name that resolves in DNS. In a cloud, avoid pointing at a raw IP address.",
@@ -101,6 +111,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
       "sourceTitle": "Creating Highly Available Clusters with kubeadm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Building the first office, the crew paints the marshal's address on it (`--control-plane-endpoint`) and, with `--upload-certs`, locks the shared office seals (certificates) in an encrypted strongbox, the **kubeadm-certs** Secret. The strongbox and its key expire after two hours; a joined office can re-upload them for a fresh key. That key unlocks sensitive port data, so keep it secret. Save the join slips and build the roads (CNI) before more offices join."
+        },
         {
           "type": "code",
           "lang": "shell",
@@ -131,6 +146,11 @@
       "sourceTitle": "Creating Highly Available Clusters with kubeadm",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Extra offices join with the same slip as ships, plus two extras: `--control-plane` (\"I'm an office, not a cargo ship\") and `--certificate-key`, which opens the strongbox and fetches the shared seals. Offices join one at a time, after the first is fully up. The phone directory staff (CoreDNS Pods) usually all crowd into the first office, so once another joins, spread them out with a `rollout restart`."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "# extra control plane node\nsudo kubeadm join <LB>:<PORT> --token <token> \\\n  --discovery-token-ca-cert-hash sha256:<hash> \\\n  --control-plane --certificate-key <key>\n\n# worker node\nsudo kubeadm join <LB>:<PORT> --token <token> \\\n  --discovery-token-ca-cert-hash sha256:<hash>"
@@ -158,6 +178,11 @@
       "sourceTitle": "Creating Highly Available Clusters with kubeadm",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "For separate records buildings (external `etcd`), build them first. Then carry their seals, the ledger CA plus the front desk's ledger client certificate and key, over to the first office, and write a plan (a kubeadm config file) listing the three ledger addresses and where those seals sit. Run `kubeadm init --config` with `--upload-certs`, and the remaining offices join exactly as in the stacked layout."
+        },
+        {
           "type": "p",
           "text": "Set up the etcd cluster first. Then copy `/etc/kubernetes/pki/etcd/ca.crt`, `/etc/kubernetes/pki/apiserver-etcd-client.crt` and `apiserver-etcd-client.key` from an etcd node to the first control plane node, and describe etcd in a kubeadm config file:"
         },
@@ -183,6 +208,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
       "sourceTitle": "Creating Highly Available Clusters with kubeadm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Run three or more offices, ideally an odd number, so choosing a lead office still works when a machine or district fails. Separate records buildings need three or more members too, an odd number for a clean vote (quorum). Copying seals by hand without the strongbox? Take only the short list of authority seals and keys; copying every certificate can break joins. These plans don't cover city-built public entrances or on-demand warehouse units."
+        },
         {
           "type": "bullets",
           "items": [

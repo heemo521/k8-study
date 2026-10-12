@@ -22,6 +22,11 @@
       "sourceTitle": "Declarative Management of Kubernetes Objects Using Kustomize",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Kustomize works from a sticker sheet (`kustomization.yaml`) layered over base forms. It can generate instruction sheets and sealed envelopes, stamp the same yard or tag on every form, and stack patches. Your radio (`kubectl`) reads them too. Preview with `kubectl kustomize <dir>`, then hand over the whole folder, not one file, with `kubectl apply -k`."
+        },
+        {
           "type": "p",
           "text": "Kustomize customises Kubernetes objects through a **kustomization file** (`kustomization.yaml`). It is a standalone tool, and kubectl has also understood kustomization files since 1.14."
         },
@@ -52,6 +57,11 @@
       "sourceTitle": "Declarative Management of Kubernetes Objects Using Kustomize",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Instead of writing instruction sheets and sealed envelopes by hand, a generator prints them from a file, an env list or literal lines. Each printout gets a fingerprint on its name (a content hash suffix), so new content means a new sheet. Your contract just names the sheet; Kustomize swaps in the fingerprinted name."
+        },
+        {
           "type": "code",
           "lang": "yaml",
           "text": "configMapGenerator:\n- name: <cm-name>\n  files:\n  - application.properties   # whole file becomes one key\n- name: <cm-name-2>\n  envs:\n  - .env                     # each line becomes its own key\n- name: <cm-name-3>\n  literals:\n  - FOO=Bar\nsecretGenerator:\n- name: <secret-name>\n  literals:\n  - username=<user>\n  - password=<password>"
@@ -72,6 +82,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
       "sourceTitle": "Declarative Management of Kubernetes Objects Using Kustomize",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "One sticker sheet can relabel every form at once: move them into a yard (`namespace`), add a `dev-` prefix, or add tags. Patches are small single-purpose stickers, applied in order; a JSON 6902 patch must name its target form. To swap a packing template, `images` changes its name or tag without any patch."
+        },
         {
           "type": "code",
           "lang": "yaml",
@@ -95,6 +110,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/",
       "sourceTitle": "Declarative Management of Kubernetes Objects Using Kustomize",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Keep one folder of master forms (the base). Each environment writes its own sticker sheet (an overlay) that points at the base and adds changes, like a `dev-` or `prod-` prefix. The base never knows who builds on it, so one base feeds many. With `-k`, your radio can apply, diff or delete it all."
+        },
         {
           "type": "p",
           "text": "A **base** is a directory with a kustomization.yaml and its resources. An **overlay** is a kustomization directory that lists other kustomization directories as its bases and customises them. A base never knows about its overlays, so one base can feed many."
@@ -143,6 +163,11 @@
       "sourceTitle": "Using Helm",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Helm hands out pre-packed shipping kits (charts). Each delivery of a kit is a **release** with a name you choose. Helm 3 starts with no catalog, so add one with `helm repo add`. Fill in the forms with `-f` files (rightmost wins), and `--set` overrides those. Helm leaves the dock immediately unless you pass `--wait`."
+        },
+        {
           "type": "p",
           "text": "Helm installs **charts** (packages). Each install creates a **release** with a name you choose. Helm 3 ships with **no default repository**, so you add one first."
         },
@@ -169,6 +194,11 @@
       "sourceUrl": "https://helm.sh/docs/intro/using_helm/",
       "sourceTitle": "Using Helm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every install, upgrade or rollback adds a page to the release logbook, starting at revision 1. Read `helm history` first, because `helm rollback` needs both the release and a revision number. Uninstalling throws the logbook away too, so there is nothing to roll back to unless you passed `--keep-history`."
+        },
         {
           "type": "code",
           "lang": "shell",
@@ -197,6 +227,11 @@
       "sourceTitle": "Charts",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Open a kit box (a chart) and you find its label (`Chart.yaml`), default answers (`values.yaml`), fill-in templates, and any smaller kits it depends on. New form types in `crds/` go in first, and Helm never upgrades or removes them. A chart repository is simply a shop serving an `index.yaml` plus packed kits."
+        },
+        {
           "type": "code",
           "lang": "text",
           "text": "<chart>/\n  Chart.yaml        # required: apiVersion, name, version\n  values.yaml       # default configuration values\n  charts/           # charts this chart depends on\n  crds/             # CustomResourceDefinitions (plain YAML)\n  templates/        # templates + values = manifests\n  templates/NOTES.txt"
@@ -224,6 +259,11 @@
       "sourceUrl": "https://helm.sh/docs/helm/helm_template/",
       "sourceTitle": "helm template",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "`helm template` fills in a kit's forms at your own desk and prints them, without ever radioing the front desk. It is a dry run on paper only: nobody at the office checks the forms, so a clean printout does not prove the port will accept them, for example that an API is supported."
+        },
         {
           "type": "p",
           "text": "`helm template` renders a chart's templates **locally** and prints the manifests. It doesn't contact the cluster: in-cluster lookups are faked and no server-side validity checks run."

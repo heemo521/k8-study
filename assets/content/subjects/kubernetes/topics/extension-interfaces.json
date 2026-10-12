@@ -22,6 +22,11 @@
       "sourceTitle": "Extending Kubernetes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The Port of Kube rarely needs rebuilding to grow. You either adjust its settings (configuration) or bring in outside help (an extension). Some helpers are phoned when needed (webhooks); others are tools the cargo officer (`kubelet`) runs directly, like the road and warehouse contractors (CNI, CSI). Supervisors (controllers) read a form's `.spec`, act, then write back its `.status`. The old FlexVolume warehouse plug is deprecated in favour of CSI."
+        },
+        {
           "type": "p",
           "text": "Customising a cluster is either **configuration** (flags, config files, API resources) or an **extension** (extra programs or services). You rarely need to fork Kubernetes."
         },
@@ -80,6 +85,11 @@
       "sourceTitle": "Container Runtime Interface (CRI)",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every crane in the port plugs into the same standard crane socket (CRI), a gRPC line where the cargo officer (`kubelet`) is the client and the crane (container runtime) serves. That lets ships use many crane brands. Since v1.26 the socket must speak CRI v1; if the crane can't, the cargo officer won't register the ship. Fix the crane, then you may need to restart the officer."
+        },
+        {
           "type": "p",
           "text": "The **CRI** is the main **gRPC** protocol between the kubelet and the container runtime. It lets the kubelet use many runtimes without recompiling cluster components. Every node needs a working runtime so the kubelet can start Pods."
         },
@@ -104,6 +114,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/",
       "sourceTitle": "Network Plugins",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The road contractor (CNI plugin) builds the network every bay needs; pick one compatible with spec v0.4.0 or later, ideally v1.0.0. The crane (container runtime) calls the contractor, not the cargo officer. Plans sit in `/etc/cni/net.d`, tools in `/opt/cni/bin`. Extra plugins handle each bay's internal loop (`lo`), gate numbers (`portmap` for `hostPort`) and speed limits (`bandwidth`)."
+        },
         {
           "type": "p",
           "text": "A **CNI** (Container Network Interface) plugin is required to implement the Kubernetes network model. Use one compatible with CNI spec **v0.4.0 or later**; the project recommends one compatible with **v1.0.0**."
@@ -142,6 +157,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
       "sourceTitle": "Volumes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "With the warehouse plug standard (CSI), any storage company can wire its units into the port. Once its driver is installed, bays use the `csi` volume type, through a rental request (PVC) or a short-lived locker. CSI migration quietly reroutes old built-in warehouse orders to the matching driver, so existing paperwork stays the same, but you still install that driver yourself."
+        },
         {
           "type": "p",
           "text": "**CSI** (Container Storage Interface) is a standard way for orchestrators to expose any storage system to containers. Once a CSI driver is deployed, you use the `csi` volume type."
@@ -195,6 +215,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/",
       "sourceTitle": "Device Plugins",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some ships carry special gear such as GPUs. A device plugin, often one per ship like a lifeboat (DaemonSet), tells the cargo officer (`kubelet`) about it through a socket under `/var/lib/kubelet/device-plugins/`, using names like `nvidia.com/gpu`. Bays request whole units only: no overbooking, no sharing. If the officer restarts, plugins must check in again. A broken unit lowers **allocatable**, not **capacity**."
+        },
         {
           "type": "p",
           "text": "Device plugins advertise hardware such as **GPUs, NICs and FPGAs** to the kubelet, so vendors don't change Kubernetes code. Deploy one as a **DaemonSet**, as an OS package, or by hand."

@@ -23,6 +23,11 @@
       "sourceTitle": "Troubleshooting Clusters",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The investigator's first round is a roll call: is every ship (node) registered and **Ready**? A ship that lost its radio, or whose cargo officer (`kubelet`) died, shows `NotReady`; its health conditions turn **Unknown**, and the port hangs \"unreachable\" signs on it (taints). After five minutes its bays are evicted. `kubectl describe node` and `kubectl cluster-info dump` give the details."
+        },
+        {
           "type": "p",
           "text": "First confirm every node you expect is registered and **Ready**. Then dig into any node that isn't."
         },
@@ -57,6 +62,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/",
       "sourceTitle": "Troubleshooting Clusters",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "For deeper clues, the investigator boards the machines and reads their logbooks. In the harbor office, the front desk, load planner and supervisors each keep a file under `/var/log`, such as `kube-apiserver.log`. On each ship, the cargo officer (`kubelet`) and the switchboard operator (`kube-proxy`) keep theirs. On systemd hosts, you may need `journalctl` instead of these files."
+        },
         {
           "type": "p",
           "text": "Going deeper means logging in to the machine. On systemd hosts you may need `journalctl` instead of these files."
@@ -105,6 +115,11 @@
       "sourceTitle": "Logging Architecture",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Not every crew member works from a bay. The cargo officer (`kubelet`) and the crane (container runtime) work outside containers, so on systemd hosts they write to the ship's journal: `journalctl -u kubelet`. The front desk, load planner and supervisors usually live in pinned bays (static Pods), as the ledger often does, and those write files under `/var/log`. The switchboard operator typically rides every ship (DaemonSet)."
+        },
+        {
           "type": "bullets",
           "items": [
             "The **kubelet and container runtime** don't run in containers. On Linux with systemd they write to **journald**: read with `journalctl -u kubelet`.",
@@ -132,6 +147,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/",
       "sourceTitle": "Create static Pods",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Pinned bays come from a folder the cargo officer checks regularly (`staticPodPath`, for example `/etc/kubernetes/manifests`). Drop a file in to start a bay; move it out to stop it. The front desk only sees a mirror copy, so deleting that mirror stops nothing. The officer reads every file not starting with a dot, so keep backups outside. When the front desk is silent, inspect the crane directly with `crictl`."
+        },
         {
           "type": "p",
           "text": "The kubelet itself runs static Pods from a directory set by `staticPodPath` in its config file. `/etc/kubernetes/manifests` is the example directory."
@@ -163,6 +183,11 @@
       "sourceTitle": "Upgrading kubeadm clusters",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "If a ship's cargo officer seems off duty, check on them directly: `systemctl status kubelet` and `journalctl -xeu kubelet`, then reload and restart the service. On ports built by the construction crew (`kubeadm`), the office's pinned bay files live in `/etc/kubernetes/manifests`, and during upgrades the crew backs up those files and the ledger in `/etc/kubernetes/tmp`, ready for a manual restore."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "systemctl status kubelet\njournalctl -xeu kubelet\nsudo systemctl daemon-reload\nsudo systemctl restart kubelet"
@@ -182,6 +207,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/kubectl-node-debug/",
       "sourceTitle": "Debugging Kubernetes Nodes With Kubectl",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "No gangway onto the ship (no SSH)? Send a debugging bay aboard with `kubectl debug node/<node-name>`. The ship's whole hold appears at `/host`, so logs like `/host/var/log/kubelet.log` are in reach. It shares the ship's network and processes but isn't privileged, so `chroot /host` fails without `--profile=sysadmin`. It can't board a ship that's already down. Delete the bay when done."
+        },
         {
           "type": "p",
           "text": "No SSH? Run a debugging Pod on the node:"
@@ -207,6 +237,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/",
       "sourceTitle": "Troubleshooting Clusters",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Picture what breaks. If the front desk (`kube-apiserver`) goes down, nobody can start, stop or change bays, yet running work carries on. Lose the ledger's storage and the desk won't start healthy, while ships keep their bays. One ship down stops its bays; a faulty cargo officer means replicas start elsewhere. A radio split makes each side think the other sank. Spare offices, reliable storage and snapshots soften the blows."
+        },
         {
           "type": "table",
           "header": [
@@ -248,6 +283,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/troubleshooting-kubeadm/",
       "sourceTitle": "Troubleshooting kubeadm",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "When the construction crew (`kubeadm`) hits trouble, the investigator knows the usual suspects. `kubeadm init` hanging points to network trouble or crashlooping office containers; check with `crictl`. The phone directory (`coredns`) waits in Pending until the road contractor's network add-on arrives, and errors after that suggest a broken add-on. An `x509` error on your radio means a bad kubeconfig. A wrong ship address needs `--node-ip` and a kubelet restart."
+        },
         {
           "type": "table",
           "header": [

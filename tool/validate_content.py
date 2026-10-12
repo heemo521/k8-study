@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent / "assets" / "content"
 BLOCK_TYPES = {"p", "bullets", "code", "callout", "table", "diagram"}
 DIAGRAM_KINDS = {"control", "worker", "pod", "service", "storage", "external", "user", "generic"}
-CALLOUTS = {"key", "exam", "warn"}
+CALLOUTS = {"key", "exam", "warn", "story"}
 
 
 

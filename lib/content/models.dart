@@ -289,7 +289,8 @@ class CodeBlock extends NoteBlock {
   final String text;
 }
 
-enum CalloutKind { key, exam, warn }
+/// [story] is the analogy narrative that opens a section (Port of Kube).
+enum CalloutKind { key, exam, warn, story }
 
 class CalloutBlock extends NoteBlock {
   const CalloutBlock({required this.kind, required this.text});
