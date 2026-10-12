@@ -13,9 +13,48 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent / "assets" / "content"
-BLOCK_TYPES = {"p", "bullets", "code", "callout", "table"}
+BLOCK_TYPES = {"p", "bullets", "code", "callout", "table", "diagram"}
+DIAGRAM_KINDS = {"control", "worker", "pod", "service", "storage", "external", "user", "generic"}
 CALLOUTS = {"key", "exam", "warn"}
 
+
+
+def check_diagram(sid, b, err):
+    """Same rules as DiagramBlock.fromJson; returns the step word count."""
+    W, H = b.get("width"), b.get("height")
+    if not isinstance(b.get("title"), str) or not b["title"].strip():
+        err(f"{sid}: diagram needs a title")
+    if not all(isinstance(v, (int, float)) and v > 0 for v in (W, H)):
+        err(f"{sid}: diagram needs width/height")
+        return 0
+    ids = set()
+    for nd in b.get("nodes", []):
+        nid = nd.get("id")
+        if nid in ids:
+            err(f"{sid}: diagram duplicate node {nid}")
+        ids.add(nid)
+        if not isinstance(nd.get("label"), str) or not nd["label"].strip():
+            err(f"{sid}: diagram node {nid} needs a label")
+        if nd.get("kind", "generic") not in DIAGRAM_KINDS:
+            err(f"{sid}: diagram node {nid} kind {nd.get('kind')}")
+        x, y, w, h = (nd.get(k) for k in ("x", "y", "w", "h"))
+        if not all(isinstance(v, (int, float)) for v in (x, y, w, h)) or \
+                x < 0 or y < 0 or x + w > W + 1e-9 or y + h > H + 1e-9:
+            err(f"{sid}: diagram node {nid} outside the grid")
+    if not ids:
+        err(f"{sid}: diagram has no nodes")
+    for ed in b.get("edges", []):
+        if ed.get("from") not in ids or ed.get("to") not in ids:
+            err(f"{sid}: diagram edge {ed.get('from')}->{ed.get('to')} unknown node")
+    n = 0
+    for st in b.get("steps", []):
+        if not isinstance(st.get("text"), str) or not st["text"].strip():
+            err(f"{sid}: diagram step needs text")
+        for h in st.get("highlight", []):
+            if h not in ids:
+                err(f"{sid}: diagram step highlights unknown {h}")
+        n += words(st.get("text", ""))
+    return n
 
 def words(text):
     return len([w for w in re.split(r"\s+", text) if w])
@@ -81,6 +120,8 @@ def check_topic(path, subject, comp_ids, domain_ids, allow, errors):
                 err(f"{s['id']}: bad block type {ty}")
             elif ty in ("p",):
                 total_words += words(b.get("text", ""))
+            elif ty == "diagram":
+                total_words += check_diagram(s["id"], b, err)
             elif ty == "bullets":
                 if not b.get("items"):
                     err(f"{s['id']}: empty bullets")

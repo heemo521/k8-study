@@ -26,6 +26,123 @@
           "text": "Pods are ephemeral and their IPs change. A **Service** puts one stable address in front of a group of Pods. Its **selector** picks the Pods by label, and a controller keeps the Service's **EndpointSlices** in sync with the matching Pods."
         },
         {
+          "type": "diagram",
+          "title": "A Service in front of its Pods",
+          "width": 10,
+          "height": 5,
+          "nodes": [
+            {
+              "id": "client",
+              "label": "Client Pod",
+              "x": 0,
+              "y": 2,
+              "w": 2.4,
+              "h": 0.9,
+              "kind": "user"
+            },
+            {
+              "id": "svc",
+              "label": "Service (app=web)",
+              "x": 3.1,
+              "y": 2,
+              "w": 3.2,
+              "h": 0.9,
+              "kind": "service"
+            },
+            {
+              "id": "p1",
+              "label": "Pod app=web",
+              "x": 7.2,
+              "y": 0.3,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "p2",
+              "label": "Pod app=web",
+              "x": 7.2,
+              "y": 2,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "p3",
+              "label": "Pod app=api",
+              "x": 7.2,
+              "y": 3.7,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "eps",
+              "label": "EndpointSlice",
+              "x": 3.1,
+              "y": 3.9,
+              "w": 3.2,
+              "h": 0.9,
+              "kind": "generic"
+            }
+          ],
+          "edges": [
+            {
+              "from": "client",
+              "to": "svc",
+              "flow": true
+            },
+            {
+              "from": "svc",
+              "to": "p1",
+              "flow": true
+            },
+            {
+              "from": "svc",
+              "to": "p2",
+              "flow": true
+            },
+            {
+              "from": "svc",
+              "to": "eps",
+              "label": "tracks"
+            }
+          ],
+          "steps": [
+            {
+              "text": "A **Service** selects Pods by label. `app=web` matches two Pods; the `app=api` Pod isn't selected.",
+              "highlight": [
+                "svc",
+                "p1",
+                "p2"
+              ]
+            },
+            {
+              "text": "Clients use the Service's stable virtual IP or DNS name instead of individual Pod IPs.",
+              "highlight": [
+                "client",
+                "svc"
+              ]
+            },
+            {
+              "text": "The control plane keeps the matching Pod addresses in **EndpointSlices** and updates them as Pods come and go.",
+              "highlight": [
+                "svc",
+                "eps"
+              ]
+            },
+            {
+              "text": "Requests are spread across the ready backend Pods.",
+              "highlight": [
+                "client",
+                "svc",
+                "p1",
+                "p2"
+              ]
+            }
+          ]
+        },
+        {
           "type": "code",
           "lang": "yaml",
           "text": "apiVersion: v1\nkind: Service\nmetadata:\n  name: <service-name>\nspec:\n  selector:\n    app.kubernetes.io/name: <app-label>\n  ports:\n    - protocol: TCP\n      port: <service-port>\n      targetPort: <container-port>"

@@ -26,6 +26,98 @@
           "text": "A NetworkPolicy controls traffic at the **IP address or port level (OSI layer 3 or 4)** for TCP, UDP and SCTP. It applies to connections that have a selected Pod on one or both ends."
         },
         {
+          "type": "diagram",
+          "title": "A NetworkPolicy guarding a Pod",
+          "width": 10,
+          "height": 4,
+          "nodes": [
+            {
+              "id": "fe",
+              "label": "frontend Pod",
+              "x": 0,
+              "y": 0.3,
+              "w": 2.4,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "other",
+              "label": "other Pod",
+              "x": 0,
+              "y": 2.8,
+              "w": 2.4,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "np",
+              "label": "NetworkPolicy",
+              "x": 4,
+              "y": 1.55,
+              "w": 2.6,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "db",
+              "label": "db Pod",
+              "x": 7.6,
+              "y": 1.55,
+              "w": 2.4,
+              "h": 0.9,
+              "kind": "pod"
+            }
+          ],
+          "edges": [
+            {
+              "from": "fe",
+              "to": "np",
+              "label": "allowed",
+              "flow": true
+            },
+            {
+              "from": "np",
+              "to": "db",
+              "flow": true
+            },
+            {
+              "from": "other",
+              "to": "np",
+              "label": "denied"
+            }
+          ],
+          "steps": [
+            {
+              "text": "By default Pods are non-isolated: they accept traffic from any source.",
+              "highlight": [
+                "db"
+              ]
+            },
+            {
+              "text": "Once a **NetworkPolicy** selects the `db` Pod for ingress, only traffic the policy allows can reach it.",
+              "highlight": [
+                "np",
+                "db"
+              ]
+            },
+            {
+              "text": "This policy allows the frontend Pods, so their traffic gets through.",
+              "highlight": [
+                "fe",
+                "np",
+                "db"
+              ]
+            },
+            {
+              "text": "Traffic from other Pods is dropped. Enforcement needs a network plugin that supports NetworkPolicy.",
+              "highlight": [
+                "other",
+                "np"
+              ]
+            }
+          ]
+        },
+        {
           "type": "callout",
           "kind": "warn",
           "text": "The **network plugin** enforces policies. Without a networking solution that supports NetworkPolicy, creating the object **has no effect**."

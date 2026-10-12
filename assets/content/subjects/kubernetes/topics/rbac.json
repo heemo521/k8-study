@@ -26,6 +26,103 @@
           "text": "RBAC lives in the `rbac.authorization.k8s.io` API group. It defines four kinds: two hold permissions (roles) and two hand those permissions to someone (bindings)."
         },
         {
+          "type": "diagram",
+          "title": "Who can do what",
+          "width": 10,
+          "height": 4,
+          "nodes": [
+            {
+              "id": "user",
+              "label": "User or SA",
+              "x": 0,
+              "y": 0.8,
+              "w": 2.4,
+              "h": 0.9,
+              "kind": "user"
+            },
+            {
+              "id": "ns",
+              "label": "namespace: dev",
+              "x": 2.9,
+              "y": 0,
+              "w": 7.1,
+              "h": 4,
+              "kind": "generic",
+              "group": true
+            },
+            {
+              "id": "rb",
+              "label": "RoleBinding",
+              "x": 3.2,
+              "y": 0.8,
+              "w": 3,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "role",
+              "label": "Role",
+              "x": 7,
+              "y": 0.8,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "res",
+              "label": "pods: get, list",
+              "x": 7,
+              "y": 2.7,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "pod"
+            }
+          ],
+          "edges": [
+            {
+              "from": "user",
+              "to": "rb",
+              "label": "subject"
+            },
+            {
+              "from": "rb",
+              "to": "role",
+              "label": "roleRef"
+            },
+            {
+              "from": "role",
+              "to": "res",
+              "label": "allows"
+            }
+          ],
+          "steps": [
+            {
+              "text": "A **Role** lists rules: which verbs are allowed on which resources, within one namespace.",
+              "highlight": [
+                "role",
+                "res"
+              ]
+            },
+            {
+              "text": "A **RoleBinding** grants a Role's permissions to subjects: users, groups or ServiceAccounts.",
+              "highlight": [
+                "user",
+                "rb",
+                "role"
+              ]
+            },
+            {
+              "text": "Permissions only add up; there are no deny rules. ClusterRole and ClusterRoleBinding work the same way cluster-wide.",
+              "highlight": [
+                "user",
+                "rb",
+                "role",
+                "res"
+              ]
+            }
+          ]
+        },
+        {
           "type": "table",
           "header": [
             "Kind",

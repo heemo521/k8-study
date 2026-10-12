@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../content/models.dart';
+import 'diagram_view.dart';
 import 'inline_text.dart';
 
 /// Renders one structured note block (spec §5.3).
@@ -42,6 +43,7 @@ class NoteBlockView extends StatelessWidget {
           header: header,
           rows: rows,
         ),
+        DiagramBlock() => DiagramView(block: block as DiagramBlock),
       },
     );
   }

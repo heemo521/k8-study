@@ -32,6 +32,93 @@
             "All containers restart after the upgrade because the container spec hash changes.",
             "With pkgs.k8s.io, enable the package repository for the **target minor release** first. Find the latest patch with `sudo apt-cache madison kubeadm`."
           ]
+        },
+        {
+          "type": "diagram",
+          "title": "Upgrade order",
+          "width": 10,
+          "height": 1.6,
+          "nodes": [
+            {
+              "id": "kubeadm",
+              "label": "kubeadm upgrade",
+              "x": 0,
+              "y": 0.35,
+              "w": 2.3,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "drain",
+              "label": "Drain",
+              "x": 2.6,
+              "y": 0.35,
+              "w": 2.2,
+              "h": 0.9,
+              "kind": "generic"
+            },
+            {
+              "id": "kubelet",
+              "label": "Upgrade kubelet",
+              "x": 5.1,
+              "y": 0.35,
+              "w": 2.3,
+              "h": 0.9,
+              "kind": "worker"
+            },
+            {
+              "id": "uncordon",
+              "label": "Uncordon",
+              "x": 7.7,
+              "y": 0.35,
+              "w": 2.3,
+              "h": 0.9,
+              "kind": "generic"
+            }
+          ],
+          "edges": [
+            {
+              "from": "kubeadm",
+              "to": "drain",
+              "flow": true
+            },
+            {
+              "from": "drain",
+              "to": "kubelet",
+              "flow": true
+            },
+            {
+              "from": "kubelet",
+              "to": "uncordon",
+              "flow": true
+            }
+          ],
+          "steps": [
+            {
+              "text": "Control plane first. Upgrade kubeadm, run `kubeadm upgrade apply` on the first control plane node and `kubeadm upgrade node` on every other node.",
+              "highlight": [
+                "kubeadm"
+              ]
+            },
+            {
+              "text": "Then, one node at a time, `kubectl drain` it to evict workloads and mark it unschedulable.",
+              "highlight": [
+                "drain"
+              ]
+            },
+            {
+              "text": "Upgrade the kubelet and kubectl packages and restart the kubelet.",
+              "highlight": [
+                "kubelet"
+              ]
+            },
+            {
+              "text": "`kubectl uncordon` the node to put it back into service.",
+              "highlight": [
+                "uncordon"
+              ]
+            }
+          ]
         }
       ]
     },

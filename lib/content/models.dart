@@ -265,6 +265,8 @@ sealed class NoteBlock {
             ];
           }),
         );
+      case 'diagram':
+        return DiagramBlock.fromJson(json, path);
       default:
         throw FormatException('$path.type: unknown block type "$type"');
     }
@@ -299,6 +301,171 @@ class TableBlock extends NoteBlock {
   const TableBlock({required this.header, required this.rows});
   final List<String> header;
   final List<List<String>> rows;
+}
+
+/// Visual role of a diagram box; the renderer maps each to a colour.
+enum DiagramKind {
+  control,
+  worker,
+  pod,
+  service,
+  storage,
+  external,
+  user,
+  generic,
+}
+
+/// A box on the diagram grid. A [group] is drawn behind the other boxes as a
+/// labelled container (e.g. a node or namespace).
+class DiagramNode {
+  const DiagramNode({
+    required this.id,
+    required this.label,
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
+    required this.kind,
+    required this.group,
+  });
+
+  final String id;
+  final String label;
+  final double x, y, w, h;
+  final DiagramKind kind;
+  final bool group;
+
+  factory DiagramNode.fromJson(dynamic raw, String path) {
+    final json = _map(raw, path);
+    final kind = _optional<String>(json, 'kind', path) ?? 'generic';
+    return DiagramNode(
+      id: _field<String>(json, 'id', path),
+      label: _field<String>(json, 'label', path),
+      x: _field<num>(json, 'x', path).toDouble(),
+      y: _field<num>(json, 'y', path).toDouble(),
+      w: _field<num>(json, 'w', path).toDouble(),
+      h: _field<num>(json, 'h', path).toDouble(),
+      kind: DiagramKind.values.firstWhere(
+        (k) => k.name == kind,
+        orElse: () => throw FormatException('$path.kind: unknown "$kind"'),
+      ),
+      group: _optional<bool>(json, 'group', path) ?? false,
+    );
+  }
+}
+
+/// An arrow between two boxes. [flow] animates dots along it.
+class DiagramEdge {
+  const DiagramEdge({
+    required this.from,
+    required this.to,
+    this.label,
+    required this.flow,
+  });
+
+  final String from;
+  final String to;
+  final String? label;
+  final bool flow;
+
+  factory DiagramEdge.fromJson(dynamic raw, String path) {
+    final json = _map(raw, path);
+    return DiagramEdge(
+      from: _field<String>(json, 'from', path),
+      to: _field<String>(json, 'to', path),
+      label: _optional<String>(json, 'label', path),
+      flow: _optional<bool>(json, 'flow', path) ?? false,
+    );
+  }
+}
+
+/// One step of a walkthrough: a sentence and the boxes it is about.
+class DiagramStep {
+  const DiagramStep({required this.text, required this.highlight});
+
+  final String text;
+  final List<String> highlight;
+
+  factory DiagramStep.fromJson(dynamic raw, String path) {
+    final json = _map(raw, path);
+    return DiagramStep(
+      text: _field<String>(json, 'text', path),
+      highlight: _list(json, 'highlight', path, _string),
+    );
+  }
+}
+
+/// A data-driven diagram on a [width] x [height] grid, with optional
+/// step-by-step walkthrough.
+class DiagramBlock extends NoteBlock {
+  const DiagramBlock({
+    required this.title,
+    required this.width,
+    required this.height,
+    required this.nodes,
+    required this.edges,
+    required this.steps,
+  });
+
+  final String title;
+  final double width;
+  final double height;
+  final List<DiagramNode> nodes;
+  final List<DiagramEdge> edges;
+  final List<DiagramStep> steps;
+
+  /// Plain-text description: title, then each walkthrough step. Used for
+  /// search, screen readers and read-aloud.
+  String get description => [title, for (final s in steps) s.text].join('. ');
+
+  DiagramNode? node(String id) {
+    for (final n in nodes) {
+      if (n.id == id) return n;
+    }
+    return null;
+  }
+
+  factory DiagramBlock.fromJson(Map<String, dynamic> json, String path) {
+    final block = DiagramBlock(
+      title: _field<String>(json, 'title', path),
+      width: _field<num>(json, 'width', path).toDouble(),
+      height: _field<num>(json, 'height', path).toDouble(),
+      nodes: _list(json, 'nodes', path, DiagramNode.fromJson),
+      edges: json.containsKey('edges')
+          ? _list(json, 'edges', path, DiagramEdge.fromJson)
+          : const [],
+      steps: json.containsKey('steps')
+          ? _list(json, 'steps', path, DiagramStep.fromJson)
+          : const [],
+    );
+    final ids = <String>{};
+    for (final n in block.nodes) {
+      if (!ids.add(n.id)) {
+        throw FormatException('$path.nodes: duplicate id "${n.id}"');
+      }
+      if (n.x < 0 ||
+          n.y < 0 ||
+          n.x + n.w > block.width ||
+          n.y + n.h > block.height) {
+        throw FormatException('$path.nodes.${n.id}: outside the grid');
+      }
+    }
+    for (final e in block.edges) {
+      if (!ids.contains(e.from) || !ids.contains(e.to)) {
+        throw FormatException(
+          '$path.edges: unknown node in ${e.from}->${e.to}',
+        );
+      }
+    }
+    for (final s in block.steps) {
+      for (final id in s.highlight) {
+        if (!ids.contains(id)) {
+          throw FormatException('$path.steps: unknown node "$id"');
+        }
+      }
+    }
+    return block;
+  }
 }
 
 class NoteSection {
