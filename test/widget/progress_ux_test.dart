@@ -163,6 +163,31 @@ void main() {
     }
     expect(find.byKey(const ValueKey('cards-summary')), findsOneWidget);
     expect(cards.every((c) => h.progress.cardState(c.id)!.box == 3), isTrue);
+    // Box 2 -> 3 is a 3-day gap: the nudge says when to come back.
+    expect(find.text('Next review in 3 days.'), findsOneWidget);
+  });
+
+  testWidgets("today's review: due cards, then due questions", (tester) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester);
+    final card = h.content.topics[0].flashcards.first;
+    h.progress.setCardState(card.id, CardState(box: 2, dueAt: testNow));
+    final q = h.content.topics[1].questions.first;
+    h.progress.recordAnswers(
+      QuizAttempt([PresentedQuestion(q, q.options)])
+        ..answer(q.id, {q.options.firstWhere((o) => !o.correct).id}),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('today-card')), findsOneWidget);
+    await tapKey(tester, 'today-start');
+    expect(find.text('Due flashcards'), findsOneWidget);
+    await tapKey(tester, 'flip');
+    await tapKey(tester, 'got-it');
+    expect(find.text('Next: 1 question to review'), findsOneWidget);
+    await tester.tap(find.text('Next: 1 question to review'));
+    await tester.pumpAndSettle();
+    expect(find.text('Questions to review'), findsOneWidget);
+    expect(find.text('Q 1/1'), findsOneWidget);
   });
 
   testWidgets('search finds a note section and jumps to it', (tester) async {

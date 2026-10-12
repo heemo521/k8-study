@@ -713,3 +713,22 @@ Each feature below comes from the audit in
 - "Questions to review" (Home chip, Progress "Review now") lists the due
   questions, earliest first. The review quiz (`kind=missed`) prioritises
   confident mistakes.
+
+### 14.3 Today's review (interleaved)
+
+- Home shows a **Today's review** card when any flashcards or questions are
+  due. It shows both counts, links to each, and has a **Start today's review**
+  button.
+- Start runs the due-card session first, then the due questions. When the
+  due-card session ends (or there are no due cards), its next button reads
+  "Next: N questions to review" if questions are due.
+- Both steps draw across every topic and shuffle, so practice is mixed
+  instead of grouped by topic.
+
+### 14.4 Session nudges
+
+- The end of a due-card session and the results of a review quiz show when
+  the next review is due ("Next review tomorrow." / "Next review in N
+  days."), using the earliest future due date across cards and questions.
+- The app never prompts for extra sessions on the same day beyond what is
+  due.

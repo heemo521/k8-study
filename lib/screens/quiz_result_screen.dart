@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../app/quiz_spec.dart';
 import '../app/session_store.dart';
 import '../content/models.dart';
+import '../engine/clock.dart';
 import '../engine/quiz.dart';
 import '../progress/insights.dart';
 import '../progress/progress_store.dart';
@@ -141,13 +142,25 @@ class QuizResultScreen extends StatelessWidget {
           ),
         ]);
       case ReviewQuizSpec():
-        children.add(
+        final nudge = comeBackText(
+          content,
+          progress,
+          context.read<Clock>().now(),
+        );
+        children.addAll([
           Text(
             'Answers count toward your gap analysis.',
             style: textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),
-        );
+          if (nudge != null)
+            Text(
+              nudge,
+              key: const ValueKey('come-back'),
+              style: textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+        ]);
         actions.addAll([
           FilledButton(
             key: const ValueKey('review-again'),

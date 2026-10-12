@@ -39,6 +39,28 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   String get _exitPath => _allDue ? '/progress' : '/topic/${widget.topicId}';
 
+  int get _dueQuestions => dueQuestions(
+    context.read<ContentBundle>(),
+    context.read<ProgressStore>(),
+    context.read<Clock>().now(),
+  ).length;
+
+  /// After a topic's cards: its quiz. After the due-card review: the due
+  /// questions, if any (spec §14.3).
+  String get _nextPath => !_allDue
+      ? '/topic/${widget.topicId}/quiz'
+      : _dueQuestions > 0
+      ? '/progress/review?kind=missed'
+      : '/progress';
+
+  String get _nextLabel {
+    if (!_allDue) return 'Next: Quiz';
+    final n = _dueQuestions;
+    return n > 0
+        ? 'Next: $n ${n == 1 ? 'question' : 'questions'} to review'
+        : 'Back to Progress';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -140,6 +162,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             child: session.length == 0
                 ? _CaughtUp(
                     topic: topic,
+                    nextLabel: _nextLabel,
+                    nextPath: _nextPath,
                     onPracticeAnyway: topic == null
                         ? null
                         : () => _startSession(practice: true),
@@ -149,12 +173,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                     session: session,
                     onAgain: () =>
                         _startSession(practice: session.practiceMode),
-                    nextLabel: topic == null
-                        ? 'Back to Progress'
-                        : 'Next: Quiz',
-                    onNext: () => context.go(
-                      topic == null ? '/progress' : '/topic/${topic.id}/quiz',
-                    ),
+                    nextLabel: _nextLabel,
+                    onNext: () => context.go(_nextPath),
                   )
                 : _CardView(
                     session: session,
@@ -317,6 +337,20 @@ class _Summary extends StatelessWidget {
           style: textTheme.bodyLarge,
           textAlign: TextAlign.center,
         ),
+        if (comeBackText(
+              context.read<ContentBundle>(),
+              context.read<ProgressStore>(),
+              context.read<Clock>().now(),
+            )
+            case final nudge?) ...[
+          const SizedBox(height: 4),
+          Text(
+            nudge,
+            key: const ValueKey('come-back'),
+            style: textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 24),
         OutlinedButton(onPressed: onAgain, child: const Text('Review again')),
         const SizedBox(height: 8),
@@ -332,9 +366,16 @@ class _Summary extends StatelessWidget {
 }
 
 class _CaughtUp extends StatelessWidget {
-  const _CaughtUp({required this.topic, required this.onPracticeAnyway});
+  const _CaughtUp({
+    required this.topic,
+    required this.nextLabel,
+    required this.nextPath,
+    required this.onPracticeAnyway,
+  });
 
   final Topic? topic;
+  final String nextLabel;
+  final String nextPath;
   final VoidCallback? onPracticeAnyway;
 
   @override
@@ -373,10 +414,8 @@ class _CaughtUp extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         FilledButton(
-          onPressed: () => context.go(
-            topic == null ? '/progress' : '/topic/${topic!.id}/quiz',
-          ),
-          child: Text(topic == null ? 'Back to Progress' : 'Next: Quiz'),
+          onPressed: () => context.go(nextPath),
+          child: Text(nextLabel),
         ),
       ],
     );

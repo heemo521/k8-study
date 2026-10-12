@@ -3,6 +3,7 @@ library;
 
 import 'gap_plan.dart';
 import '../content/models.dart';
+import '../engine/clock.dart';
 import '../engine/flashcards.dart' as fc;
 import '../engine/quiz.dart';
 import 'progress_store.dart';
@@ -251,6 +252,35 @@ List<Question> reviewPool(
     default:
       return const [];
   }
+}
+
+/// Earliest future review date across flashcards and scheduled questions,
+/// or null when nothing is scheduled after today.
+DateTime? nextReviewDate(ContentBundle content, ProgressStore p, DateTime now) {
+  final today = dateOnly(now);
+  DateTime? next;
+  void consider(DateTime? d) {
+    if (d == null || !d.isAfter(today)) return;
+    if (next == null || d.isBefore(next!)) next = d;
+  }
+
+  for (final c in content.allFlashcards) {
+    consider(p.cardState(c.id)?.dueAt);
+  }
+  for (final q in content.allQuestions) {
+    consider(p.answerStats(q.id)?.review?.dueAt);
+  }
+  return next;
+}
+
+/// End-of-session nudge (spec §14.4): spacing beats one long session.
+String? comeBackText(ContentBundle content, ProgressStore p, DateTime now) {
+  final next = nextReviewDate(content, p, now);
+  if (next == null) return null;
+  final days = next.difference(dateOnly(now)).inDays;
+  return days == 1
+      ? 'Next review tomorrow. Sleep helps it stick.'
+      : 'Next review in $days days.';
 }
 
 /// Re-exported so screens only import insights for card counts.
