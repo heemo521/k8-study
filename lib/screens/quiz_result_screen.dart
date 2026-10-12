@@ -11,6 +11,7 @@ import '../progress/progress_store.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
 import '../widgets/question_view.dart';
+import '../widgets/rewards_view.dart';
 
 /// S6 — score, review, retry, and what to do next.
 class QuizResultScreen extends StatelessWidget {
@@ -52,6 +53,7 @@ class QuizResultScreen extends StatelessWidget {
         style: textTheme.titleMedium,
         textAlign: TextAlign.center,
       ),
+      XpEarned(result.xpEarned),
       const SizedBox(height: 8),
     ];
     final actions = <Widget>[];

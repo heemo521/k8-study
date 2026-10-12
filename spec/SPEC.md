@@ -385,6 +385,7 @@ tested parser. Anything else renders literally.
 | `k8s.practice` | `[ { testId, pct, perDomain: {domainId: {correct,total}}, durationSec, at } ]` (max 50, oldest dropped) |
 | `k8s.ads` | `{ quizzesSinceInterstitial, lastInterstitialAt }` |
 | `k8s.settings` | `{ practiceTimerOn }` |
+| `k8s.rewards` | `{ xp, streak, day: last study date, best }` (XP, daily streak; see §14) |
 
 - Content-version changes: entries for ids that no longer exist are ignored, not crashed on.
 - Topic **complete** = all sections read **and** quiz best score ≥ 80%.
@@ -676,3 +677,19 @@ assets/content/subjects/<id>/topics/*.json
   They feed answer history but not topic best scores.
 - **Due-card session** (`/progress/cards`) reviews every due flashcard in the
   subject in one Leitner session.
+
+## 14. Gamification: XP and daily streak
+
+- **XP** is earned for studying: 10 per note section read (first time), 2 per
+  flashcard reviewed, 5 per question answered correctly and 1 per wrong answer
+  (any quiz, review or practice test; skipped questions earn nothing), and a
+  50 XP bonus the first time a topic quiz reaches mastery.
+- **Levels**: level N needs 100 × N XP to reach N + 1 (100, 200, 300…).
+- **Daily streak**: consecutive days with any study activity. It still shows
+  on the day after the last session and resets after a missed day. It is
+  stored in `k8s.rewards`, so it isn't capped by the 60-day activity log, and
+  the best streak is kept.
+- Existing progress is credited once when `k8s.rewards` is missing (first run
+  after the update, or a backup without it).
+- Shown on the continue card (level and streak), the Progress screen (level
+  bar, XP to next level, streak and best) and quiz/practice results (+XP).

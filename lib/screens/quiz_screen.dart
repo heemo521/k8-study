@@ -152,17 +152,18 @@ class _QuizScreenState extends State<QuizScreen> {
     _finishing = true;
     final attempt = _attempt!;
     final progress = context.read<ProgressStore>();
-    progress.recordAnswers(attempt);
+    var xp = progress.recordAnswers(attempt);
     if (_spec case TopicQuizSpec(:final topicId, :final retryMissed)) {
       if (retryMissed) {
         progress.recordRetryMissed(topicId, attempt.missedIds);
       } else {
-        progress.recordQuiz(topicId, attempt.percent, attempt.missedIds);
+        xp += progress.recordQuiz(topicId, attempt.percent, attempt.missedIds);
       }
     }
     context.read<SessionStore>().lastQuiz = QuizResult(
       spec: _spec,
       attempt: attempt,
+      xpEarned: xp,
     );
     // Interstitial (if any) shows before the results screen renders.
     await context.read<AdsService>().maybeShowInterstitial(

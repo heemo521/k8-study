@@ -11,6 +11,7 @@ import '../content/models.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
 import '../widgets/question_view.dart';
+import '../widgets/rewards_view.dart';
 
 /// S9 — score, per-domain breakdown, weak spots and review.
 class PracticeResultScreen extends StatelessWidget {
@@ -67,6 +68,7 @@ class PracticeResultScreen extends StatelessWidget {
             style: textTheme.titleMedium,
             textAlign: TextAlign.center,
           ),
+          XpEarned(result.xpEarned),
           const SizedBox(height: 16),
           _ExamGaps(testId: testId, attempt: attempt),
           const SizedBox(height: 16),
