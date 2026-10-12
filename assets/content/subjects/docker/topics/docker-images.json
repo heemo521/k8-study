@@ -518,6 +518,20 @@
         { "id": "a", "text": "True", "correct": true, "explanation": "Separating build and runtime environments shrinks the image and improves security." },
         { "id": "b", "text": "False", "correct": false, "explanation": "That's exactly the stated benefit." }
       ]
+    },
+    {
+      "id": "docker-images-q-16",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-images",
+      "stem": "An image is already built. How do you change what's in it?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/",
+      "options": [
+        { "id": "a", "text": "Edit the image in place", "correct": false, "explanation": "Images are immutable: once created, they can't be modified." },
+        { "id": "b", "text": "Build a new image, or add changes on top of it", "correct": true, "explanation": "Because images are immutable, a change means a new image or new layers added on top." },
+        { "id": "c", "text": "Run a container from it; the container's changes are saved into the image", "correct": false, "explanation": "A container writes to its own writable layer; the image layers stay untouched." },
+        { "id": "d", "text": "Rename its tag", "correct": false, "explanation": "A tag is only a name for an image; renaming it changes nothing inside." }
+      ]
     }
   ]
 }

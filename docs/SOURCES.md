@@ -712,7 +712,7 @@ Cited by 4 cards/questions: `docker-overview-fc-12`, `docker-overview-fc-13`, `d
 
 Notes: Docker Overview & Architecture › What an image is
 
-Cited by 4 cards/questions: `docker-overview-fc-10`, `docker-overview-fc-11`, `docker-overview-q-10`, `docker-overview-q-11`
+Cited by 5 cards/questions: `docker-overview-fc-10`, `docker-overview-fc-11`, `docker-overview-q-10`, `docker-overview-q-11`, `docker-images-q-16`
 
 ### [What is Docker?](https://docs.docker.com/get-started/docker-overview/)
 
