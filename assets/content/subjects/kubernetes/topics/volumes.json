@@ -1,0 +1,810 @@
+{
+  "id": "volumes",
+  "title": "Volumes",
+  "summary": "Give containers shared and longer-lived files: emptyDir, hostPath, configMap/secret/projected, subPath and CSI.",
+  "order": 1,
+  "domainIds": [
+    "storage"
+  ],
+  "competencyIds": [
+    "st-volume-types"
+  ],
+  "prerequisites": [
+    "pods"
+  ],
+  "estMinutes": 15,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "volumes-why",
+      "heading": "Why volumes, and how they plug in",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "sourceTitle": "Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Files written inside a container are lost when it crashes: the kubelet restarts it with a **clean state**. Containers in one Pod also have no easy way to share files. Volumes fix both."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Ephemeral** volume types live and die with the Pod. **Persistent** volumes outlive any single Pod.",
+            "Whatever the type, data in a Pod's volumes survives **container restarts**.",
+            "Declare volumes once in `.spec.volumes`, then mount them per container in `.spec.containers[*].volumeMounts`.",
+            "For each container, you specify independently where to mount each volume it uses.",
+            "A volume can't be mounted inside another volume (use `subPath` instead), and can't hard-link into another volume."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "A Pod can use **any number** of volume types at once."
+        }
+      ]
+    },
+    {
+      "id": "volumes-emptydir",
+      "heading": "emptyDir: scratch space shared by the Pod",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "sourceTitle": "Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "An `emptyDir` is created **empty** when the Pod is assigned to a node. All containers in the Pod can read and write it, at the same or different paths. When the Pod leaves the node for any reason, the data is **deleted permanently**. A container crash does not remove the Pod, so the data survives crashes."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Typical uses: scratch space for a disk-based merge sort, checkpoints of a long computation, files fetched by one container and served by another.",
+            "By default it sits on whatever backs the node (disk, SSD, network storage).",
+            "`medium: Memory` mounts a **tmpfs** instead. It is fast, but written files count against the writing container's **memory limit**.",
+            "`sizeLimit` caps the volume. With no size set, a memory-backed volume is sized to node allocatable memory."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "volumes:\n- name: cache-volume\n  emptyDir:\n    sizeLimit: 500Mi\n    medium: Memory   # optional: RAM-backed"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "To share files between two containers in one Pod, define one `emptyDir` under `volumes` and add a `volumeMounts` entry with the same `name` to **each** container."
+        }
+      ]
+    },
+    {
+      "id": "volumes-hostpath",
+      "heading": "hostPath: the node's filesystem (risky)",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "sourceTitle": "Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "`hostPath` mounts a file or directory from the **node** into the Pod. Few Pods need it, and the docs say to avoid it when you can, for example by using a `local` PersistentVolume instead."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "It can expose privileged credentials or APIs (such as the container runtime socket) that enable **container escape**.",
+            "Identical Pods may behave differently on different nodes because the node files differ.",
+            "Its usage isn't counted as ephemeral storage, so heavy use can cause **disk pressure**.",
+            "Admission rules restricting host directories only work if those mounts are also forced **read only**.",
+            "Legitimate uses: a log shipper reading `/var/log` read-only; giving a **static Pod** a config file (static Pods can't use ConfigMaps)."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "type",
+            "Behaviour"
+          ],
+          "rows": [
+            [
+              "\"\" (default)",
+              "No checks before mounting"
+            ],
+            [
+              "DirectoryOrCreate",
+              "Creates an empty directory (0755) if nothing is there"
+            ],
+            [
+              "Directory",
+              "A directory must already exist"
+            ],
+            [
+              "FileOrCreate",
+              "Creates an empty file (0644); does **not** create the parent directory"
+            ],
+            [
+              "File / Socket",
+              "A file / UNIX socket must exist"
+            ],
+            [
+              "CharDevice / BlockDevice",
+              "A device must exist (Linux nodes only)"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "volumes:\n- name: <volume-name>\n  hostPath:\n    path: <host-path>\n    type: Directory   # optional"
+        }
+      ]
+    },
+    {
+      "id": "volumes-config",
+      "heading": "configMap and secret volumes",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "sourceTitle": "Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "These volumes turn API data into files. Name the object in the volume; optionally use `items` to map a `key` to a file `path` under the mount point."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "volumes:\n- name: config-vol\n  configMap:\n    name: <configmap-name>\n    items:\n    - key: <key>\n      path: <file-name>   # appears at <mountPath>/<file-name>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The ConfigMap or Secret must **exist before** the Pod can use it.",
+            "Both are **always mounted readOnly**.",
+            "`secret` volumes are backed by **tmpfs**, so secrets are never written to non-volatile storage.",
+            "Text is exposed as UTF-8 files; use `binaryData` for other encodings."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "A container that mounts a ConfigMap, Secret or downwardAPI volume through `subPath` will **not** receive updates when the source changes."
+        }
+      ]
+    },
+    {
+      "id": "volumes-projected",
+      "heading": "Projected volumes",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/projected-volumes/",
+      "sourceTitle": "Projected Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A `projected` volume merges several sources into **one directory**. Allowed sources: `secret`, `downwardAPI`, `configMap`, `serviceAccountToken`, `clusterTrustBundle` and `podCertificate`. Every source must be in the **same namespace** as the Pod."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "volumes:\n- name: all-in-one\n  projected:\n    sources:\n    - secret:\n        name: <secret-name>\n    - configMap:\n        name: <configmap-name>\n    - serviceAccountToken:\n        path: token\n        expirationSeconds: 3600"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A projected secret uses `name` (not `secretName`), matching ConfigMap naming.",
+            "`defaultMode` can only be set at the projected level; set `mode` per item if needed.",
+            "`serviceAccountToken`: `audience` defaults to the API server's identifier; `expirationSeconds` defaults to **1 hour** and must be at least **600** seconds.",
+            "As with other sources, a `subPath` mount of a projected volume gets no updates."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "volumes-subpath",
+      "heading": "subPath, subPathExpr and read-only mounts",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "sourceTitle": "Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "`volumeMounts[*].subPath` mounts a sub-path of the volume instead of its root, so one volume can serve several mounts. For example, a database and a web server can each mount their own folder of one PVC."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "volumeMounts:\n- name: site-data\n  mountPath: /var/lib/mysql\n  subPath: mysql\n- name: workdir1\n  mountPath: /logs\n  subPathExpr: $(POD_NAME)   # round brackets"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`subPathExpr` builds the sub-path from downward API **environment variables**. It and `subPath` are **mutually exclusive**.",
+            "`readOnly: true` on a mount stops that container writing; other containers may still mount the same volume read-write.",
+            "Linux read-only mounts don't cover **sub-mounts** underneath by default; set `recursiveReadOnly` to change that."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "volumes-ephemeral",
+      "heading": "Ephemeral volume types",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/",
+      "sourceTitle": "Ephemeral Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Ephemeral volumes are declared **inline** in the Pod spec and are created and deleted with the Pod."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`emptyDir`, `configMap`, `downwardAPI`, `secret`: local ephemeral storage managed by the **kubelet**.",
+            "`image`: mounts files from a container image or artifact.",
+            "**CSI ephemeral volumes**: inline `csi` volumes from third-party drivers that support them.",
+            "**Generic ephemeral volumes** (an `ephemeral` volume with a `volumeClaimTemplate`): work with any driver that supports dynamic provisioning, and can offer a fixed size, snapshots, cloning and resizing."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "For a generic ephemeral volume, a controller creates a real PVC named `<pod-name>-<volume-name>` in the Pod's namespace. The Pod **owns** it, so the PVC is garbage-collected when the Pod is deleted. `WaitForFirstConsumer` binding is recommended for these volumes."
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Users who can create Pods can create PVCs indirectly through generic ephemeral volumes. Namespace PVC quota still applies."
+        }
+      ]
+    },
+    {
+      "id": "volumes-csi",
+      "heading": "Out-of-tree plugins and CSI",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "sourceTitle": "Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Volume plugins used to be **in-tree**: compiled and shipped inside Kubernetes. **CSI** (Container Storage Interface) and the deprecated **FlexVolume** are out-of-tree, so vendors can ship drivers without touching the Kubernetes code base."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "CSI is the standard interface orchestrators use to expose arbitrary storage systems to containers.",
+            "Once a CSI driver is deployed, a Pod can use it three ways: through a **PersistentVolumeClaim**, a **generic ephemeral volume**, or a **CSI ephemeral volume** (if the driver supports it).",
+            "Key fields on a CSI PersistentVolume: `driver` (driver name) and `volumeHandle` (unique volume ID).",
+            "Many old in-tree types (for example `portworxVolume`) are deprecated and redirected to CSI drivers."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "volumes-fc-01",
+      "front": "What happens to a container's own files when it crashes?",
+      "back": "They are lost. The kubelet restarts the container with a clean state; volumes keep data across container restarts.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "volumes-fc-02",
+      "front": "Where do you declare volumes vs. mount them?",
+      "back": "Declare in `.spec.volumes`; mount per container in `.spec.containers[*].volumeMounts`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "volumes-fc-03",
+      "front": "When is an emptyDir created and when is its data deleted?",
+      "back": "Created empty when the Pod is assigned to a node; deleted permanently when the Pod is removed from the node. It survives container crashes.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "volumes-fc-04",
+      "front": "What does `emptyDir.medium: Memory` do?",
+      "back": "Mounts a RAM-backed tmpfs. Files written count against the container's memory limit.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "volumes-fc-05",
+      "front": "Name three hostPath risks.",
+      "back": "Exposing privileged credentials/APIs (container escape), different behaviour per node, and unmonitored disk usage causing disk pressure.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "volumes-fc-06",
+      "front": "Which hostPath `type` creates a missing directory, and with what permissions?",
+      "back": "`DirectoryOrCreate`, with 0755.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "volumes-fc-07",
+      "front": "Are ConfigMap and Secret volumes writable?",
+      "back": "No. They are always mounted readOnly. Secret volumes are tmpfs-backed.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "volumes-fc-08",
+      "front": "Why might a mounted ConfigMap file never change after an update?",
+      "back": "The container mounts it with `subPath`; subPath mounts don't receive updates.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "volumes-fc-09",
+      "front": "Which sources can a projected volume combine?",
+      "back": "secret, downwardAPI, configMap, serviceAccountToken, clusterTrustBundle, podCertificate — all from the Pod's namespace.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/projected-volumes/"
+    },
+    {
+      "id": "volumes-fc-10",
+      "front": "serviceAccountToken projection: default and minimum `expirationSeconds`?",
+      "back": "Default 1 hour; minimum 600 seconds (10 minutes).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/projected-volumes/"
+    },
+    {
+      "id": "volumes-fc-11",
+      "front": "`subPath` vs `subPathExpr`?",
+      "back": "`subPath` is a fixed sub-path of the volume; `subPathExpr` expands downward API env vars like `$(POD_NAME)`. They're mutually exclusive.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    },
+    {
+      "id": "volumes-fc-12",
+      "front": "What PVC name does a generic ephemeral volume get?",
+      "back": "`<pod-name>-<volume-name>`, owned by the Pod and deleted with it.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/"
+    },
+    {
+      "id": "volumes-fc-13",
+      "front": "Three ways a Pod can use a CSI driver?",
+      "back": "Via a PersistentVolumeClaim, a generic ephemeral volume, or a CSI ephemeral volume (if supported).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "volumes-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "st-volume-types",
+      "stem": "Two containers in the same Pod must exchange files, and the data can be thrown away when the Pod goes. Which volume fits best?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "emptyDir",
+          "correct": true,
+          "explanation": "An emptyDir is shared by all containers in the Pod and lives as long as the Pod is on the node."
+        },
+        {
+          "id": "b",
+          "text": "hostPath",
+          "correct": false,
+          "explanation": "hostPath exposes the node filesystem and carries security risks; it isn't needed for Pod-local sharing."
+        },
+        {
+          "id": "c",
+          "text": "A persistentVolumeClaim",
+          "correct": false,
+          "explanation": "Works, but it's durable storage that outlives the Pod — more than this need."
+        },
+        {
+          "id": "d",
+          "text": "A secret volume",
+          "correct": false,
+          "explanation": "Secret volumes are always read-only and carry API data, not scratch files."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-02",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "st-volume-types",
+      "stem": "True or false: If a container in a Pod crashes and is restarted, data it wrote to an emptyDir volume is lost.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "A container crash doesn't remove the Pod from the node, so emptyDir data survives."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. emptyDir data is only deleted when the Pod is removed from the node."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "A Pod sets `emptyDir.medium: Memory`. Which statement is true?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Files written to it count against the writing container's memory limit",
+          "correct": true,
+          "explanation": "tmpfs is RAM-backed, so its usage counts toward the memory limit."
+        },
+        {
+          "id": "b",
+          "text": "The data survives Pod deletion",
+          "correct": false,
+          "explanation": "Any emptyDir is deleted permanently when the Pod leaves the node."
+        },
+        {
+          "id": "c",
+          "text": "It is stored on the node's root disk",
+          "correct": false,
+          "explanation": "That's the default medium; Memory uses tmpfs."
+        },
+        {
+          "id": "d",
+          "text": "sizeLimit cannot be used with it",
+          "correct": false,
+          "explanation": "The docs' example sets sizeLimit together with medium: Memory."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "Which are documented risks of hostPath volumes? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "They can expose privileged APIs such as the container runtime socket",
+          "correct": true,
+          "explanation": "This can lead to container escape."
+        },
+        {
+          "id": "b",
+          "text": "Identical Pods may behave differently on different nodes",
+          "correct": true,
+          "explanation": "Node files can differ."
+        },
+        {
+          "id": "c",
+          "text": "Usage isn't counted as ephemeral storage, so it can cause disk pressure",
+          "correct": true,
+          "explanation": "You have to monitor it yourself."
+        },
+        {
+          "id": "d",
+          "text": "They are always deleted when the Pod is deleted",
+          "correct": false,
+          "explanation": "hostPath data lives on the node; it isn't removed with the Pod."
+        },
+        {
+          "id": "e",
+          "text": "They can only be mounted read-only",
+          "correct": false,
+          "explanation": "They can be mounted read-write, which is part of the danger."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "A hostPath volume uses `type: FileOrCreate` for `/var/local/aaa/1.txt`, but `/var/local/aaa` doesn't exist on the node. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The Pod fails to start, because FileOrCreate doesn't create the parent directory",
+          "correct": true,
+          "explanation": "Mount the directory separately (e.g. DirectoryOrCreate) as the docs' example shows."
+        },
+        {
+          "id": "b",
+          "text": "The kubelet creates both the directory and the file",
+          "correct": false,
+          "explanation": "Only the file is created; the parent must already exist."
+        },
+        {
+          "id": "c",
+          "text": "The volume silently mounts an empty directory instead",
+          "correct": false,
+          "explanation": "There's no such fallback."
+        },
+        {
+          "id": "d",
+          "text": "Nothing is checked, as with the empty-string type",
+          "correct": false,
+          "explanation": "The empty string skips checks; FileOrCreate doesn't."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "You update a ConfigMap. One container mounts the whole volume, another mounts a single key with `subPath`. What do they see?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Only the container without subPath receives the update",
+          "correct": true,
+          "explanation": "subPath mounts of a ConfigMap don't receive updates."
+        },
+        {
+          "id": "b",
+          "text": "Both receive the update",
+          "correct": false,
+          "explanation": "The subPath mount won't."
+        },
+        {
+          "id": "c",
+          "text": "Neither sees updates until the Pod restarts",
+          "correct": false,
+          "explanation": "The full-volume mount does receive updates."
+        },
+        {
+          "id": "d",
+          "text": "The subPath container crashes",
+          "correct": false,
+          "explanation": "It just keeps the old content."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-07",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "st-volume-types",
+      "stem": "True or false: Secret volumes are backed by tmpfs, so their contents are never written to non-volatile storage.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct — that's how the volumes page describes secret volumes."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "They are tmpfs-backed, RAM only."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "Which are valid sources inside a `projected` volume? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/projected-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "serviceAccountToken",
+          "correct": true,
+          "explanation": "Listed as a projectable source."
+        },
+        {
+          "id": "b",
+          "text": "configMap",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "c",
+          "text": "downwardAPI",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "d",
+          "text": "persistentVolumeClaim",
+          "correct": false,
+          "explanation": "PVCs aren't a projected source; mount them as a separate volume."
+        },
+        {
+          "id": "e",
+          "text": "hostPath",
+          "correct": false,
+          "explanation": "Not a projected source."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-09",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "st-volume-types",
+      "stem": "In a projected volume you want the secret files to have a non-default mode. Where can you set it?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/projected-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "`defaultMode` on the projected volume, or `mode` on an individual item",
+          "correct": true,
+          "explanation": "defaultMode only exists at the projected level; per-item mode is allowed."
+        },
+        {
+          "id": "b",
+          "text": "`defaultMode` on each secret source",
+          "correct": false,
+          "explanation": "defaultMode can't be set per source in a projection."
+        },
+        {
+          "id": "c",
+          "text": "Only in the Secret object itself",
+          "correct": false,
+          "explanation": "Modes are set in the Pod's volume definition."
+        },
+        {
+          "id": "d",
+          "text": "Modes can't be changed for projected volumes",
+          "correct": false,
+          "explanation": "The docs show `mode: 0777` on an item."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "A projected `serviceAccountToken` sets `expirationSeconds: 300`. What's wrong?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/projected-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It's below the 600-second minimum",
+          "correct": true,
+          "explanation": "The value must be at least 10 minutes."
+        },
+        {
+          "id": "b",
+          "text": "It must be exactly 3600",
+          "correct": false,
+          "explanation": "3600 (1 hour) is the default, not a requirement."
+        },
+        {
+          "id": "c",
+          "text": "expirationSeconds isn't a valid field",
+          "correct": false,
+          "explanation": "It is; it sets the token's expected validity."
+        },
+        {
+          "id": "d",
+          "text": "Tokens can't be projected",
+          "correct": false,
+          "explanation": "serviceAccountToken is a projected source."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "Several Pods log to one hostPath directory, and each Pod should write to its own sub-directory named after the Pod. Which mount field does this?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "`subPathExpr: $(POD_NAME)` with POD_NAME from the downward API",
+          "correct": true,
+          "explanation": "subPathExpr expands env vars from the downward API."
+        },
+        {
+          "id": "b",
+          "text": "`subPath: ${POD_NAME}`",
+          "correct": false,
+          "explanation": "subPath is literal, and expansion uses round brackets in subPathExpr."
+        },
+        {
+          "id": "c",
+          "text": "`mountPropagation: Bidirectional`",
+          "correct": false,
+          "explanation": "That controls how mounts propagate, not the sub-directory name."
+        },
+        {
+          "id": "d",
+          "text": "`readOnly: true`",
+          "correct": false,
+          "explanation": "That only blocks writes."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "A Pod named `web` has a generic ephemeral volume named `cache`. What happens to the PVC it creates?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A PVC named `web-cache` is created; it's owned by the Pod and deleted with it",
+          "correct": true,
+          "explanation": "Names are `<pod>-<volume>` and the Pod owns the PVC."
+        },
+        {
+          "id": "b",
+          "text": "A PVC named `cache` is created and kept after the Pod is deleted",
+          "correct": false,
+          "explanation": "The name includes the Pod name and the PVC is garbage-collected."
+        },
+        {
+          "id": "c",
+          "text": "No PVC is created; the kubelet manages it like emptyDir",
+          "correct": false,
+          "explanation": "Generic ephemeral volumes create a real PVC."
+        },
+        {
+          "id": "d",
+          "text": "You must create the PVC first",
+          "correct": false,
+          "explanation": "The ephemeral volume controller creates it."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-13",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "True or false: CSI lets storage vendors ship volume plugins without adding code to the Kubernetes repository.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct — CSI (and the deprecated FlexVolume) are out-of-tree plugin mechanisms."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "That's exactly the purpose of out-of-tree plugins."
+        }
+      ]
+    },
+    {
+      "id": "volumes-q-14",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "st-volume-types",
+      "stem": "Through which mechanisms can a Pod use volumes from a CSI driver? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A PersistentVolumeClaim",
+          "correct": true,
+          "explanation": "The common path."
+        },
+        {
+          "id": "b",
+          "text": "A generic ephemeral volume",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "c",
+          "text": "A CSI ephemeral volume, if the driver supports it",
+          "correct": true,
+          "explanation": "Listed, with that condition."
+        },
+        {
+          "id": "d",
+          "text": "A projected volume source",
+          "correct": false,
+          "explanation": "Projected volumes combine secret/configMap/downwardAPI/token-type sources, not CSI."
+        },
+        {
+          "id": "e",
+          "text": "A hostPath with type BlockDevice",
+          "correct": false,
+          "explanation": "That mounts a node device, not a CSI volume."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "tests": [
+    {
+      "id": "cka-mock",
+      "title": "CKA domain-weighted mock",
+      "description": "Questions spread across all five CKA domains by exam weight.",
+      "questionCount": 30,
+      "timeLimitMinutes": 45,
+      "filter": {
+        "domainIds": [
+          "troubleshooting",
+          "cluster-arch",
+          "services-networking",
+          "workloads-scheduling",
+          "storage"
+        ]
+      },
+      "weighting": "domain"
+    },
+    {
+      "id": "mixed",
+      "title": "Mixed — all topics",
+      "description": "Random questions from every topic, foundations included.",
+      "questionCount": 25,
+      "timeLimitMinutes": 35,
+      "filter": {
+        "domainIds": null
+      },
+      "weighting": "uniform"
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "description": "CKA domain test (30% of the exam).",
+      "questionCount": 15,
+      "timeLimitMinutes": 20,
+      "filter": {
+        "domainIds": [
+          "troubleshooting"
+        ]
+      },
+      "weighting": "domain"
+    },
+    {
+      "id": "cluster-arch",
+      "title": "Cluster Architecture, Installation & Configuration",
+      "description": "CKA domain test (25% of the exam).",
+      "questionCount": 15,
+      "timeLimitMinutes": 20,
+      "filter": {
+        "domainIds": [
+          "cluster-arch"
+        ]
+      },
+      "weighting": "domain"
+    },
+    {
+      "id": "services-networking",
+      "title": "Services & Networking",
+      "description": "CKA domain test (20% of the exam).",
+      "questionCount": 15,
+      "timeLimitMinutes": 20,
+      "filter": {
+        "domainIds": [
+          "services-networking"
+        ]
+      },
+      "weighting": "domain"
+    },
+    {
+      "id": "workloads-scheduling",
+      "title": "Workloads & Scheduling",
+      "description": "CKA domain test (15% of the exam).",
+      "questionCount": 15,
+      "timeLimitMinutes": 20,
+      "filter": {
+        "domainIds": [
+          "workloads-scheduling"
+        ]
+      },
+      "weighting": "domain"
+    },
+    {
+      "id": "storage",
+      "title": "Storage",
+      "description": "CKA domain test (10% of the exam).",
+      "questionCount": 15,
+      "timeLimitMinutes": 20,
+      "filter": {
+        "domainIds": [
+          "storage"
+        ]
+      },
+      "weighting": "domain"
+    }
+  ]
+}

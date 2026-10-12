@@ -1,0 +1,733 @@
+{
+  "id": "crds-operators",
+  "title": "CRDs & Operators",
+  "summary": "Add your own API types with CustomResourceDefinitions, manage them with kubectl, and automate them with controllers and operators.",
+  "order": 10,
+  "domainIds": [
+    "cluster-arch"
+  ],
+  "competencyIds": [
+    "ca-crds"
+  ],
+  "prerequisites": [
+    "kubectl-basics"
+  ],
+  "estMinutes": 16,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "crds-operators-cr",
+      "heading": "Custom resources & controllers",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/",
+      "sourceTitle": "Custom Resources",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A **resource** is an API endpoint holding objects of one kind (for example `pods`). A **custom resource** extends the API with a kind that isn't in a default install. It can be registered and removed in a running cluster, and once installed you use it with kubectl like any built-in kind."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A custom resource alone just stores and returns structured data.",
+            "Add a **custom controller** and you get a real **declarative API**: you declare desired state and the controller keeps the actual state in line.",
+            "The **operator pattern** = custom resources + custom controllers, encoding app-specific know-how."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Most RBAC roles don't cover new custom resources (only `cluster-admin` or wildcard rules do). Grant access to them explicitly."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-choose",
+      "heading": "CRD vs aggregation vs ConfigMap",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/",
+      "sourceTitle": "Custom Resources",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Option",
+            "Notes"
+          ],
+          "rows": [
+            [
+              "CustomResourceDefinition",
+              "No programming; the main API server serves and stores the objects"
+            ],
+            [
+              "API aggregation",
+              "Needs code: your own API server behind the main one, for more control (storage, version conversion)"
+            ],
+            [
+              "ConfigMap",
+              "For an existing config file format consumed by a Pod as a file or env vars"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Pick a custom resource when you want kubectl support, `.spec`/`.status`/`.metadata` conventions, and automation that watches the object.",
+            "Don't use custom resources as storage for application or end-user data.",
+            "Custom resources use storage like ConfigMaps do; too many can overload API server storage.",
+            "CRDs always use the API server's own authentication, authorization and audit logging."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-anatomy",
+      "heading": "Anatomy of a CRD",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "sourceTitle": "Extend the Kubernetes API with CustomResourceDefinitions",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: apiextensions.k8s.io/v1\nkind: CustomResourceDefinition\nmetadata:\n  name: crontabs.stable.example.com   # <plural>.<group>\nspec:\n  group: stable.example.com           # REST path /apis/<group>/<version>\n  versions:\n    - name: v1\n      served: true                    # enable/disable this version\n      storage: true                   # exactly one storage version\n      schema:\n        openAPIV3Schema:\n          type: object\n          properties:\n            spec:\n              type: object\n              properties:\n                cronSpec:\n                  type: string\n                replicas:\n                  type: integer\n  scope: Namespaced                   # or Cluster\n  names:\n    plural: crontabs\n    singular: crontab\n    kind: CronTab\n    shortNames:\n    - ct"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The CRD's `metadata.name` must be `<plural>.<group>`.",
+            "`scope` makes the custom objects **Namespaced** or **Cluster**-scoped. The CRD object itself is always non-namespaced.",
+            "With `apiextensions.k8s.io/v1` a **structural schema** is mandatory. Unknown fields are **pruned** unless a subtree sets `x-kubernetes-preserve-unknown-fields: true`.",
+            "Creating the CRD adds an endpoint such as `/apis/stable.example.com/v1/namespaces/*/crontabs/...`. It can take a few seconds: wait for the `Established` condition."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-use",
+      "heading": "Working with custom objects",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "sourceTitle": "Extend the Kubernetes API with CustomResourceDefinitions",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl apply -f resourcedefinition.yaml   # create the CRD\nkubectl apply -f my-crontab.yaml           # create a CronTab object\nkubectl get crontab                        # plural, singular or short name works\nkubectl get ct -o yaml\nkubectl delete -f resourcedefinition.yaml  # removes the CRD AND all its objects"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Resource names in kubectl are case-insensitive.",
+            "Deleting a namespace deletes the custom objects in it.",
+            "Deleting a CRD removes its REST endpoint and every stored object. Recreating it starts empty.",
+            "The published schema powers client-side validation and `kubectl explain` for custom resources."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "To inspect a custom resource quickly, use the names from the CRD's `names` block: `kubectl get <plural|singular|shortName>`."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-extras",
+      "heading": "Printer columns, subresources, categories, finalizers",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "sourceTitle": "Extend the Kubernetes API with CustomResourceDefinitions",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "CRD feature",
+            "What it does"
+          ],
+          "rows": [
+            [
+              "additionalPrinterColumns",
+              "Adds columns (with a jsonPath) to kubectl get output"
+            ],
+            [
+              "subresources.status",
+              "Exposes /status; normal updates ignore .status changes"
+            ],
+            [
+              "subresources.scale",
+              "Exposes /scale via specReplicasPath, statusReplicasPath, labelSelectorPath"
+            ],
+            [
+              "names.categories",
+              "Groups the resource, e.g. `all`, so `kubectl get all` lists it"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl scale --replicas=5 crontabs/<name>   # needs the scale subresource"
+        },
+        {
+          "type": "p",
+          "text": "**Finalizers** act as asynchronous pre-delete hooks. A delete sets `metadata.deletionTimestamp`; the object is removed only when every controller has removed its entry from `metadata.finalizers`."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-operator",
+      "heading": "The operator pattern",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/operator/",
+      "sourceTitle": "Operator pattern",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "**Operators** are API clients that act as controllers for a custom resource. They follow the control loop and automate what a human operator would do for one application."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Typical jobs: deploy on demand, back up and restore state, handle upgrades (including schema changes), and pick a leader.",
+            "**Deploying**: add the CRD and its controller to the cluster. The controller usually runs outside the control plane, for example as a **Deployment**.",
+            "**Using**: create, edit or delete objects of the operator's kind; the operator does the rest.",
+            "Build your own with tools such as kubebuilder, Operator Framework, Kopf or Java Operator SDK. Find existing ones on OperatorHub.io."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get SampleDB                     # list configured databases\nkubectl edit SampleDB/<name>             # change settings; the operator reconciles"
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "crds-operators-fc-01",
+      "front": "What does a custom controller add to a custom resource?",
+      "back": "A declarative API: it keeps actual state matching the declared desired state.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/"
+    },
+    {
+      "id": "crds-operators-fc-02",
+      "front": "Two ways to add custom resources?",
+      "back": "CustomResourceDefinitions (no programming) and API aggregation (your own API server).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/"
+    },
+    {
+      "id": "crds-operators-fc-03",
+      "front": "Do existing RBAC roles cover new custom resources?",
+      "back": "Mostly no: only cluster-admin or wildcard rules. Grant access explicitly.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/"
+    },
+    {
+      "id": "crds-operators-fc-04",
+      "front": "Required form of a CRD's metadata.name?",
+      "back": "<plural>.<group>, e.g. crontabs.stable.example.com",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "id": "crds-operators-fc-05",
+      "front": "Values of a CRD's spec.scope?",
+      "back": "Namespaced or Cluster.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "id": "crds-operators-fc-06",
+      "front": "How many versions can be the storage version?",
+      "back": "Exactly one (storage: true).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "id": "crds-operators-fc-07",
+      "front": "Is the CustomResourceDefinition object itself namespaced?",
+      "back": "No. CRDs are non-namespaced and available to all namespaces.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "id": "crds-operators-fc-08",
+      "front": "Which fields go under spec.names?",
+      "back": "plural, singular, kind, and optionally shortNames (and categories).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "id": "crds-operators-fc-09",
+      "front": "What happens to custom objects when you delete their CRD?",
+      "back": "They're all deleted along with the REST endpoint.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "id": "crds-operators-fc-10",
+      "front": "Which condition shows a new CRD is ready to serve?",
+      "back": "Established",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "id": "crds-operators-fc-11",
+      "front": "What's needed for kubectl scale to work on a custom resource?",
+      "back": "The scale subresource (specReplicasPath, statusReplicasPath) in the CRD.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "id": "crds-operators-fc-12",
+      "front": "Make a custom resource show up in kubectl get all?",
+      "back": "Add all to spec.names.categories.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
+    },
+    {
+      "id": "crds-operators-fc-13",
+      "front": "What is an operator?",
+      "back": "An API client acting as a controller for a custom resource, automating one application's operations.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/operator/"
+    },
+    {
+      "id": "crds-operators-fc-14",
+      "front": "Most common way to deploy an operator?",
+      "back": "Add its CRD and its controller to the cluster, often running the controller as a Deployment.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/operator/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "crds-operators-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-crds",
+      "stem": "A CRD defines `group: stable.example.com` and `names.plural: crontabs`. What must `metadata.name` be?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "a",
+          "text": "crontabs.stable.example.com",
+          "correct": true,
+          "explanation": "The name must be <plural>.<group>."
+        },
+        {
+          "id": "b",
+          "text": "stable.example.com",
+          "correct": false,
+          "explanation": "That's only the group."
+        },
+        {
+          "id": "c",
+          "text": "CronTab",
+          "correct": false,
+          "explanation": "That's the kind."
+        },
+        {
+          "id": "d",
+          "text": "crontab.stable.example.com",
+          "correct": false,
+          "explanation": "The name uses the plural, not the singular."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-02",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-crds",
+      "stem": "Which `spec.scope` values does a CRD accept?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Namespaced or Cluster",
+          "correct": true,
+          "explanation": "The example comments say: either Namespaced or Cluster."
+        },
+        {
+          "id": "b",
+          "text": "served or storage",
+          "correct": false,
+          "explanation": "Those are per-version flags, not scope values."
+        },
+        {
+          "id": "c",
+          "text": "plural or singular",
+          "correct": false,
+          "explanation": "Those are fields under spec.names."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-03",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "True or false: A CustomResourceDefinition object lives in a namespace, so each namespace needs its own copy.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "CRDs are non-namespaced and available to all namespaces."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: one CRD serves the whole cluster."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "With the CronTab CRD (`plural: crontabs`, `singular: crontab`, `shortNames: [ct]`) installed, which commands list CronTab objects? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl get crontabs",
+          "correct": true,
+          "explanation": "Plural works."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get crontab",
+          "correct": true,
+          "explanation": "Singular works."
+        },
+        {
+          "id": "c",
+          "text": "kubectl get ct",
+          "correct": true,
+          "explanation": "Short names work."
+        },
+        {
+          "id": "d",
+          "text": "kubectl get stable",
+          "correct": false,
+          "explanation": "stable is part of the group, not a resource name."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "You delete a CRD while 20 custom objects of that kind exist. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The REST endpoint is removed and all 20 objects are deleted",
+          "correct": true,
+          "explanation": "The server uninstalls the endpoint and deletes all stored custom objects."
+        },
+        {
+          "id": "b",
+          "text": "The objects stay and reappear if you recreate the CRD",
+          "correct": false,
+          "explanation": "A recreated CRD starts empty."
+        },
+        {
+          "id": "c",
+          "text": "The delete is refused until the objects are removed",
+          "correct": false,
+          "explanation": "The server uninstalls the endpoint and deletes the stored objects."
+        },
+        {
+          "id": "d",
+          "text": "Only cluster-scoped objects are removed",
+          "correct": false,
+          "explanation": "All stored custom objects are deleted."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "In a CRD with two versions, how many can have `storage: true`?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Exactly one",
+          "correct": true,
+          "explanation": "One and only one version must be the storage version."
+        },
+        {
+          "id": "b",
+          "text": "Both",
+          "correct": false,
+          "explanation": "Only one can be the storage version."
+        },
+        {
+          "id": "c",
+          "text": "None; storage is set per object",
+          "correct": false,
+          "explanation": "It's set per version in the CRD."
+        },
+        {
+          "id": "d",
+          "text": "Any number, as long as served: true",
+          "correct": false,
+          "explanation": "served and storage are separate flags."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-07",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ca-crds",
+      "stem": "You create a custom object with a field not in the CRD's structural schema. What happens by default?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The unknown field is pruned",
+          "correct": true,
+          "explanation": "Unspecified fields are pruned unless x-kubernetes-preserve-unknown-fields: true is set."
+        },
+        {
+          "id": "b",
+          "text": "It's stored as is",
+          "correct": false,
+          "explanation": "Only with x-kubernetes-preserve-unknown-fields: true."
+        },
+        {
+          "id": "c",
+          "text": "A new version is created",
+          "correct": false,
+          "explanation": "Versions come from the CRD spec."
+        },
+        {
+          "id": "d",
+          "text": "The CRD is updated automatically",
+          "correct": false,
+          "explanation": "The CRD schema doesn't change."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "`kubectl scale --replicas=5 crontabs/<name>` fails. What should the CRD define?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The scale subresource, with specReplicasPath and statusReplicasPath",
+          "correct": true,
+          "explanation": "The /scale subresource lets kubectl scale work on a custom resource."
+        },
+        {
+          "id": "b",
+          "text": "additionalPrinterColumns",
+          "correct": false,
+          "explanation": "That only changes kubectl get output."
+        },
+        {
+          "id": "c",
+          "text": "categories: [all]",
+          "correct": false,
+          "explanation": "That groups it for kubectl get all."
+        },
+        {
+          "id": "d",
+          "text": "A finalizer",
+          "correct": false,
+          "explanation": "Finalizers are pre-delete hooks."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "You want `kubectl get` to show a Replicas column for your custom resource. Which CRD field?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "a",
+          "text": "additionalPrinterColumns",
+          "correct": true,
+          "explanation": "Columns are defined server-side with a jsonPath."
+        },
+        {
+          "id": "b",
+          "text": "subresources.status",
+          "correct": false,
+          "explanation": "That exposes /status."
+        },
+        {
+          "id": "c",
+          "text": "shortNames",
+          "correct": false,
+          "explanation": "Short aliases for the resource name."
+        },
+        {
+          "id": "d",
+          "text": "selectableFields",
+          "correct": false,
+          "explanation": "That's for field selectors."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-10",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "True or false: A custom object with entries in `metadata.finalizers` is removed as soon as you delete it.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Deletion only sets metadata.deletionTimestamp; the object goes once all finalizers are removed."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: controllers must remove their finalizers first."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "Which way of adding custom resources needs no programming?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/",
+      "options": [
+        {
+          "id": "a",
+          "text": "CustomResourceDefinition",
+          "correct": true,
+          "explanation": "CRDs are simple and need no programming."
+        },
+        {
+          "id": "b",
+          "text": "API aggregation",
+          "correct": false,
+          "explanation": "Aggregation needs your own API server."
+        },
+        {
+          "id": "c",
+          "text": "A ConfigMap",
+          "correct": false,
+          "explanation": "ConfigMaps don't add new resource types."
+        },
+        {
+          "id": "d",
+          "text": "A Secret",
+          "correct": false,
+          "explanation": "Secrets hold sensitive data; they don't add resource types."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "A developer with an existing namespace-scoped Role can't list a newly installed custom resource. Why?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Most RBAC roles don't grant access to new resources unless they use wildcards; access must be granted explicitly",
+          "correct": true,
+          "explanation": "Only cluster-admin or wildcard roles cover it automatically."
+        },
+        {
+          "id": "b",
+          "text": "CRDs bypass RBAC and use their own authorization",
+          "correct": false,
+          "explanation": "CRDs use the same authn, authz and auditing as built-in resources."
+        },
+        {
+          "id": "c",
+          "text": "Custom resources can't be listed with kubectl",
+          "correct": false,
+          "explanation": "kubectl works with custom resources."
+        },
+        {
+          "id": "d",
+          "text": "The CRD must be recreated in that namespace",
+          "correct": false,
+          "explanation": "Not the cause described."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-13",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-crds",
+      "stem": "Which describe how an operator is normally deployed and used? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/operator/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Add the CRD and its controller to the cluster",
+          "correct": true,
+          "explanation": "The most common way to deploy an operator."
+        },
+        {
+          "id": "b",
+          "text": "Run the controller, for example as a Deployment, outside the control plane",
+          "correct": true,
+          "explanation": "Stated on the Operator pattern page."
+        },
+        {
+          "id": "c",
+          "text": "Change and rebuild Kubernetes' own code to add the operator",
+          "correct": false,
+          "explanation": "Operators extend the cluster without changing Kubernetes code."
+        },
+        {
+          "id": "d",
+          "text": "Edit the operator's Pods directly to change app settings",
+          "correct": false,
+          "explanation": "You edit objects of the operator's kind, e.g. kubectl edit SampleDB/<name>."
+        }
+      ]
+    },
+    {
+      "id": "crds-operators-q-14",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-crds",
+      "stem": "What best describes an operator?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/operator/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A client of the Kubernetes API that acts as a controller for a custom resource",
+          "correct": true,
+          "explanation": "That's the page's definition."
+        },
+        {
+          "id": "b",
+          "text": "Code that must be compiled into Kubernetes itself",
+          "correct": false,
+          "explanation": "Operators extend cluster behaviour without modifying Kubernetes code."
+        },
+        {
+          "id": "c",
+          "text": "A StatefulSet that runs the database",
+          "correct": false,
+          "explanation": "In the SampleDB example, the operator creates the StatefulSet; it isn't the operator."
+        },
+        {
+          "id": "d",
+          "text": "A one-off Job that backs up data",
+          "correct": false,
+          "explanation": "The operator may create backup Pods or Jobs, but it is the controller managing them."
+        }
+      ]
+    }
+  ]
+}

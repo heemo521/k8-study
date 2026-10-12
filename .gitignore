@@ -9,3 +9,6 @@ build/
 # Ad unit IDs and other secrets
 .env
 *.env
+
+# Node (headless PWA checks)
+node_modules/

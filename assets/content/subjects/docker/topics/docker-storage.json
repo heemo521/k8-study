@@ -1,0 +1,781 @@
+{
+  "id": "docker-storage",
+  "title": "Volumes & Bind Mounts",
+  "summary": "Why container files vanish, and how volumes, bind mounts and tmpfs mounts keep or share data.",
+  "order": 2,
+  "domainIds": [
+    "docker-run"
+  ],
+  "competencyIds": [
+    "dk-data"
+  ],
+  "prerequisites": [
+    "docker-containers"
+  ],
+  "estMinutes": 16,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "docker-storage-layer",
+      "heading": "The writable layer and mount types",
+      "sourceUrl": "https://docs.docker.com/engine/storage/",
+      "sourceTitle": "Storage",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Files a container creates land in a **writable container layer** on top of the read-only image layers. That layer is unique to the container and is **lost when the container is destroyed**, and it's hard to get data out of it."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Mount",
+            "Where data lives",
+            "Use it for"
+          ],
+          "rows": [
+            [
+              "Volume",
+              "Host filesystem, managed by the Docker daemon",
+              "Long-term and performance-critical data; survives container removal"
+            ],
+            [
+              "Bind mount",
+              "Any host path you choose",
+              "Files both the host and the container must access"
+            ],
+            [
+              "tmpfs",
+              "Host memory only, never disk",
+              "Temporary data such as caches or credentials; gone on stop or restart"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Image mounts and named pipes also exist. Image mounts need the containerd image store.",
+            "Whatever the type, the container just sees a directory or a file.",
+            "Don't touch volume data on the host directly; that is unsupported and can break the volume."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-persist",
+      "heading": "Persisting data with a volume",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/persisting-container-data/",
+      "sourceTitle": "Persisting container data",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A volume outlives any single container. Mount the same volume into a new container and the files are still there."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker volume create log-data\ndocker run -d -p 80:80 -v log-data:/logs docker/welcome-to-docker\n\n# database example: recreate the container, keep the data\ndocker run --name=db -e POSTGRES_PASSWORD=secret -d -v postgres_data:/var/lib/postgresql postgres:18\ndocker stop db && docker rm db\ndocker run --name=new-db -d -v postgres_data:/var/lib/postgresql postgres:18"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "If the named volume doesn't exist, `docker run -v` creates it.",
+            "One volume can be attached to several containers to share files.",
+            "`docker volume ls` lists volumes; `docker volume rm <name>` removes one that no container is using; `docker volume prune` removes all unused volumes."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "`docker volume rm` fails while a container still uses the volume. Remove the container first, e.g. `docker rm -f <container>` (stops it, then removes it)."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-volumes",
+      "heading": "Volume behaviour",
+      "sourceUrl": "https://docs.docker.com/engine/storage/volumes/",
+      "sourceTitle": "Volumes",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Volumes are the **preferred** way to persist container data: easier to back up and migrate than bind mounts, managed with the Docker CLI or API, work on Linux and Windows containers, safer to share, and good for high-performance I/O.",
+            "They don't grow the container's size, and they're faster than writing to the writable layer, which goes through a storage driver.",
+            "They're a poor fit when the host needs to access the files; use a bind mount then.",
+            "A volume isn't removed automatically when no container uses it."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Case",
+            "What happens"
+          ],
+          "rows": [
+            [
+              "Empty volume over a non-empty directory",
+              "The directory's files are copied into the volume (disable with `volume-nocopy`)"
+            ],
+            [
+              "Non-empty volume over a non-empty directory",
+              "Existing files are hidden by the mount"
+            ],
+            [
+              "Anonymous volume",
+              "Random unique name; each container gets its own; kept after container removal unless `--rm` was used"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-syntax",
+      "heading": "-v vs --mount, and managing volumes",
+      "sourceUrl": "https://docs.docker.com/engine/storage/volumes/",
+      "sourceTitle": "Volumes",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker run --mount type=volume,src=<volume-name>,dst=<mount-path> <image>\ndocker run -v <volume-name>:<mount-path> <image>\n\n# read-only\ndocker run -d --name=nginxtest --mount source=nginx-vol,destination=/usr/share/nginx/html,readonly nginx:latest\ndocker run -d --name=nginxtest -v nginx-vol:/usr/share/nginx/html:ro nginx:latest"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`-v` has three colon-separated fields in fixed order: `[<volume-name>:]<mount-path>[:opts]`. Omit the name for an anonymous volume.",
+            "`--mount` takes comma-separated `key=value` pairs in any order: `source`/`src`, `destination`/`dst`/`target`, `readonly`/`ro`, `volume-nocopy`, `volume-subpath`, `volume-opt`.",
+            "`--mount` is generally preferred. You **must** use it for volume driver options, a volume subdirectory, or Swarm services."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker volume create my-vol\ndocker volume ls\ndocker volume inspect my-vol   # Driver local, Mountpoint /var/lib/docker/volumes/my-vol/_data\ndocker volume rm my-vol\ndocker volume prune            # all unused volumes"
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Check a mount with `docker inspect <container>` and read the `Mounts` section: `Type`, `Source`, `Destination` and `RW` (false when read-only)."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-bind",
+      "heading": "Bind mounts",
+      "sourceUrl": "https://docs.docker.com/engine/storage/bind-mounts/",
+      "sourceTitle": "Bind mounts",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A bind mount puts a host file or directory into the container. Typical uses: sharing source code or build output in development, writing files back to the host, and sharing config files (Docker mounts the host's `/etc/resolv.conf` this way for DNS)."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker run -d -it --name devtest --mount type=bind,source=\"$(pwd)\"/target,target=/app nginx:latest\ndocker run -d -it --name devtest -v \"$(pwd)\"/target:/app nginx:latest\ndocker run -d -it --name devtest -v \"$(pwd)\"/target:/app:ro nginx:latest   # read-only"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Host path missing",
+            "Result"
+          ],
+          "rows": [
+            [
+              "-v / --volume",
+              "Docker creates it on the host, always as a directory"
+            ],
+            [
+              "--mount",
+              "Error: bind source path does not exist (unless you add `bind-create-src`)"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Bind mounts are **writable by default**, so container processes can change or delete host files. Add `ro`/`readonly` to prevent that.",
+            "The path is on the **daemon** host, not the client, and the container depends on that host's directory layout.",
+            "Mounting over a non-empty container directory hides its contents. Unlike volumes, nothing is copied.",
+            "SELinux `z`/`Z` labeling is listed among the `-v` options, not the `--mount` options. It relabels the host path itself, so use it with great care."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-choose",
+      "heading": "Choosing volume or bind mount",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/sharing-local-files/",
+      "sourceTitle": "Sharing local files with containers",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Data the container creates or changes and must keep after it stops → **volume**.",
+            "Specific host files you want the container to see directly, like config or code under development → **bind mount**.",
+            "Append `:ro` (read-only) or `:rw` (read-write) to control access. Read-only stops the container changing or deleting host files; read-write changes appear on the host."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker run -v /HOST/PATH:/CONTAINER/PATH -it nginx\ndocker run --mount type=bind,source=/HOST/PATH,target=/CONTAINER/PATH,readonly nginx"
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Docker recommends `--mount` over `-v`: it gives more control and errors on a missing host path instead of silently creating a directory."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-runflags",
+      "heading": "tmpfs, read-only root and cleanup",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/",
+      "sourceTitle": "docker container run",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker run -d --tmpfs /run:rw,noexec,nosuid,size=65536k <image>\ndocker run --read-only -v /icanwrite busybox touch /icanwrite/here\ndocker run --rm -v /foo -v awesome:/bar busybox top"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`--tmpfs` creates a tmpfs mount; its options match Linux `mount -t tmpfs -o`.",
+            "`--read-only` makes the container's root filesystem read-only, so it can write only to the volumes you give it.",
+            "`--rm` removes the container's **anonymous** volumes too. In the last example `/foo` is removed but the named volume `awesome` is kept."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "docker-storage-fc-01",
+      "front": "What happens to data in a container's writable layer when the container is destroyed?",
+      "back": "It's lost. The writable layer is unique to the container and doesn't persist.",
+      "sourceUrl": "https://docs.docker.com/engine/storage/"
+    },
+    {
+      "id": "docker-storage-fc-02",
+      "front": "Where does a tmpfs mount store data?",
+      "back": "In host memory only, never on disk. It's gone when the container stops or restarts.",
+      "sourceUrl": "https://docs.docker.com/engine/storage/"
+    },
+    {
+      "id": "docker-storage-fc-03",
+      "front": "Command to remove all unused volumes?",
+      "back": "docker volume prune",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/persisting-container-data/"
+    },
+    {
+      "id": "docker-storage-fc-04",
+      "front": "When does docker volume rm work?",
+      "back": "Only when no container is using the volume.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/persisting-container-data/"
+    },
+    {
+      "id": "docker-storage-fc-05",
+      "front": "What happens when an empty volume is mounted over a container directory that has files?",
+      "back": "The files are copied into the volume, unless volume-nocopy is set.",
+      "sourceUrl": "https://docs.docker.com/engine/storage/volumes/"
+    },
+    {
+      "id": "docker-storage-fc-06",
+      "front": "Three cases where you must use --mount rather than -v for volumes?",
+      "back": "Volume driver options, mounting a volume subdirectory, and Swarm services.",
+      "sourceUrl": "https://docs.docker.com/engine/storage/volumes/"
+    },
+    {
+      "id": "docker-storage-fc-07",
+      "front": "Default Mountpoint shown by docker volume inspect my-vol?",
+      "back": "/var/lib/docker/volumes/my-vol/_data (driver local).",
+      "sourceUrl": "https://docs.docker.com/engine/storage/volumes/"
+    },
+    {
+      "id": "docker-storage-fc-08",
+      "front": "-v vs --mount when the bind-mount host path doesn't exist?",
+      "back": "-v creates a directory on the host; --mount errors unless bind-create-src is set.",
+      "sourceUrl": "https://docs.docker.com/engine/storage/bind-mounts/"
+    },
+    {
+      "id": "docker-storage-fc-09",
+      "front": "Are bind mounts read-only or writable by default?",
+      "back": "Writable. Add ro / readonly to prevent writes.",
+      "sourceUrl": "https://docs.docker.com/engine/storage/bind-mounts/"
+    },
+    {
+      "id": "docker-storage-fc-10",
+      "front": "Volume or bind mount for code you edit on the host and want live in the container?",
+      "back": "Bind mount. Use a volume for data the container produces and must keep.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/sharing-local-files/"
+    },
+    {
+      "id": "docker-storage-fc-11",
+      "front": "Which volumes does docker run --rm delete on exit?",
+      "back": "Anonymous volumes only. Named volumes are kept.",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/"
+    },
+    {
+      "id": "docker-storage-fc-12",
+      "front": "What does docker run --read-only do?",
+      "back": "Mounts the container's root filesystem read-only; it can still write to its volumes.",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "docker-storage-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-data",
+      "stem": "You remove a database container that stored its data only in its writable layer. What happens to the data?",
+      "sourceUrl": "https://docs.docker.com/engine/storage/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It is lost with the container",
+          "correct": true,
+          "explanation": "Writable-layer data doesn't persist when the container is destroyed."
+        },
+        {
+          "id": "b",
+          "text": "It moves to an anonymous volume",
+          "correct": false,
+          "explanation": "Nothing is moved automatically; the layer is discarded."
+        },
+        {
+          "id": "c",
+          "text": "It is saved into the image",
+          "correct": false,
+          "explanation": "Image layers are read-only and immutable."
+        },
+        {
+          "id": "d",
+          "text": "It remains in a tmpfs mount",
+          "correct": false,
+          "explanation": "tmpfs is memory-only and is also lost when the container stops."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-data",
+      "stem": "An app needs scratch space for sensitive temporary data that must never hit disk. Which mount fits?",
+      "sourceUrl": "https://docs.docker.com/engine/storage/",
+      "options": [
+        {
+          "id": "a",
+          "text": "tmpfs mount",
+          "correct": true,
+          "explanation": "Stored in host memory only and not persisted."
+        },
+        {
+          "id": "b",
+          "text": "Named volume",
+          "correct": false,
+          "explanation": "Volumes store data on the host filesystem."
+        },
+        {
+          "id": "c",
+          "text": "Bind mount",
+          "correct": false,
+          "explanation": "Bind mounts write to a host path on disk."
+        },
+        {
+          "id": "d",
+          "text": "Image mount",
+          "correct": false,
+          "explanation": "Image mounts are read-only content from another image."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "dk-data",
+      "stem": "docker run -v log-data:/logs <image> fails if the volume log-data hasn't been created yet.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/persisting-container-data/",
+      "options": [
+        {
+          "id": "true",
+          "text": "True",
+          "correct": false,
+          "explanation": "Docker creates the missing volume automatically."
+        },
+        {
+          "id": "false",
+          "text": "False",
+          "correct": true,
+          "explanation": "The volume is created for you."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-data",
+      "stem": "docker volume rm postgres_data fails because the volume is in use. What should you do?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/persisting-container-data/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Remove the container using it (e.g. docker rm -f <container>), then remove the volume",
+          "correct": true,
+          "explanation": "A volume can only be removed when no container is attached."
+        },
+        {
+          "id": "b",
+          "text": "Run docker volume ls first",
+          "correct": false,
+          "explanation": "ls only lists volumes; it doesn't detach anything."
+        },
+        {
+          "id": "c",
+          "text": "Run docker volume create postgres_data",
+          "correct": false,
+          "explanation": "That creates a volume, not removes one."
+        },
+        {
+          "id": "d",
+          "text": "Run docker volume prune",
+          "correct": false,
+          "explanation": "prune removes only unused volumes, so an attached one stays."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-05",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "dk-data",
+      "stem": "Which are reasons the Docker docs give for preferring volumes over bind mounts? Select 3.",
+      "sourceUrl": "https://docs.docker.com/engine/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Easier to back up or migrate",
+          "correct": true,
+          "explanation": "Listed as a volume advantage."
+        },
+        {
+          "id": "b",
+          "text": "Manageable with Docker CLI commands or the Docker API",
+          "correct": true,
+          "explanation": "Listed as a volume advantage."
+        },
+        {
+          "id": "c",
+          "text": "Work on both Linux and Windows containers",
+          "correct": true,
+          "explanation": "Listed as a volume advantage."
+        },
+        {
+          "id": "d",
+          "text": "Easy to edit directly from the host",
+          "correct": false,
+          "explanation": "Volumes are a poor choice when the host needs the files; use a bind mount."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-06",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "dk-data",
+      "stem": "You start nginx with a new, empty volume mounted at /usr/share/nginx/html. What ends up in the volume?",
+      "sourceUrl": "https://docs.docker.com/engine/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "nginx's default HTML files, copied from the container directory",
+          "correct": true,
+          "explanation": "Files in the target directory are copied into an empty volume by default."
+        },
+        {
+          "id": "b",
+          "text": "Nothing; the directory appears empty",
+          "correct": false,
+          "explanation": "That happens only with volume-nocopy."
+        },
+        {
+          "id": "c",
+          "text": "The files are hidden and the volume stays empty",
+          "correct": false,
+          "explanation": "Hiding happens when a non-empty volume is mounted over existing files."
+        },
+        {
+          "id": "d",
+          "text": "The container fails to start",
+          "correct": false,
+          "explanation": "This is the documented way to pre-populate a volume."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-data",
+      "stem": "Which command mounts the volume nginx-vol read-only at /usr/share/nginx/html?",
+      "sourceUrl": "https://docs.docker.com/engine/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "docker run -d -v nginx-vol:/usr/share/nginx/html:ro nginx:latest",
+          "correct": true,
+          "explanation": "ro in the third -v field makes it read-only."
+        },
+        {
+          "id": "b",
+          "text": "docker run -d --mount source=nginx-vol,destination=/usr/share/nginx/html nginx:latest",
+          "correct": false,
+          "explanation": "Without readonly (or ro) the volume is mounted read-write."
+        },
+        {
+          "id": "c",
+          "text": "docker run -d -v ro:nginx-vol:/usr/share/nginx/html nginx:latest",
+          "correct": false,
+          "explanation": "-v fields are in fixed order: name, path, options."
+        },
+        {
+          "id": "d",
+          "text": "docker run -d --mount source=nginx-vol,destination=/usr/share/nginx/html,volume-nocopy nginx:latest",
+          "correct": false,
+          "explanation": "volume-nocopy stops copying into an empty volume; it doesn't make it read-only."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-08",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "dk-data",
+      "stem": "For volumes, which require --mount rather than -v? Select 2.",
+      "sourceUrl": "https://docs.docker.com/engine/storage/volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Mounting a volume subdirectory (volume-subpath)",
+          "correct": true,
+          "explanation": "Only --mount supports volume-subpath."
+        },
+        {
+          "id": "b",
+          "text": "Passing volume driver options",
+          "correct": true,
+          "explanation": "Driver options need --mount."
+        },
+        {
+          "id": "c",
+          "text": "Mounting read-only",
+          "correct": false,
+          "explanation": "-v supports ro too."
+        },
+        {
+          "id": "d",
+          "text": "Mounting a named volume",
+          "correct": false,
+          "explanation": "-v <volume-name>:<mount-path> works."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-data",
+      "stem": "docker run --mount type=bind,src=/dev/noexist,dst=/mnt/foo alpine returns an error. Why?",
+      "sourceUrl": "https://docs.docker.com/engine/storage/bind-mounts/",
+      "options": [
+        {
+          "id": "a",
+          "text": "--mount doesn't create a missing host path by default",
+          "correct": true,
+          "explanation": "Add bind-create-src or create the directory first."
+        },
+        {
+          "id": "b",
+          "text": "Bind mounts need -v",
+          "correct": false,
+          "explanation": "Both --mount and -v create bind mounts."
+        },
+        {
+          "id": "c",
+          "text": "dst must be a relative path",
+          "correct": false,
+          "explanation": "The container path must be absolute."
+        },
+        {
+          "id": "d",
+          "text": "alpine images can't use bind mounts",
+          "correct": false,
+          "explanation": "The image isn't the problem; the source path is missing."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-10",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "dk-data",
+      "stem": "A process in a container can modify host files through a bind mount unless it's mounted read-only.",
+      "sourceUrl": "https://docs.docker.com/engine/storage/bind-mounts/",
+      "options": [
+        {
+          "id": "true",
+          "text": "True",
+          "correct": true,
+          "explanation": "Bind mounts are writable by default; use ro to block writes."
+        },
+        {
+          "id": "false",
+          "text": "False",
+          "correct": false,
+          "explanation": "Write access is the default for bind mounts."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-11",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "dk-data",
+      "stem": "You bind-mount a host directory over a non-empty directory in the container. What happens to the container's original files?",
+      "sourceUrl": "https://docs.docker.com/engine/storage/bind-mounts/",
+      "options": [
+        {
+          "id": "a",
+          "text": "They are hidden by the mount",
+          "correct": true,
+          "explanation": "Pre-existing files are obscured; recreate the container without the mount to see them."
+        },
+        {
+          "id": "b",
+          "text": "They are copied to the host directory",
+          "correct": false,
+          "explanation": "Copying into an empty mount is volume behaviour, not bind-mount behaviour."
+        },
+        {
+          "id": "c",
+          "text": "They are merged with the host files",
+          "correct": false,
+          "explanation": "No merge happens; the mount replaces the view."
+        },
+        {
+          "id": "d",
+          "text": "Docker refuses to mount",
+          "correct": false,
+          "explanation": "The mount succeeds; the files are just hidden."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-12",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-data",
+      "stem": "You want the container to always see your latest build output from the host. Which storage option fits?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/running-containers/sharing-local-files/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A bind mount",
+          "correct": true,
+          "explanation": "Bind mounts share specific host files directly; ideal for development."
+        },
+        {
+          "id": "b",
+          "text": "A named volume",
+          "correct": false,
+          "explanation": "Volumes are for data the container generates and must keep."
+        },
+        {
+          "id": "c",
+          "text": "Copying the files into the image",
+          "correct": false,
+          "explanation": "Files baked into the image don't follow later changes on the host; a bind mount shares the host files directly."
+        },
+        {
+          "id": "d",
+          "text": "The container's writable layer",
+          "correct": false,
+          "explanation": "By default a container can't directly access data on the host; you need a bind mount or volume for that."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-data",
+      "stem": "docker run --rm -v /foo -v awesome:/bar busybox top exits. Which volumes remain?",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Only awesome",
+          "correct": true,
+          "explanation": "--rm removes anonymous volumes (/foo) but keeps named ones."
+        },
+        {
+          "id": "b",
+          "text": "Both",
+          "correct": false,
+          "explanation": "The anonymous /foo volume is removed with the container."
+        },
+        {
+          "id": "c",
+          "text": "Neither",
+          "correct": false,
+          "explanation": "Named volumes survive --rm."
+        },
+        {
+          "id": "d",
+          "text": "Only the /foo volume",
+          "correct": false,
+          "explanation": "It's the other way round."
+        }
+      ]
+    },
+    {
+      "id": "docker-storage-q-14",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "dk-data",
+      "stem": "You run a container with --read-only and it must still write files under /icanwrite. What do you add?",
+      "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A volume at /icanwrite, e.g. -v /icanwrite",
+          "correct": true,
+          "explanation": "With a read-only root, writes go only to the volumes you specify."
+        },
+        {
+          "id": "b",
+          "text": "--privileged",
+          "correct": false,
+          "explanation": "That grants extended privileges, not a writable path."
+        },
+        {
+          "id": "c",
+          "text": "-w /icanwrite",
+          "correct": false,
+          "explanation": "-w sets the working directory only."
+        },
+        {
+          "id": "d",
+          "text": "--volumes-from with :ro",
+          "correct": false,
+          "explanation": ":ro mounts read-only."
+        }
+      ]
+    }
+  ]
+}

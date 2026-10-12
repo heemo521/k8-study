@@ -1,0 +1,843 @@
+{
+  "id": "scheduling",
+  "title": "Scheduling: Resources, Affinity & Taints",
+  "summary": "Requests, limits and QoS; LimitRange and ResourceQuota at admission; steering Pods with nodeSelector, affinity, taints, tolerations and nodeName.",
+  "order": 4,
+  "domainIds": [
+    "workloads-scheduling"
+  ],
+  "competencyIds": [
+    "ws-admission-scheduling"
+  ],
+  "prerequisites": [
+    "pods"
+  ],
+  "estMinutes": 20,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "scheduling-requests-limits",
+      "heading": "Requests vs limits",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+      "sourceTitle": "Resource Management for Pods and Containers",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "",
+            "Request",
+            "Limit"
+          ],
+          "rows": [
+            [
+              "Who uses it",
+              "kube-scheduler, to pick a node",
+              "kubelet + runtime, enforced by the kernel (cgroups)"
+            ],
+            [
+              "CPU",
+              "A weighting under contention",
+              "Hard ceiling: the container is **throttled**"
+            ],
+            [
+              "Memory",
+              "Mainly for scheduling",
+              "Exceed it and the kernel may **OOM-kill** a process"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "resources:\n  requests:\n    memory: \"64Mi\"\n    cpu: \"250m\"\n  limits:\n    memory: \"128Mi\"\n    cpu: \"500m\""
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A container may use more than its request if the node has room; never more CPU than its limit.",
+            "Set a limit but no request (and no admission default)? The limit is **copied** into the request.",
+            "CPU: `0.1` = `100m`; nothing finer than `1m`. Memory: `Mi` = mebibytes, `M` = megabytes, and `m` means **millibytes**, so `400m` of memory is 0.4 bytes.",
+            "A Pod's request or limit is the sum over its containers.",
+            "The scheduler places a Pod only where the **sum of requests** fits the node's capacity, even if real usage is low."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl describe pod <pod-name>     # FailedScheduling ... insufficient cpu  |  Last State: OOMKilled\nkubectl describe nodes <node-name>  # Capacity, Allocatable, Allocated resources"
+        }
+      ]
+    },
+    {
+      "id": "scheduling-qos",
+      "heading": "QoS classes",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/",
+      "sourceTitle": "Pod Quality of Service Classes",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Class",
+            "Rule (container-level resources)"
+          ],
+          "rows": [
+            [
+              "Guaranteed",
+              "Every container has CPU **and** memory requests and limits, all > 0, with limit = request"
+            ],
+            [
+              "Burstable",
+              "Not Guaranteed, but at least one container has a CPU or memory request or limit"
+            ],
+            [
+              "BestEffort",
+              "No container has any CPU or memory request or limit"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Under node pressure the kubelet evicts **BestEffort first, then Burstable, then Guaranteed**.",
+            "A Burstable container without a limit can grow up to the node's capacity.",
+            "The class is fixed when the Pod is created and never changes; an in-place resize that would change it is rejected.",
+            "kube-scheduler ignores QoS class when it picks Pods to preempt."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scheduling-limitrange",
+      "heading": "LimitRange: per-object defaults and bounds",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/policy/limit-range/",
+      "sourceTitle": "Limit Ranges",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A LimitRange is a namespaced policy for **individual** Pods, containers or PersistentVolumeClaims. Its admission controller first fills in default requests/limits for containers that set none, then checks min, max and the request-to-limit ratio."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: v1\nkind: LimitRange\nmetadata:\n  name: <name>\nspec:\n  limits:\n  - type: Container\n    default:          # default limit\n      cpu: 500m\n    defaultRequest:   # default request\n      cpu: 500m\n    max:\n      cpu: \"1\"\n    min:\n      cpu: 100m"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A violating create or update is refused with **HTTP 403 Forbidden** and an explanation.",
+            "Checks run only at admission. Existing Pods keep running unchanged after you add or edit a LimitRange.",
+            "Defaults aren't checked for consistency: with the example above, a Pod that requests `700m` CPU and sets no limit gets the 500m default limit and is rejected as invalid. Set both request and limit to avoid it.",
+            "With two or more LimitRanges in one namespace, which default applies is not deterministic."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scheduling-quota",
+      "heading": "ResourceQuota: per-namespace totals",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/policy/resource-quotas/",
+      "sourceTitle": "Resource Quotas",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A ResourceQuota caps the **aggregate** use in a namespace: total requests/limits and object counts. It is enforced by the `ResourceQuota` admission plugin (listed in the API server's `--enable-admission-plugins`) once a quota exists in the namespace."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl create quota <name> --hard=count/deployments.apps=2,count/pods=3 --namespace=<ns>\nkubectl get quota --namespace=<ns>\nkubectl describe quota <name> --namespace=<ns>   # Used vs Hard"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Common keys: `requests.cpu`, `requests.memory`, `limits.cpu`, `limits.memory`, `pods`, `services`, `secrets`, `configmaps`, `persistentvolumeclaims`, `requests.storage`, and `count/<resource>.<group>`.",
+            "If the quota covers cpu or memory, every new Pod must set a request or limit for it, or it may be refused. Pair it with a LimitRange that injects defaults.",
+            "Exceeding the quota gets **403 Forbidden**. A Deployment is still created, but some of its Pods may never appear; check it with `kubectl describe`.",
+            "Changing a quota doesn't affect existing objects. Quotas are absolute, so adding nodes doesn't raise them."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scheduling-nodeselector",
+      "heading": "nodeSelector and nodeName in practice",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/",
+      "sourceTitle": "Assign Pods to Nodes",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get nodes --show-labels\nkubectl label nodes <your-node-name> disktype=ssd\nkubectl get pods --output=wide    # NODE column shows placement"
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "spec:\n  nodeSelector:\n    disktype: ssd\n  # or bypass selection entirely:\n  # nodeName: <node-name>"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "For a \"run this Pod on node X\" task: `kubectl label nodes <your-node-name> <key>=<value>`, add a matching `nodeSelector`, then confirm the NODE column with `kubectl get pods --output=wide`."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-affinity",
+      "heading": "Node affinity, Pod (anti-)affinity, nodeName",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/",
+      "sourceTitle": "Assigning Pods to Nodes",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "affinity:\n  nodeAffinity:\n    requiredDuringSchedulingIgnoredDuringExecution:   # hard\n      nodeSelectorTerms:\n      - matchExpressions:\n        - key: <label-key>\n          operator: In\n          values: [<value-1>, <value-2>]\n    preferredDuringSchedulingIgnoredDuringExecution:  # soft\n    - weight: 1          # 1-100\n      preference:\n        matchExpressions:\n        - key: <label-key>\n          operator: In\n          values: [<value>]"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**required**: no matching node, no scheduling (like nodeSelector). **preferred**: scored by weight; the Pod still schedules if nothing matches.",
+            "**IgnoredDuringExecution**: if node labels change later, the running Pod stays.",
+            "Operators: `In`, `NotIn`, `Exists`, `DoesNotExist`, plus `Gt`/`Lt` (node affinity only). `NotIn`/`DoesNotExist` give node anti-affinity.",
+            "Several `nodeSelectorTerms` are ORed; expressions inside one `matchExpressions` are ANDed. With both `nodeSelector` and node affinity set, **both** must match.",
+            "`podAffinity` / `podAntiAffinity` match **labels of Pods already running** in a topology domain named by `topologyKey` (for example `kubernetes.io/hostname` or `topology.kubernetes.io/zone`). They are expensive and not advised beyond several hundred nodes."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "`nodeName` skips the scheduler and overrides nodeSelector and affinity. If the node doesn't exist the Pod won't run; if it lacks room the Pod fails (for example `OutOfcpu`). Prefer nodeSelector or affinity."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-taints",
+      "heading": "Taints and tolerations",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+      "sourceTitle": "Taints and Tolerations",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Affinity attracts Pods; a **taint** on a node repels them. A **toleration** on a Pod lets it schedule onto a matching taint but doesn't force it there."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl taint nodes <node> <key>=<value>:NoSchedule    # add\nkubectl taint nodes <node> <key>=<value>:NoSchedule-   # remove (trailing -)"
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "tolerations:\n- key: \"<key>\"\n  operator: \"Equal\"     # default; Exists = any value (omit value)\n  value: \"<value>\"\n  effect: \"NoExecute\"\n  tolerationSeconds: 3600   # NoExecute only: stay this long, then evicted"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Effect",
+            "New Pods without toleration",
+            "Running Pods without toleration"
+          ],
+          "rows": [
+            [
+              "NoSchedule",
+              "Not scheduled",
+              "Keep running"
+            ],
+            [
+              "PreferNoSchedule",
+              "Avoided if possible (soft)",
+              "Keep running"
+            ],
+            [
+              "NoExecute",
+              "Not scheduled",
+              "Evicted immediately"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A match needs the same key and effect, plus equal values (`Equal`) or any value (`Exists`). An empty key with `Exists` matches every key.",
+            "Setting `.spec.nodeName` bypasses the scheduler, so `NoSchedule` taints don't stop it; a `NoExecute` taint still makes the kubelet evict an intolerant Pod.",
+            "The node controller adds taints such as `node.kubernetes.io/not-ready`, `node.kubernetes.io/unreachable`, `node.kubernetes.io/memory-pressure` and `node.kubernetes.io/disk-pressure`.",
+            "Pods automatically get not-ready/unreachable tolerations with `tolerationSeconds=300` (5 minutes), unless set explicitly."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "scheduling-fc-01",
+      "front": "Requests vs limits: who uses which?",
+      "back": "The scheduler uses requests to place the Pod; the kubelet/runtime/kernel enforce limits.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "id": "scheduling-fc-02",
+      "front": "What happens when a container hits its CPU limit vs its memory limit?",
+      "back": "CPU: throttled. Memory: the kernel may OOM-kill it (reason OOMKilled).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "id": "scheduling-fc-03",
+      "front": "A container sets a limit but no request. What's its request?",
+      "back": "Equal to the limit (unless an admission default such as a LimitRange set one).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "id": "scheduling-fc-04",
+      "front": "What is memory: 400m?",
+      "back": "0.4 bytes. Lower-case m means millibytes; you probably meant 400Mi or 400M.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+    },
+    {
+      "id": "scheduling-fc-05",
+      "front": "Criteria for the Guaranteed QoS class?",
+      "back": "Every container has CPU and memory requests and limits, all non-zero, with limit equal to request.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/"
+    },
+    {
+      "id": "scheduling-fc-06",
+      "front": "QoS eviction order under node pressure?",
+      "back": "BestEffort first, then Burstable, then Guaranteed.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/"
+    },
+    {
+      "id": "scheduling-fc-07",
+      "front": "LimitRange vs ResourceQuota in one line?",
+      "back": "LimitRange: defaults and min/max per Pod/container/PVC. ResourceQuota: total usage and object counts per namespace.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/policy/limit-range/"
+    },
+    {
+      "id": "scheduling-fc-08",
+      "front": "HTTP status when a request violates a ResourceQuota?",
+      "back": "403 Forbidden, with a message naming the violated constraint.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/policy/resource-quotas/"
+    },
+    {
+      "id": "scheduling-fc-09",
+      "front": "Label a node so a nodeSelector of disktype: ssd matches it?",
+      "back": "kubectl label nodes <your-node-name> disktype=ssd",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/"
+    },
+    {
+      "id": "scheduling-fc-10",
+      "front": "What does IgnoredDuringExecution mean in node affinity?",
+      "back": "If node labels change after scheduling, the Pod keeps running.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/"
+    },
+    {
+      "id": "scheduling-fc-11",
+      "front": "nodeSelectorTerms vs matchExpressions: AND or OR?",
+      "back": "Terms are ORed; expressions within one term are ANDed.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/"
+    },
+    {
+      "id": "scheduling-fc-12",
+      "front": "Remove the taint key1=value1:NoSchedule from node1?",
+      "back": "kubectl taint nodes node1 key1=value1:NoSchedule-",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/"
+    },
+    {
+      "id": "scheduling-fc-13",
+      "front": "The three taint effects?",
+      "back": "NoSchedule, PreferNoSchedule (soft), NoExecute (also evicts running Pods).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/"
+    },
+    {
+      "id": "scheduling-fc-14",
+      "front": "Default toleration Kubernetes adds for not-ready/unreachable nodes?",
+      "back": "tolerationSeconds=300 (5 minutes) on tolerations for the node.kubernetes.io/unreachable and node.kubernetes.io/not-ready taints.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "scheduling-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "Which value does kube-scheduler use when deciding whether a Pod fits on a node?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The sum of the containers' resource requests",
+          "correct": true,
+          "explanation": "The scheduler checks that the sum of requests fits the node's capacity."
+        },
+        {
+          "id": "b",
+          "text": "The sum of the containers' limits",
+          "correct": false,
+          "explanation": "Limits are enforced at runtime by the kubelet and kernel."
+        },
+        {
+          "id": "c",
+          "text": "The node's current actual CPU and memory usage",
+          "correct": false,
+          "explanation": "The scheduler refuses a node that fails the request check even if real usage is low."
+        },
+        {
+          "id": "d",
+          "text": "The Pod's QoS class",
+          "correct": false,
+          "explanation": "QoS drives eviction order, not the fit check."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "`kubectl describe pod` shows Last State: Terminated, Reason: OOMKilled, with a rising restart count. What does this tell you?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The container tried to use more memory than its limit",
+          "correct": true,
+          "explanation": "OOMKilled shows the memory limit was exceeded; check for a leak or raise the limit."
+        },
+        {
+          "id": "b",
+          "text": "The container exceeded its CPU limit",
+          "correct": false,
+          "explanation": "CPU overuse is throttled; runtimes don't kill containers for it."
+        },
+        {
+          "id": "c",
+          "text": "No node had enough CPU to schedule it",
+          "correct": false,
+          "explanation": "That shows up as a FailedScheduling event while the Pod is Pending."
+        },
+        {
+          "id": "d",
+          "text": "The namespace ResourceQuota is exhausted",
+          "correct": false,
+          "explanation": "Quota violations are refused at admission with 403; nothing gets killed."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "A Pod has two containers. Both set cpu and memory requests equal to their limits, except the second container has no memory settings at all. What is its QoS class?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Burstable",
+          "correct": true,
+          "explanation": "Guaranteed needs every container to have memory and CPU requests equal to limits. Having some requests makes it Burstable."
+        },
+        {
+          "id": "b",
+          "text": "Guaranteed",
+          "correct": false,
+          "explanation": "One container lacks a memory request and limit."
+        },
+        {
+          "id": "c",
+          "text": "BestEffort",
+          "correct": false,
+          "explanation": "BestEffort means no container has any CPU or memory request or limit."
+        },
+        {
+          "id": "d",
+          "text": "It depends on which node it lands on",
+          "correct": false,
+          "explanation": "The class is decided from the spec when the Pod is created."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-04",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "True or false: When a node runs short of resources, Guaranteed Pods are evicted before BestEffort Pods.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "It's the reverse: BestEffort goes first, Guaranteed last."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Order is BestEffort, then Burstable, then Guaranteed."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-05",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "A namespace's LimitRange sets default cpu 500m, defaultRequest 500m, max 1. A Pod asks for cpu request 700m and no limit. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/policy/limit-range/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It's rejected: the injected 500m default limit is below the 700m request",
+          "correct": true,
+          "explanation": "LimitRange doesn't check its defaults for consistency; the request must be ≤ the limit."
+        },
+        {
+          "id": "b",
+          "text": "It's admitted with a 700m limit",
+          "correct": false,
+          "explanation": "The default limit (500m) is applied, not the request."
+        },
+        {
+          "id": "c",
+          "text": "It's admitted with a 1 CPU limit",
+          "correct": false,
+          "explanation": "max is a bound, not a default."
+        },
+        {
+          "id": "d",
+          "text": "It's admitted and becomes BestEffort",
+          "correct": false,
+          "explanation": "It sets a request, so it isn't BestEffort, and it isn't admitted anyway."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-06",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "True or false: Adding a LimitRange to a namespace resizes the Pods already running there.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/policy/limit-range/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Validation happens only at admission; existing Pods are unchanged."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Only new or updated objects are checked."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "A namespace has a ResourceQuota on requests.cpu and requests.memory. A Pod with no resources section is refused. What's the cleanest fix so users don't have to set values each time?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/policy/resource-quotas/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Add a LimitRange that sets default requests/limits",
+          "correct": true,
+          "explanation": "The docs suggest a LimitRange to force defaults on Pods that set none."
+        },
+        {
+          "id": "b",
+          "text": "Add more nodes to the cluster",
+          "correct": false,
+          "explanation": "Quotas are absolute and don't depend on cluster capacity."
+        },
+        {
+          "id": "c",
+          "text": "Delete the Deployment and create bare Pods",
+          "correct": false,
+          "explanation": "Bare Pods face the same quota check."
+        },
+        {
+          "id": "d",
+          "text": "Remove ResourceQuota from --enable-admission-plugins",
+          "correct": false,
+          "explanation": "That turns quota enforcement off entirely rather than fixing the Pods."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "Which statements about ResourceQuota are correct? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/policy/resource-quotas/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It limits aggregate resource use and object counts per namespace",
+          "correct": true,
+          "explanation": "That's its purpose."
+        },
+        {
+          "id": "b",
+          "text": "Changing a quota doesn't affect resources that already exist",
+          "correct": true,
+          "explanation": "The docs say this explicitly."
+        },
+        {
+          "id": "c",
+          "text": "Adding nodes automatically raises each namespace's quota",
+          "correct": false,
+          "explanation": "Quotas are expressed in absolute units, independent of capacity."
+        },
+        {
+          "id": "d",
+          "text": "A violating request is accepted and the Pod is later evicted",
+          "correct": false,
+          "explanation": "It's rejected up front with 403 Forbidden."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-09",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "You labelled a node with disktype=ssd. Which Pod field makes the Pod schedule only onto nodes with that label?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "nodeSelector: {disktype: ssd}",
+          "correct": true,
+          "explanation": "nodeSelector requires the node to have the listed label."
+        },
+        {
+          "id": "b",
+          "text": "nodeName: disktype=ssd",
+          "correct": false,
+          "explanation": "nodeName takes a node's name, not a label."
+        },
+        {
+          "id": "c",
+          "text": "tolerations with key disktype",
+          "correct": false,
+          "explanation": "Tolerations relate to taints, not labels."
+        },
+        {
+          "id": "d",
+          "text": "metadata.labels: {disktype: ssd}",
+          "correct": false,
+          "explanation": "That labels the Pod itself; it doesn't select nodes."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "You want Pods to prefer nodes in a certain zone but still run elsewhere if none are free. Which field do you use?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/",
+      "options": [
+        {
+          "id": "a",
+          "text": "nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution",
+          "correct": true,
+          "explanation": "Preferred rules are soft; the Pod still schedules if nothing matches."
+        },
+        {
+          "id": "b",
+          "text": "nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution",
+          "correct": false,
+          "explanation": "Required is a hard rule; the Pod won't schedule without a match."
+        },
+        {
+          "id": "c",
+          "text": "nodeSelector",
+          "correct": false,
+          "explanation": "nodeSelector has no soft mode."
+        },
+        {
+          "id": "d",
+          "text": "nodeName",
+          "correct": false,
+          "explanation": "nodeName pins one node and bypasses the scheduler."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-11",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "A required node affinity has two nodeSelectorTerms, A and B. Term A has two matchExpressions. When can the Pod schedule on a node?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/",
+      "options": [
+        {
+          "id": "a",
+          "text": "If the node satisfies both expressions of A, or satisfies B",
+          "correct": true,
+          "explanation": "Terms are ORed; expressions within a term are ANDed."
+        },
+        {
+          "id": "b",
+          "text": "Only if it satisfies A and B",
+          "correct": false,
+          "explanation": "Terms are ORed, not ANDed."
+        },
+        {
+          "id": "c",
+          "text": "If it satisfies either expression of A",
+          "correct": false,
+          "explanation": "Expressions within a term must all match."
+        },
+        {
+          "id": "d",
+          "text": "Always; required rules are only scored",
+          "correct": false,
+          "explanation": "Required rules are hard filters."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "You want replicas of a cache Deployment to land on different nodes. Which construct does that?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/",
+      "options": [
+        {
+          "id": "a",
+          "text": "podAntiAffinity matching the cache's own labels with topologyKey kubernetes.io/hostname",
+          "correct": true,
+          "explanation": "Anti-affinity keeps Pods matching the selector apart within each topology domain (here, a node)."
+        },
+        {
+          "id": "b",
+          "text": "podAffinity matching the cache's own labels",
+          "correct": false,
+          "explanation": "Affinity co-locates matching Pods: the opposite effect."
+        },
+        {
+          "id": "c",
+          "text": "nodeAffinity with operator NotIn",
+          "correct": false,
+          "explanation": "That avoids nodes by node label, not by which Pods run there."
+        },
+        {
+          "id": "d",
+          "text": "A NoSchedule taint on every node",
+          "correct": false,
+          "explanation": "That repels all intolerant Pods; it doesn't spread replicas."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "Node node1 has the taint key1=value1:NoSchedule. Which toleration lets a Pod schedule there?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+      "options": [
+        {
+          "id": "a",
+          "text": "key: key1, operator: Exists, effect: NoSchedule",
+          "correct": true,
+          "explanation": "Exists matches any value for that key when the effect matches."
+        },
+        {
+          "id": "b",
+          "text": "key: key1, operator: Equal, value: value2, effect: NoSchedule",
+          "correct": false,
+          "explanation": "With Equal, the values must match."
+        },
+        {
+          "id": "c",
+          "text": "key: key1, operator: Equal, value: value1, effect: NoExecute",
+          "correct": false,
+          "explanation": "The effect must match too."
+        },
+        {
+          "id": "d",
+          "text": "key: key2, operator: Exists, effect: NoSchedule",
+          "correct": false,
+          "explanation": "The key must match."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-14",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "You add a NoExecute taint to a node. Which outcomes are correct for Pods already running there? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Pods without a matching toleration are evicted immediately",
+          "correct": true,
+          "explanation": "NoExecute evicts intolerant running Pods."
+        },
+        {
+          "id": "b",
+          "text": "A Pod tolerating it with tolerationSeconds: 3600 stays up to 3600 seconds, then is evicted",
+          "correct": true,
+          "explanation": "tolerationSeconds bounds how long a tolerating Pod remains bound."
+        },
+        {
+          "id": "c",
+          "text": "All Pods keep running; only new Pods are blocked",
+          "correct": false,
+          "explanation": "That describes NoSchedule."
+        },
+        {
+          "id": "d",
+          "text": "Pods that tolerate it without tolerationSeconds are evicted after 300 seconds",
+          "correct": false,
+          "explanation": "Without tolerationSeconds they stay bound indefinitely."
+        }
+      ]
+    },
+    {
+      "id": "scheduling-q-15",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-admission-scheduling",
+      "stem": "A Pod sets .spec.nodeName to a node tainted with NoSchedule, and has no tolerations. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It's bound to that node anyway, because nodeName bypasses the scheduler",
+          "correct": true,
+          "explanation": "NoSchedule is a scheduler check; a NoExecute taint would still get it evicted."
+        },
+        {
+          "id": "b",
+          "text": "It stays Pending until the taint is removed",
+          "correct": false,
+          "explanation": "The scheduler isn't involved when nodeName is set."
+        },
+        {
+          "id": "c",
+          "text": "The scheduler moves it to an untainted node",
+          "correct": false,
+          "explanation": "The scheduler ignores Pods with nodeName set."
+        },
+        {
+          "id": "d",
+          "text": "The API server rejects the Pod",
+          "correct": false,
+          "explanation": "No such admission rejection is described."
+        }
+      ]
+    }
+  ]
+}

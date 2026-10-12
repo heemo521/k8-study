@@ -1,0 +1,866 @@
+{
+  "id": "workload-controllers",
+  "title": "DaemonSets, StatefulSets & Jobs",
+  "summary": "Pick the right controller: one Pod per node, Pods with sticky identity, run-to-completion tasks and scheduled tasks.",
+  "order": 2,
+  "domainIds": [
+    "workloads-scheduling"
+  ],
+  "competencyIds": [
+    "ws-self-healing"
+  ],
+  "prerequisites": [
+    "deployments"
+  ],
+  "estMinutes": 20,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "workload-controllers-daemonset",
+      "heading": "DaemonSet: one Pod per node",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+      "sourceTitle": "DaemonSet",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A DaemonSet makes all (or some) nodes run a copy of a Pod. When a node joins, it gets the Pod; when a node leaves, its Pod is garbage collected. Typical uses: a storage daemon, a log collector or a node monitoring agent on every node. Network plugins often ship a DaemonSet component."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`.spec.template` is required; its restart policy must be `Always` (or unset, which defaults to Always).",
+            "`.spec.selector` must match the template labels and **can't be changed** after creation.",
+            "Set `.spec.template.spec.nodeSelector` or `.spec.template.spec.affinity` to target only some nodes. With neither, Pods go on **all** nodes.",
+            "The controller adds a node affinity for the target node to each Pod; the default scheduler then binds it.",
+            "If node labels change, Pods are added to newly matching nodes and removed from nodes that no longer match.",
+            "Deleting with `--cascade=orphan` leaves the Pods on the nodes. A new DaemonSet with the same selector adopts them."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Automatic toleration",
+            "Effect"
+          ],
+          "rows": [
+            [
+              "node.kubernetes.io/not-ready",
+              "NoExecute"
+            ],
+            [
+              "node.kubernetes.io/unreachable",
+              "NoExecute"
+            ],
+            [
+              "node.kubernetes.io/disk-pressure, memory-pressure, pid-pressure",
+              "NoSchedule"
+            ],
+            [
+              "node.kubernetes.io/unschedulable",
+              "NoSchedule"
+            ],
+            [
+              "node.kubernetes.io/network-unavailable (hostNetwork Pods only)",
+              "NoSchedule"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "These tolerations don't cover the control-plane taint. To run daemon Pods on control plane nodes, add a toleration for `node-role.kubernetes.io/control-plane` (operator `Exists`, effect `NoSchedule`) in the Pod template, as the page's example does."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-sts-identity",
+      "heading": "StatefulSet: sticky identity",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+      "sourceTitle": "StatefulSets",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Like a Deployment, a StatefulSet runs Pods from one template, but the Pods are **not interchangeable**. Each keeps its identity across rescheduling. Use it when you need stable network IDs, stable persistent storage, or ordered deployment, scaling and rolling updates."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Ordinal:** with N replicas, Pods get ordinals 0 to N-1 (or from `.spec.ordinals.start`). The label `apps.kubernetes.io/pod-index` holds it.",
+            "**Name/hostname:** `<statefulset-name>-<ordinal>`, e.g. a StatefulSet `web` gives `web-0`, `web-1`, `web-2`.",
+            "**DNS:** you must create a **headless Service** (`clusterIP: None`) and name it in `serviceName`. Each Pod gets `<pod-name>.<service>.<namespace>.svc.cluster.local`.",
+            "**Storage:** each `volumeClaimTemplates` entry gives every Pod its own PVC. If no StorageClass is named, the default one is used.",
+            "Scaling down or deleting a StatefulSet does **not** delete its volumes by default (`persistentVolumeClaimRetentionPolicy` defaults to `Retain`)."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: <name>\nspec:\n  serviceName: <headless-service>\n  replicas: 3\n  selector:\n    matchLabels:\n      app: <label>\n  template:\n    metadata:\n      labels:\n        app: <label>\n    spec:\n      containers:\n      - name: <container>\n        image: <image>\n        volumeMounts:\n        - name: <claim-name>\n          mountPath: <path>\n  volumeClaimTemplates:\n  - metadata:\n      name: <claim-name>\n    spec:\n      accessModes: [ \"ReadWriteOnce\" ]\n      resources:\n        requests:\n          storage: <size>"
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-sts-order",
+      "heading": "StatefulSet ordering and updates",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+      "sourceTitle": "StatefulSets",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "With the default `podManagementPolicy: OrderedReady`, Pods are created in order 0 → N-1, each waiting for the previous one to be Running and Ready.",
+            "Pods are terminated in reverse order, N-1 → 0, and a Pod is only removed once all higher ordinals have fully shut down.",
+            "`podManagementPolicy: Parallel` launches or terminates all Pods at once, without waiting.",
+            "Deleting a StatefulSet gives no ordering guarantee. Scale it to 0 first if you need a graceful, ordered shutdown."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "`.spec.updateStrategy.type`",
+            "Behaviour"
+          ],
+          "rows": [
+            [
+              "RollingUpdate (default)",
+              "Replaces Pods one at a time from the highest ordinal down. `rollingUpdate.partition` updates only ordinals ≥ the partition"
+            ],
+            [
+              "OnDelete",
+              "No automatic update; new Pods use the new template only after you delete the old ones"
+            ],
+            [
+              "Recreate (alpha since v1.37, off by default)",
+              "Deletes all Pods and waits for them to terminate before creating new ones; needs the `StatefulSetRecreateStrategy` feature gate"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "StatefulSets keep revisions too (as ControllerRevisions, default `revisionHistoryLimit` 10): `kubectl rollout history statefulset/<name>` and `kubectl rollout undo statefulset/<name> --to-revision=<n>`."
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "If a bad template never becomes Ready under OrderedReady, reverting the template isn't enough. You must also delete the Pods that already tried the bad config."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-job",
+      "heading": "Job: run to completion",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+      "sourceTitle": "Jobs",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A Job creates Pods and keeps retrying until a set number of them **succeed**. If a Pod fails or its node dies, the Job starts a new one, so prefer a Job over a bare Pod even for a single task."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: batch/v1\nkind: Job\nmetadata:\n  name: <name>\nspec:\n  completions: <n>      # successful Pods needed\n  parallelism: <n>      # Pods running at once\n  backoffLimit: 4       # retries before the Job fails\n  template:\n    spec:\n      containers:\n      - name: <container>\n        image: <image>\n        command: [<cmd>]\n      restartPolicy: Never   # Never or OnFailure only"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Job type",
+            "How to set it"
+          ],
+          "rows": [
+            [
+              "Non-parallel",
+              "Leave completions and parallelism unset (both default to 1)"
+            ],
+            [
+              "Fixed completion count",
+              "Set completions; parallelism defaults to 1. `completionMode: Indexed` gives each Pod an index 0 to completions-1"
+            ],
+            [
+              "Work queue",
+              "Leave completions unset; set parallelism"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`.spec.template` is the only required field. Don't set `.spec.selector` in almost all cases.",
+            "`parallelism: 0` effectively pauses the Job. `.spec.suspend: true` suspends it and terminates its running Pods.",
+            "`kubectl logs jobs/<name>` shows the output; `kubectl delete jobs/<name>` deletes the Job and its Pods."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-job-failure",
+      "heading": "Job failures, deadlines and cleanup",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+      "sourceTitle": "Jobs",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Field",
+            "Effect",
+            "Default"
+          ],
+          "rows": [
+            [
+              "backoffLimit",
+              "Retries before the Job is marked failed",
+              "6"
+            ],
+            [
+              "activeDeadlineSeconds",
+              "Max run time for the whole Job; then Pods are killed, reason `DeadlineExceeded`. Wins over backoffLimit",
+              "unset"
+            ],
+            [
+              "ttlSecondsAfterFinished",
+              "Delete the finished Job (and its Pods) this many seconds later; 0 = right away",
+              "unset (no TTL cleanup)"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Failed Pods are recreated with an exponential back-off (10s, 20s, 40s …) capped at six minutes.",
+            "With `restartPolicy: OnFailure` the container restarts in the same Pod; with `Never` the whole Pod fails and a new one is created.",
+            "Terminal conditions: `Complete` on success, `Failed` on failure. A failed Job is **not** restarted automatically.",
+            "Finished Jobs and their Pods stay around (so you can read logs) until you delete them or a TTL or CronJob history limit removes them."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Both the Job spec and the Pod spec have an `activeDeadlineSeconds` field. Set it at the Job level to cap the Job."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-cronjob",
+      "heading": "CronJob: Jobs on a schedule",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/",
+      "sourceTitle": "CronJob",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A CronJob creates a Job on a repeating schedule, like one line of a crontab. `.spec.schedule` and `.spec.jobTemplate` are required."
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "text": "# minute  hour  day-of-month  month  day-of-week(0-6, Sun=0)\n0 3 * * 1     # Mondays at 03:00\n*/2           # step value: every 2 (e.g. in the hour field)\n@hourly = 0 * * * *    @daily = 0 0 * * *    @weekly = 0 0 * * 0"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Field",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "concurrencyPolicy",
+              "`Allow` (default), `Forbid` (skip the new run if the last is still going), `Replace` (replace the running Job)"
+            ],
+            [
+              "startingDeadlineSeconds",
+              "Skip a run that can't start within this many seconds of its scheduled time"
+            ],
+            [
+              "suspend",
+              "`true` stops future runs (default false); already-started Jobs keep going"
+            ],
+            [
+              "successfulJobsHistoryLimit / failedJobsHistoryLimit",
+              "Finished Jobs to keep: defaults 3 and 1"
+            ],
+            [
+              "timeZone",
+              "e.g. `Etc/UTC`. Unset = kube-controller-manager's local time. CRON_TZ/TZ in the schedule is rejected"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Editing a CronJob only affects Jobs created afterwards.",
+            "Scheduling is approximate: occasionally two Jobs, or none, may be created, so make Jobs **idempotent**.",
+            "CronJob names may be at most 52 characters, because the controller appends 11 characters and Job names max out at 63."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "workload-controllers-fc-01",
+      "front": "What does a DaemonSet guarantee?",
+      "back": "A copy of a Pod runs on all (or selected) nodes, including nodes added later.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/"
+    },
+    {
+      "id": "workload-controllers-fc-02",
+      "front": "How do you limit a DaemonSet to some nodes?",
+      "back": "Set .spec.template.spec.nodeSelector or .spec.template.spec.affinity.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/"
+    },
+    {
+      "id": "workload-controllers-fc-03",
+      "front": "Why can DaemonSet Pods run on cordoned nodes?",
+      "back": "The controller adds a node.kubernetes.io/unschedulable:NoSchedule toleration automatically.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/"
+    },
+    {
+      "id": "workload-controllers-fc-04",
+      "front": "Three parts of a StatefulSet Pod's identity?",
+      "back": "An ordinal, a stable network identity, and stable storage.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "workload-controllers-fc-05",
+      "front": "DNS name of Pod web-0 behind headless Service nginx in namespace default?",
+      "back": "web-0.nginx.default.svc.cluster.local",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "workload-controllers-fc-06",
+      "front": "Which Service type must you create for a StatefulSet's network identity?",
+      "back": "A headless Service (clusterIP: None), named in spec.serviceName.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "workload-controllers-fc-07",
+      "front": "StatefulSet order for creating and terminating Pods (OrderedReady)?",
+      "back": "Create 0 → N-1, each after its predecessor is Running and Ready; terminate N-1 → 0.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "workload-controllers-fc-08",
+      "front": "StatefulSet update strategies?",
+      "back": "RollingUpdate (the default, optionally with a partition) and OnDelete. A third, Recreate, is alpha since v1.37 and needs a feature gate.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+    },
+    {
+      "id": "workload-controllers-fc-09",
+      "front": "Which restartPolicy values are allowed in a Job?",
+      "back": "Never or OnFailure.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "workload-controllers-fc-10",
+      "front": "Default Job backoffLimit?",
+      "back": "6.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "workload-controllers-fc-11",
+      "front": "completions vs parallelism?",
+      "back": "completions = successful Pods needed; parallelism = Pods running at once. Both default to 1 when unset.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "workload-controllers-fc-12",
+      "front": "Auto-delete a Job 100 seconds after it finishes?",
+      "back": "Set .spec.ttlSecondsAfterFinished: 100.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/"
+    },
+    {
+      "id": "workload-controllers-fc-13",
+      "front": "CronJob concurrencyPolicy values?",
+      "back": "Allow (default), Forbid, Replace.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "workload-controllers-fc-14",
+      "front": "Default CronJob history limits?",
+      "back": "successfulJobsHistoryLimit 3, failedJobsHistoryLimit 1.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    },
+    {
+      "id": "workload-controllers-fc-15",
+      "front": "What does the schedule `0 3 * * 1` mean?",
+      "back": "Every Monday at 3 AM.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "workload-controllers-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ws-self-healing",
+      "stem": "You need a log collector running on every node, including nodes added later. Which controller fits?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+      "options": [
+        {
+          "id": "a",
+          "text": "DaemonSet",
+          "correct": true,
+          "explanation": "A DaemonSet adds the Pod to each node as it joins."
+        },
+        {
+          "id": "b",
+          "text": "Deployment with replicas equal to the node count",
+          "correct": false,
+          "explanation": "A Deployment doesn't control which host each Pod lands on, or follow node changes."
+        },
+        {
+          "id": "c",
+          "text": "StatefulSet",
+          "correct": false,
+          "explanation": "StatefulSets give sticky identity, not one Pod per node."
+        },
+        {
+          "id": "d",
+          "text": "CronJob",
+          "correct": false,
+          "explanation": "CronJobs run Jobs on a schedule."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-02",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ws-self-healing",
+      "stem": "Which tolerations does the DaemonSet controller add to its Pods automatically? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+      "options": [
+        {
+          "id": "a",
+          "text": "node.kubernetes.io/not-ready:NoExecute",
+          "correct": true,
+          "explanation": "So daemon Pods aren't evicted from not-ready nodes."
+        },
+        {
+          "id": "b",
+          "text": "node.kubernetes.io/unschedulable:NoSchedule",
+          "correct": true,
+          "explanation": "That's why daemon Pods can run on nodes marked unschedulable."
+        },
+        {
+          "id": "c",
+          "text": "node.kubernetes.io/disk-pressure:NoSchedule",
+          "correct": true,
+          "explanation": "Listed among the automatic tolerations."
+        },
+        {
+          "id": "d",
+          "text": "node-role.kubernetes.io/control-plane:NoSchedule",
+          "correct": false,
+          "explanation": "Not automatic; the page's example adds it in the Pod template."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-03",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "True or false: You can change a DaemonSet's `.spec.selector` after it has been created.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "The selector can't be mutated once the DaemonSet exists."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Changing it could orphan Pods, so it's immutable."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "A database needs each replica to keep its own volume and a stable hostname after rescheduling. Which controller should you use?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+      "options": [
+        {
+          "id": "a",
+          "text": "StatefulSet with volumeClaimTemplates",
+          "correct": true,
+          "explanation": "Each Pod gets a sticky identity and its own PVC."
+        },
+        {
+          "id": "b",
+          "text": "Deployment",
+          "correct": false,
+          "explanation": "Deployment Pods are interchangeable and have no stable identity."
+        },
+        {
+          "id": "c",
+          "text": "DaemonSet",
+          "correct": false,
+          "explanation": "That runs one Pod per node, not stable per-replica storage."
+        },
+        {
+          "id": "d",
+          "text": "Job",
+          "correct": false,
+          "explanation": "Jobs are for tasks that run to completion."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "StatefulSet `web` has 3 replicas and the default Pod management policy. You scale it to 1. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+      "options": [
+        {
+          "id": "a",
+          "text": "web-2 is terminated first; web-1 only after web-2 has fully shut down",
+          "correct": true,
+          "explanation": "Termination runs in reverse ordinal order, one at a time."
+        },
+        {
+          "id": "b",
+          "text": "web-0 and web-1 are terminated together",
+          "correct": false,
+          "explanation": "The lowest ordinal is kept; Pods go from the highest down."
+        },
+        {
+          "id": "c",
+          "text": "A random Pod is removed",
+          "correct": false,
+          "explanation": "StatefulSets remove Pods in a defined order."
+        },
+        {
+          "id": "d",
+          "text": "All Pods are recreated with new names",
+          "correct": false,
+          "explanation": "Remaining Pods keep their identity."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "You scale a StatefulSet from 5 to 2 replicas. What happens to the PVCs of the removed Pods by default?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+      "options": [
+        {
+          "id": "a",
+          "text": "They are kept",
+          "correct": true,
+          "explanation": "The default retention policy is Retain, for data safety."
+        },
+        {
+          "id": "b",
+          "text": "They are deleted with the Pods",
+          "correct": false,
+          "explanation": "Only if whenScaled is set to Delete."
+        },
+        {
+          "id": "c",
+          "text": "They are attached to the remaining Pods",
+          "correct": false,
+          "explanation": "Each PVC belongs to one Pod identity."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-07",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-rollouts",
+      "stem": "A StatefulSet has 5 replicas and `rollingUpdate.partition: 3`. You change the image. Which Pods are updated?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Ordinals 3 and 4",
+          "correct": true,
+          "explanation": "Only Pods with an ordinal greater than or equal to the partition are updated."
+        },
+        {
+          "id": "b",
+          "text": "Ordinals 0, 1 and 2",
+          "correct": false,
+          "explanation": "Those are below the partition and stay on the old version."
+        },
+        {
+          "id": "c",
+          "text": "All five Pods",
+          "correct": false,
+          "explanation": "The partition holds back the lower ordinals."
+        },
+        {
+          "id": "d",
+          "text": "None until you delete them",
+          "correct": false,
+          "explanation": "That's the OnDelete strategy."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-08",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ws-self-healing",
+      "stem": "Which `restartPolicy` is NOT allowed in a Job's Pod template?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Always",
+          "correct": true,
+          "explanation": "Jobs only allow Never or OnFailure."
+        },
+        {
+          "id": "b",
+          "text": "Never",
+          "correct": false,
+          "explanation": "Never is allowed."
+        },
+        {
+          "id": "c",
+          "text": "OnFailure",
+          "correct": false,
+          "explanation": "OnFailure is allowed."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "You need 10 successful runs of a task, with at most 3 Pods at a time. Which Job settings do that?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+      "options": [
+        {
+          "id": "a",
+          "text": "completions: 10, parallelism: 3",
+          "correct": true,
+          "explanation": "completions counts successes; parallelism caps concurrent Pods."
+        },
+        {
+          "id": "b",
+          "text": "completions: 3, parallelism: 10",
+          "correct": false,
+          "explanation": "That's reversed."
+        },
+        {
+          "id": "c",
+          "text": "backoffLimit: 10, parallelism: 3",
+          "correct": false,
+          "explanation": "backoffLimit counts retries, not successes."
+        },
+        {
+          "id": "d",
+          "text": "parallelism: 10 with completions unset",
+          "correct": false,
+          "explanation": "That's a work-queue Job with 10 Pods at once."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-10",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-self-healing",
+      "stem": "A Job has `backoffLimit: 5` and `activeDeadlineSeconds: 100`. Its Pods keep failing, and 100 seconds pass after only 2 retries. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The Job fails with reason DeadlineExceeded and its running Pods are terminated",
+          "correct": true,
+          "explanation": "activeDeadlineSeconds takes precedence over backoffLimit."
+        },
+        {
+          "id": "b",
+          "text": "It keeps retrying until 5 failures",
+          "correct": false,
+          "explanation": "The deadline stops new Pods even if backoffLimit isn't reached."
+        },
+        {
+          "id": "c",
+          "text": "It restarts from scratch automatically",
+          "correct": false,
+          "explanation": "A failed Job isn't restarted automatically."
+        },
+        {
+          "id": "d",
+          "text": "It is marked Complete",
+          "correct": false,
+          "explanation": "No Pod succeeded, so it can't be Complete."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-11",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "Which statements about finished Jobs are correct? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Completed Pods are kept by default so you can read their logs",
+          "correct": true,
+          "explanation": "Pods usually aren't deleted when the Job completes."
+        },
+        {
+          "id": "b",
+          "text": "ttlSecondsAfterFinished lets the TTL controller delete the Job and its Pods",
+          "correct": true,
+          "explanation": "The TTL controller deletes the Job cascadingly."
+        },
+        {
+          "id": "c",
+          "text": "Finished Jobs are deleted immediately by default",
+          "correct": false,
+          "explanation": "Without a TTL, the Job stays until you delete it."
+        },
+        {
+          "id": "d",
+          "text": "Deleting a Job with kubectl leaves its Pods running",
+          "correct": false,
+          "explanation": "kubectl delete removes the Job's Pods too."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "A CronJob's backup sometimes runs longer than its interval. You never want two backups at once; a late run should be skipped. Which setting fits?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/",
+      "options": [
+        {
+          "id": "a",
+          "text": "concurrencyPolicy: Forbid",
+          "correct": true,
+          "explanation": "Forbid skips the new run while the previous one is still going."
+        },
+        {
+          "id": "b",
+          "text": "concurrencyPolicy: Replace",
+          "correct": false,
+          "explanation": "Replace stops the running Job and starts the new one."
+        },
+        {
+          "id": "c",
+          "text": "concurrencyPolicy: Allow",
+          "correct": false,
+          "explanation": "Allow (the default) lets runs overlap."
+        },
+        {
+          "id": "d",
+          "text": "suspend: true",
+          "correct": false,
+          "explanation": "That stops all future runs."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-13",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "True or false: Editing a CronJob's job template also updates Jobs that are already running.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Changes only apply to Jobs created after the edit."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Running Jobs and their Pods continue unchanged."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-14",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ws-self-healing",
+      "stem": "Which CronJob schedule runs once a day at midnight?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/",
+      "options": [
+        {
+          "id": "a",
+          "text": "0 0 * * *",
+          "correct": true,
+          "explanation": "Equivalent to @daily."
+        },
+        {
+          "id": "b",
+          "text": "0 * * * *",
+          "correct": false,
+          "explanation": "That's @hourly."
+        },
+        {
+          "id": "c",
+          "text": "0 0 * * 0",
+          "correct": false,
+          "explanation": "That's @weekly (Sunday)."
+        },
+        {
+          "id": "d",
+          "text": "0 0 1 * *",
+          "correct": false,
+          "explanation": "That's @monthly."
+        }
+      ]
+    },
+    {
+      "id": "workload-controllers-q-15",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-rollouts",
+      "stem": "A StatefulSet rollout to a bad image is stuck under OrderedReady. You revert the template, but nothing changes. What else must you do?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Delete the Pods that were already started with the bad configuration",
+          "correct": true,
+          "explanation": "The StatefulSet keeps waiting for the broken Pod; deleting it lets the reverted template take effect."
+        },
+        {
+          "id": "b",
+          "text": "Increase revisionHistoryLimit",
+          "correct": false,
+          "explanation": "That only keeps more ControllerRevisions; it doesn't unstick the rollout."
+        },
+        {
+          "id": "c",
+          "text": "Delete the headless Service",
+          "correct": false,
+          "explanation": "That only breaks network identity."
+        },
+        {
+          "id": "d",
+          "text": "Wait; it recovers on its own",
+          "correct": false,
+          "explanation": "The page says this state needs manual intervention."
+        }
+      ]
+    }
+  ]
+}

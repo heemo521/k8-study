@@ -1,0 +1,852 @@
+{
+  "id": "pods",
+  "title": "Pods",
+  "summary": "What a Pod is, init and sidecar containers, lifecycle phases, restart policy, health probes and static Pods.",
+  "order": 5,
+  "domainIds": [
+    "foundations",
+    "workloads-scheduling"
+  ],
+  "competencyIds": [
+    "ws-self-healing"
+  ],
+  "prerequisites": [
+    "kubectl-basics"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "pods-what",
+      "heading": "What a Pod is",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/",
+      "sourceTitle": "Pods",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A Pod is the **smallest deployable unit** in Kubernetes: one or more containers that share network and storage, plus a spec saying how to run them. Its containers are always placed on the same node and scheduled together."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**One container per Pod** is the most common pattern; Kubernetes manages the Pod, not the container.",
+            "Put several containers in one Pod only when they are tightly coupled. Don't do it for replication: run more Pods instead.",
+            "Each Pod gets its own IP address. Its containers share the network namespace, so they reach each other on `localhost` and must not clash on ports.",
+            "Volumes declared in the Pod are visible to every container in it.",
+            "You rarely create bare Pods. Use a workload resource such as a Deployment, Job or StatefulSet, whose controller replaces failed Pods.",
+            "A Pod is an environment, not a process. Restarting a container is not the same as restarting the Pod."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Most of a running Pod is immutable. Updates may only change `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds`, `spec.terminationGracePeriodSeconds`, `spec.tolerations` (add only) and `spec.schedulingGates`."
+        }
+      ]
+    },
+    {
+      "id": "pods-init",
+      "heading": "Init containers",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
+      "sourceTitle": "Init Containers",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Init containers live in the `initContainers` field and run **before** the app containers. Use them for setup tools or to wait for a dependency."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "They always run to completion, **one at a time, in order**. Each must succeed before the next starts.",
+            "On failure the kubelet keeps restarting the init container. If the Pod's `restartPolicy` is `Never`, the whole Pod is marked failed instead.",
+            "Regular init containers don't support `lifecycle`, `livenessProbe`, `readinessProbe` or `startupProbe`.",
+            "While they run the Pod stays `Pending`, its `Initialized` condition is false and `kubectl get` shows a status like `Init:0/2`.",
+            "If the Pod restarts, every init container runs again, so make their code idempotent.",
+            "Check one with `kubectl logs <pod> -c <init-container>`."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "spec:\n  initContainers:\n  - name: <init-name>\n    image: busybox:1.28\n    command: ['sh', '-c', '<wait-or-setup-command>']\n  containers:\n  - name: <app-name>\n    image: <image>"
+        }
+      ]
+    },
+    {
+      "id": "pods-sidecar",
+      "heading": "Sidecar containers",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/",
+      "sourceTitle": "Sidecar Containers",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A native sidecar is an entry in `initContainers` with `restartPolicy: Always`. Instead of exiting, it keeps running for the Pod's whole life, alongside the app (stable since v1.33)."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "It starts in init order. The next init container waits until the sidecar has started (or its `startupProbe` passes).",
+            "It supports probes. A sidecar's `readinessProbe` feeds into whether the Pod is ready.",
+            "It can be restarted on its own without touching the main container.",
+            "At shutdown, sidecars stop **after** the main containers, in reverse order of declaration.",
+            "A sidecar does not stop a Job from completing once the main container finishes.",
+            "Typical uses: logging, monitoring, security or data sync."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "initContainers:\n- name: logshipper\n  image: alpine:latest\n  restartPolicy: Always\n  command: ['sh', '-c', 'tail -F /opt/logs.txt']"
+        }
+      ]
+    },
+    {
+      "id": "pods-phases",
+      "heading": "Pod phases and container states",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
+      "sourceTitle": "Pod Lifecycle",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Phase",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "Pending",
+              "Accepted, but containers not ready to run yet (includes scheduling and image pulls)"
+            ],
+            [
+              "Running",
+              "Bound to a node, all containers created, at least one running, starting or restarting"
+            ],
+            [
+              "Succeeded",
+              "All containers exited successfully and won't restart"
+            ],
+            [
+              "Failed",
+              "All containers terminated, at least one in failure"
+            ],
+            [
+              "Unknown",
+              "The Pod's state couldn't be obtained, usually a node communication problem"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Each container is **Waiting**, **Running** or **Terminated**. `kubectl describe pod <name-of-pod>` shows them, with a reason or exit code.",
+            "`CrashLoopBackOff` and `Terminating` are kubectl display statuses, not phases.",
+            "A Pod is scheduled once. It is never moved to another node; a controller creates a new Pod with a new UID instead.",
+            "Graceful termination defaults to **30 seconds** (`terminationGracePeriodSeconds`). The kubelet sends TERM, then KILL when time runs out."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "For a Pod stuck in `CrashLoopBackOff`, start with `kubectl logs <name-of-pod>` for the app error, then `kubectl describe pod <name-of-pod>` for events such as failed probes or config problems."
+        }
+      ]
+    },
+    {
+      "id": "pods-restart",
+      "heading": "restartPolicy and back-off",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
+      "sourceTitle": "Pod Lifecycle",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The Pod-level `restartPolicy` covers app containers and regular init containers. It takes `Always` (the default), `OnFailure` or `Never`."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Policy",
+            "Exit 0",
+            "Non-zero exit"
+          ],
+          "rows": [
+            [
+              "Always",
+              "Restarts",
+              "Restarts"
+            ],
+            [
+              "OnFailure",
+              "No restart",
+              "Restarts"
+            ],
+            [
+              "Never",
+              "No restart",
+              "No restart"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Deployments allow only `Always`. Jobs usually use `OnFailure` or `Never`.",
+            "Sidecars ignore the Pod policy because their own container-level `restartPolicy` is `Always`.",
+            "Restarts use exponential back-off: 10s, 20s, 40s and so on, capped at 300 seconds (5 minutes).",
+            "After a container runs cleanly for 10 minutes, the back-off timer resets.",
+            "Restart policy only covers replacement containers inside the same Pod, on the same node."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pods-probes",
+      "heading": "Liveness, readiness and startup probes",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+      "sourceTitle": "Liveness, Readiness, and Startup Probes",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Probe",
+            "On failure"
+          ],
+          "rows": [
+            [
+              "livenessProbe",
+              "kubelet kills the container; restartPolicy applies"
+            ],
+            [
+              "readinessProbe",
+              "Container marked not ready; Pod removed from Service endpoints. Runs for the whole lifecycle"
+            ],
+            [
+              "startupProbe",
+              "kubelet kills the container. Liveness and readiness wait until it succeeds"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Each probe uses exactly one mechanism: `exec` (exit code 0), `httpGet` (status 200 to 399), `tcpSocket` (port open) or `grpc` (response SERVING).",
+            "Defaults: `initialDelaySeconds` 0, `periodSeconds` 10, `timeoutSeconds` 1, `successThreshold` 1, `failureThreshold` 3.",
+            "`successThreshold` must be 1 for liveness and startup probes.",
+            "Liveness doesn't wait for readiness. Delay it with `initialDelaySeconds` or a startup probe.",
+            "A container with no probe of a given kind counts as Success for it."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "livenessProbe:\n  httpGet:\n    path: /healthz\n    port: 8080\n  initialDelaySeconds: 10\n  periodSeconds: 5\nreadinessProbe:\n  httpGet:\n    path: /ready\n    port: 8080"
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "A badly designed liveness probe can cause cascading failures by restarting containers under load. It should only fail when the app truly can't recover, such as a deadlock."
+        }
+      ]
+    },
+    {
+      "id": "pods-static",
+      "heading": "Static Pods",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/",
+      "sourceTitle": "Create static Pods",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A static Pod is defined by a manifest file on one node and run directly by that node's kubelet. Set `staticPodPath: <the directory>` in the kubelet config, e.g. `/etc/kubernetes/manifests`."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The kubelet rescans the directory and creates or removes Pods as files appear or disappear.",
+            "The API server shows a **mirror Pod**, named in the example as `static-web-my-node1` (Pod name plus node). Labels are copied to it.",
+            "`kubectl delete pod` on the mirror Pod doesn't stop the static Pod.",
+            "Files starting with a dot are skipped, but extensions are not filtered. A `.backup` copy in that directory also gets run.",
+            "On the node, inspect with `crictl ps` and `crictl logs <container_id>`.",
+            "The `--pod-manifest-path` kubelet flag is the deprecated alternative; `--manifest-url` / `staticPodURL` loads a manifest from a URL."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "To remove or change a static Pod, SSH to its node and move or edit the file in the manifest directory (e.g. `mv /etc/kubernetes/manifests/<file>.yaml /tmp`). Keep backups outside that directory."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "pods-fc-01",
+      "front": "What is a Pod?",
+      "back": "The smallest deployable unit: one or more containers sharing network and storage, scheduled together on one node.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/"
+    },
+    {
+      "id": "pods-fc-02",
+      "front": "How do containers in the same Pod talk to each other?",
+      "back": "Over `localhost`. They share the Pod's IP and port space.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/"
+    },
+    {
+      "id": "pods-fc-03",
+      "front": "Five Pod phases?",
+      "back": "Pending, Running, Succeeded, Failed, Unknown.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+    },
+    {
+      "id": "pods-fc-04",
+      "front": "Is CrashLoopBackOff a Pod phase?",
+      "back": "No. It's a kubectl status meaning restarts are in back-off.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+    },
+    {
+      "id": "pods-fc-05",
+      "front": "Default restartPolicy, and allowed values?",
+      "back": "Always (default), OnFailure, Never.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+    },
+    {
+      "id": "pods-fc-06",
+      "front": "Container restart back-off schedule?",
+      "back": "10s, 20s, 40s and so on, capped at 300s (5 min); resets after 10 min of clean running.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+    },
+    {
+      "id": "pods-fc-07",
+      "front": "Default Pod termination grace period?",
+      "back": "30 seconds.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+    },
+    {
+      "id": "pods-fc-08",
+      "front": "How do init containers run?",
+      "back": "Sequentially, in order, each to completion, before any app container starts.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/init-containers/"
+    },
+    {
+      "id": "pods-fc-09",
+      "front": "Which probe fields do regular init containers reject?",
+      "back": "livenessProbe, readinessProbe and startupProbe (and lifecycle).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/init-containers/"
+    },
+    {
+      "id": "pods-fc-10",
+      "front": "How do you declare a native sidecar?",
+      "back": "Put it in `initContainers` with `restartPolicy: Always`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/"
+    },
+    {
+      "id": "pods-fc-11",
+      "front": "Liveness vs readiness failure?",
+      "back": "Liveness: container is killed and restarted. Readiness: Pod is removed from Service endpoints, container keeps running.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/probes/"
+    },
+    {
+      "id": "pods-fc-12",
+      "front": "Probe defaults for periodSeconds, timeoutSeconds, failureThreshold?",
+      "back": "10s, 1s, 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/probes/"
+    },
+    {
+      "id": "pods-fc-13",
+      "front": "Startup probe with failureThreshold 30 and periodSeconds 10 gives how long to start?",
+      "back": "Up to 5 minutes (30 x 10 = 300s).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"
+    },
+    {
+      "id": "pods-fc-14",
+      "front": "Kubelet config field for the static Pod directory?",
+      "back": "`staticPodPath`",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/"
+    },
+    {
+      "id": "pods-fc-15",
+      "front": "What happens if you kubectl delete a static Pod's mirror Pod?",
+      "back": "The static Pod keeps running; the kubelet still owns it.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "pods-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Two containers in the same Pod need to talk over the network. What address should one use to reach the other?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/",
+      "options": [
+        {
+          "id": "a",
+          "text": "localhost, on the other container's port",
+          "correct": true,
+          "explanation": "Containers in a Pod share the network namespace."
+        },
+        {
+          "id": "b",
+          "text": "The other container's own IP address",
+          "correct": false,
+          "explanation": "Containers in a Pod don't get separate IPs; they share the Pod's."
+        },
+        {
+          "id": "c",
+          "text": "A Service is required",
+          "correct": false,
+          "explanation": "Services are for reaching Pods, not containers in the same Pod."
+        },
+        {
+          "id": "d",
+          "text": "They can't communicate over the network",
+          "correct": false,
+          "explanation": "They can, via localhost."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-02",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which fields of a running Pod can be changed with an ordinary update? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/",
+      "options": [
+        {
+          "id": "a",
+          "text": "spec.containers[*].image",
+          "correct": true,
+          "explanation": "One of the few mutable fields."
+        },
+        {
+          "id": "b",
+          "text": "spec.activeDeadlineSeconds",
+          "correct": true,
+          "explanation": "Mutable, within limits."
+        },
+        {
+          "id": "c",
+          "text": "metadata.namespace",
+          "correct": false,
+          "explanation": "Namespace, name and uid are immutable."
+        },
+        {
+          "id": "d",
+          "text": "spec.containers[*].resources",
+          "correct": false,
+          "explanation": "Resources change through the resize subresource, not a regular update."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-03",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ws-self-healing",
+      "stem": "A Pod's containers have all exited, and one exited with a non-zero code. The Pod has restartPolicy: Never. What phase is it in?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Failed",
+          "correct": true,
+          "explanation": "All containers terminated and at least one failed."
+        },
+        {
+          "id": "b",
+          "text": "Succeeded",
+          "correct": false,
+          "explanation": "Succeeded needs every container to exit successfully."
+        },
+        {
+          "id": "c",
+          "text": "Pending",
+          "correct": false,
+          "explanation": "Pending is before containers are set up."
+        },
+        {
+          "id": "d",
+          "text": "CrashLoopBackOff",
+          "correct": false,
+          "explanation": "That is a kubectl status, not a phase, and Never means no restarts."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "A container exits with code 0. Under which restartPolicy is it restarted?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Always",
+          "correct": true,
+          "explanation": "Always restarts after any termination."
+        },
+        {
+          "id": "b",
+          "text": "OnFailure",
+          "correct": false,
+          "explanation": "OnFailure restarts only on non-zero exit."
+        },
+        {
+          "id": "c",
+          "text": "Never",
+          "correct": false,
+          "explanation": "Never doesn't restart at all."
+        },
+        {
+          "id": "d",
+          "text": "None of them",
+          "correct": false,
+          "explanation": "Always does restart it."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-05",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "The delay between container restarts keeps doubling with no upper limit.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "The back-off is capped at 300 seconds (5 minutes)."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. It starts at 10s, doubles, and caps at 300s."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "A Pod shows STATUS CrashLoopBackOff. What is the most direct first step to find the cause?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl logs <name-of-pod>",
+          "correct": true,
+          "explanation": "The lifecycle docs call checking logs the most direct way to diagnose."
+        },
+        {
+          "id": "b",
+          "text": "Delete and recreate the node",
+          "correct": false,
+          "explanation": "The issue is inside the container, not the node."
+        },
+        {
+          "id": "c",
+          "text": "Change the Pod's restartPolicy to Always",
+          "correct": false,
+          "explanation": "Restarts are what's already happening."
+        },
+        {
+          "id": "d",
+          "text": "kubectl config use-context <context>",
+          "correct": false,
+          "explanation": "Switches clusters; it doesn't diagnose."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "A Pod has two init containers. The first never completes. What does kubectl get pods show?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A status like Init:0/2, and the app container hasn't started",
+          "correct": true,
+          "explanation": "Init containers run in order and block app containers."
+        },
+        {
+          "id": "b",
+          "text": "Running, with both init containers running in parallel",
+          "correct": false,
+          "explanation": "Init containers run one at a time."
+        },
+        {
+          "id": "c",
+          "text": "Succeeded",
+          "correct": false,
+          "explanation": "Nothing has completed."
+        },
+        {
+          "id": "d",
+          "text": "The app container starts once the second init container finishes",
+          "correct": false,
+          "explanation": "The second can't start until the first succeeds."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which statements about regular init containers are true? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "They run sequentially and each must succeed before the next",
+          "correct": true,
+          "explanation": "Stated directly in the docs."
+        },
+        {
+          "id": "b",
+          "text": "They can't use readinessProbe",
+          "correct": true,
+          "explanation": "Validation rejects it."
+        },
+        {
+          "id": "c",
+          "text": "They all run again if the Pod restarts",
+          "correct": true,
+          "explanation": "So their code should be idempotent."
+        },
+        {
+          "id": "d",
+          "text": "They keep running alongside the app containers",
+          "correct": false,
+          "explanation": "That describes sidecars; init containers run to completion."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "You want a log shipper that starts before the app and keeps running for the Pod's lifetime. How do you declare it as a native sidecar?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Under initContainers with restartPolicy: Always",
+          "correct": true,
+          "explanation": "That's how Kubernetes defines a sidecar."
+        },
+        {
+          "id": "b",
+          "text": "Under containers with restartPolicy: Never",
+          "correct": false,
+          "explanation": "Containers there are app containers, and Never stops restarts."
+        },
+        {
+          "id": "c",
+          "text": "Under initContainers with no restartPolicy",
+          "correct": false,
+          "explanation": "That is a regular init container that must exit."
+        },
+        {
+          "id": "d",
+          "text": "As a second entry under containers",
+          "correct": false,
+          "explanation": "That works as a plain multi-container Pod, but gives no start ordering and isn't a native sidecar."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-10",
+      "type": "truefalse",
+      "difficulty": 2,
+      "stem": "In a Job, a native sidecar container stops the Job from completing because it never exits.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "Native sidecars don't block Job completion once the main container finishes."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. The Job can complete while its sidecar was still running."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "A container's readiness probe starts failing while its liveness probe still passes. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The Pod is removed from matching Services' endpoints but the container keeps running",
+          "correct": true,
+          "explanation": "Readiness failure means no traffic, not a restart."
+        },
+        {
+          "id": "b",
+          "text": "The kubelet restarts the container",
+          "correct": false,
+          "explanation": "That's what a liveness or startup failure does."
+        },
+        {
+          "id": "c",
+          "text": "The Pod is rescheduled to another node",
+          "correct": false,
+          "explanation": "Pods are never moved between nodes."
+        },
+        {
+          "id": "d",
+          "text": "Nothing; readiness only matters at startup",
+          "correct": false,
+          "explanation": "Readiness probes run during the whole lifecycle."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-12",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ws-self-healing",
+      "stem": "Which probe defaults are correct? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "periodSeconds: 10",
+          "correct": true,
+          "explanation": "Probes run every 10 seconds by default."
+        },
+        {
+          "id": "b",
+          "text": "timeoutSeconds: 1",
+          "correct": true,
+          "explanation": "Default timeout is 1 second."
+        },
+        {
+          "id": "c",
+          "text": "failureThreshold: 3",
+          "correct": true,
+          "explanation": "Three failures in a row by default."
+        },
+        {
+          "id": "d",
+          "text": "initialDelaySeconds: 30",
+          "correct": false,
+          "explanation": "It defaults to 0. 30 seconds is the default Pod termination grace period."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-13",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-self-healing",
+      "stem": "A slow app needs up to 5 minutes to start, but you want liveness to react quickly afterwards. What does the probes task page recommend?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Add a startupProbe on the same endpoint with failureThreshold: 30 and periodSeconds: 10",
+          "correct": true,
+          "explanation": "30 x 10 = 300s to start; then liveness takes over."
+        },
+        {
+          "id": "b",
+          "text": "Set the liveness probe's failureThreshold to 1",
+          "correct": false,
+          "explanation": "That makes liveness react even faster; it gives no extra startup time. The page pairs it with a startup probe."
+        },
+        {
+          "id": "c",
+          "text": "Replace the liveness probe with a readiness probe",
+          "correct": false,
+          "explanation": "Readiness doesn't restart deadlocked containers."
+        },
+        {
+          "id": "d",
+          "text": "Set restartPolicy: Never",
+          "correct": false,
+          "explanation": "That disables restarts entirely."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-14",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-self-healing",
+      "stem": "You run kubectl delete pod on a static Pod's mirror Pod. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The static Pod keeps running and still appears in kubectl get pods",
+          "correct": true,
+          "explanation": "Deleting the mirror Pod doesn't make the kubelet remove the static Pod."
+        },
+        {
+          "id": "b",
+          "text": "The static Pod stops for good",
+          "correct": false,
+          "explanation": "Only removing the manifest file stops it."
+        },
+        {
+          "id": "c",
+          "text": "The kubelet deletes the manifest file",
+          "correct": false,
+          "explanation": "The Pod is removed only when you move the file out of the directory yourself."
+        },
+        {
+          "id": "d",
+          "text": "The request is rejected",
+          "correct": false,
+          "explanation": "The delete succeeds, but the Pod is still running afterwards."
+        }
+      ]
+    },
+    {
+      "id": "pods-q-15",
+      "type": "single",
+      "difficulty": 3,
+      "stem": "Before editing a static Pod manifest you ran cp kube-apiserver.yaml kube-apiserver.yaml.backup in the manifest directory. What's the risk?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The kubelet also reads the backup, so the outdated spec may take effect",
+          "correct": true,
+          "explanation": "Extensions aren't filtered; only dot-files are skipped."
+        },
+        {
+          "id": "b",
+          "text": "None; the kubelet only reads files ending in .yaml",
+          "correct": false,
+          "explanation": "There is no filtering by extension."
+        },
+        {
+          "id": "c",
+          "text": "The kubelet refuses to start",
+          "correct": false,
+          "explanation": "It tries to create a Pod from each file."
+        },
+        {
+          "id": "d",
+          "text": "The API server deletes the backup",
+          "correct": false,
+          "explanation": "The API server doesn't touch node files."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,654 @@
+{
+  "id": "ha-control-plane",
+  "title": "Highly Available Control Plane",
+  "summary": "Stacked vs external etcd, the API server load balancer, and building an HA control plane with kubeadm.",
+  "order": 5,
+  "domainIds": [
+    "cluster-arch"
+  ],
+  "competencyIds": [
+    "ca-ha"
+  ],
+  "prerequisites": [
+    "kubeadm"
+  ],
+  "estMinutes": 15,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "ha-control-plane-topologies",
+      "heading": "Stacked vs external etcd",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/",
+      "sourceTitle": "Options for Highly Available Topology",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "In both topologies every control plane node runs kube-apiserver, kube-scheduler and kube-controller-manager, and worker nodes reach the API servers through a **load balancer**. The difference is where etcd lives."
+        },
+        {
+          "type": "table",
+          "header": [
+            "",
+            "Stacked etcd",
+            "External etcd"
+          ],
+          "rows": [
+            [
+              "etcd location",
+              "A local member on each control plane node",
+              "Separate etcd hosts"
+            ],
+            [
+              "Talks to",
+              "Each etcd member serves only its own node's kube-apiserver",
+              "Each etcd host talks to every control plane node's kube-apiserver"
+            ],
+            [
+              "Minimum for HA",
+              "3 control plane nodes",
+              "3 control plane hosts + 3 etcd hosts"
+            ],
+            [
+              "Pros",
+              "Simpler to set up and to manage replication",
+              "Losing one node hurts redundancy less"
+            ],
+            [
+              "Cons",
+              "Losing a node loses a control plane instance **and** an etcd member",
+              "Needs twice as many hosts"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Stacked is the **kubeadm default**. `kubeadm init` and `kubeadm join --control-plane` create the local etcd member automatically.",
+            "Add more control plane nodes to reduce the coupled-failure risk of a stacked setup."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-lb",
+      "heading": "Load balancer for kube-apiserver",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "sourceTitle": "Creating Highly Available Clusters with kubeadm",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Give the load balancer a name that resolves in DNS. In a cloud, avoid pointing at a raw IP address.",
+            "Use a TCP forwarding load balancer that sends traffic to all healthy control plane nodes. The health check is a TCP check on the API server port (default **6443**).",
+            "The load balancer address must always match kubeadm's **ControlPlaneEndpoint**.",
+            "Add the first control plane node, test, then add the rest to the target group."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "nc -zv -w 2 <LOAD_BALANCER_IP> <PORT>"
+        },
+        {
+          "type": "p",
+          "text": "Before init, **connection refused** is expected (no API server yet). A **timeout** means the load balancer cannot reach the node, so fix its configuration."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-init",
+      "heading": "Initialise the first control plane node",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "sourceTitle": "Creating Highly Available Clusters with kubeadm",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "sudo kubeadm init --control-plane-endpoint \"LOAD_BALANCER_DNS:LOAD_BALANCER_PORT\" --upload-certs"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`--control-plane-endpoint`: the load balancer's address or DNS name and port.",
+            "`--upload-certs`: encrypts the certificates shared by all control plane nodes and stores them in the **kubeadm-certs** Secret.",
+            "The kubeadm-certs Secret and its decryption key **expire after two hours**. Re-upload and get a fresh key with `sudo kubeadm init phase upload-certs --upload-certs` on a joined control plane node.",
+            "`kubeadm certs certificate-key` generates a key you can pass with `--certificate-key` at init.",
+            "`--config` and `--certificate-key` can't be combined on init. With a config file, set the `certificateKey` field instead.",
+            "Save the printed join commands, then install a CNI plugin before joining further nodes."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "The certificate key unlocks sensitive cluster data. Keep it secret."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-join",
+      "heading": "Join more control plane nodes and workers",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "sourceTitle": "Creating Highly Available Clusters with kubeadm",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "# extra control plane node\nsudo kubeadm join <LB>:<PORT> --token <token> \\\n  --discovery-token-ca-cert-hash sha256:<hash> \\\n  --control-plane --certificate-key <key>\n\n# worker node\nsudo kubeadm join <LB>:<PORT> --token <token> \\\n  --discovery-token-ca-cert-hash sha256:<hash>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`--control-plane` makes the joining node a new control plane instance.",
+            "`--certificate-key` downloads the certificates from the kubeadm-certs Secret and decrypts them.",
+            "Join control plane nodes one at a time, after the first node is fully initialised.",
+            "CoreDNS Pods usually all land on the first node. After another node joins, spread them with `kubectl -n kube-system rollout restart deployment coredns`."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Spot the difference fast: the control plane join command is the worker join command plus `--control-plane --certificate-key <key>`."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-external",
+      "heading": "External etcd setup",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "sourceTitle": "Creating Highly Available Clusters with kubeadm",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Set up the etcd cluster first. Then copy `/etc/kubernetes/pki/etcd/ca.crt`, `/etc/kubernetes/pki/apiserver-etcd-client.crt` and `apiserver-etcd-client.key` from an etcd node to the first control plane node, and describe etcd in a kubeadm config file:"
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: kubeadm.k8s.io/v1beta4\nkind: ClusterConfiguration\nkubernetesVersion: stable\ncontrolPlaneEndpoint: \"LOAD_BALANCER_DNS:LOAD_BALANCER_PORT\"\netcd:\n  external:\n    endpoints:\n      - https://ETCD_0_IP:2379\n      - https://ETCD_1_IP:2379\n      - https://ETCD_2_IP:2379\n    caFile: /etc/kubernetes/pki/etcd/ca.crt\n    certFile: /etc/kubernetes/pki/apiserver-etcd-client.crt\n    keyFile: /etc/kubernetes/pki/apiserver-etcd-client.key"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "sudo kubeadm init --config kubeadm-config.yaml --upload-certs"
+        },
+        {
+          "type": "p",
+          "text": "Remaining control plane nodes join exactly as in the stacked case."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-sizing",
+      "heading": "Sizing, quorum and manual certificates",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "sourceTitle": "Creating Highly Available Clusters with kubeadm",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Use **three or more** control plane machines. An **odd number** helps leader selection if a machine or zone fails.",
+            "External etcd needs three or more extra machines. An odd number of etcd members is required for optimal voting quorum.",
+            "Without `--upload-certs`, copy only these from the first node: `ca.crt`, `ca.key`, `sa.key`, `sa.pub`, `front-proxy-ca.crt`, `front-proxy-ca.key`, `etcd/ca.crt` and (stacked only) `etcd/ca.key`. Copying every certificate can break joins because of missing SANs."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "This guide doesn't cover cloud providers: neither approach works there with LoadBalancer Services or dynamic PersistentVolumes."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "ha-control-plane-fc-01",
+      "front": "Stacked etcd topology in one line?",
+      "back": "Each control plane node also runs a local etcd member that serves only that node's kube-apiserver.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/"
+    },
+    {
+      "id": "ha-control-plane-fc-02",
+      "front": "Which HA topology does kubeadm use by default?",
+      "back": "Stacked etcd.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/"
+    },
+    {
+      "id": "ha-control-plane-fc-03",
+      "front": "Minimum hosts for HA with external etcd?",
+      "back": "Three control plane hosts plus three etcd hosts.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/"
+    },
+    {
+      "id": "ha-control-plane-fc-04",
+      "front": "Main risk of the stacked topology?",
+      "back": "Coupled failure: losing one node loses both an etcd member and a control plane instance.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/"
+    },
+    {
+      "id": "ha-control-plane-fc-05",
+      "front": "How do worker nodes reach the API servers in an HA cluster?",
+      "back": "Through a load balancer in front of the kube-apiserver instances.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/"
+    },
+    {
+      "id": "ha-control-plane-fc-06",
+      "front": "Health check for the API server load balancer?",
+      "back": "A TCP check on the kube-apiserver port (default 6443).",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/"
+    },
+    {
+      "id": "ha-control-plane-fc-07",
+      "front": "Two key flags on the first HA kubeadm init?",
+      "back": "--control-plane-endpoint \"<LB_DNS>:<LB_PORT>\" and --upload-certs.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/"
+    },
+    {
+      "id": "ha-control-plane-fc-08",
+      "front": "Where does --upload-certs store certificates, and for how long?",
+      "back": "Encrypted in the kubeadm-certs Secret; it and the key expire after two hours.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/"
+    },
+    {
+      "id": "ha-control-plane-fc-09",
+      "front": "Re-upload control plane certs and get a new key?",
+      "back": "sudo kubeadm init phase upload-certs --upload-certs",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/"
+    },
+    {
+      "id": "ha-control-plane-fc-10",
+      "front": "Extra flags that turn a worker join into a control plane join?",
+      "back": "--control-plane --certificate-key <key>",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/"
+    },
+    {
+      "id": "ha-control-plane-fc-11",
+      "front": "Why prefer an odd number of control plane nodes?",
+      "back": "It helps leader selection when a machine or zone fails.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/"
+    },
+    {
+      "id": "ha-control-plane-fc-12",
+      "front": "Rebalance CoreDNS after joining control plane nodes?",
+      "back": "kubectl -n kube-system rollout restart deployment coredns",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "ha-control-plane-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-ha",
+      "stem": "Which topology runs an etcd member on every control plane node?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Stacked etcd",
+          "correct": true,
+          "explanation": "etcd is colocated with the control plane in the stacked topology."
+        },
+        {
+          "id": "b",
+          "text": "External etcd",
+          "correct": false,
+          "explanation": "External etcd runs on separate hosts."
+        },
+        {
+          "id": "c",
+          "text": "Single-node etcd",
+          "correct": false,
+          "explanation": "That is not one of the two HA topologies."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "You must survive a node loss with as little redundancy impact as possible and have hosts to spare. Which topology fits?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/",
+      "options": [
+        {
+          "id": "a",
+          "text": "External etcd",
+          "correct": true,
+          "explanation": "Decoupling etcd from the control plane limits the impact of losing one host."
+        },
+        {
+          "id": "b",
+          "text": "Stacked etcd with two nodes",
+          "correct": false,
+          "explanation": "Stacked loses an etcd member and a control plane instance together, and the page asks for at least three."
+        },
+        {
+          "id": "c",
+          "text": "Stacked etcd with one node",
+          "correct": false,
+          "explanation": "One node is not highly available."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ca-ha",
+      "stem": "True or false: The external etcd topology needs at least six hosts for the control plane and etcd together.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct: three control plane hosts plus three etcd hosts."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "The page states a minimum of three of each."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "Which command initialises the first node of a stacked HA control plane?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "options": [
+        {
+          "id": "a",
+          "text": "sudo kubeadm init --control-plane-endpoint \"LOAD_BALANCER_DNS:LOAD_BALANCER_PORT\" --upload-certs",
+          "correct": true,
+          "explanation": "The endpoint points at the load balancer; --upload-certs shares the certificates."
+        },
+        {
+          "id": "b",
+          "text": "sudo kubeadm join --control-plane --certificate-key <key>",
+          "correct": false,
+          "explanation": "That joins additional control plane nodes."
+        },
+        {
+          "id": "c",
+          "text": "sudo kubeadm init phase upload-certs --upload-certs",
+          "correct": false,
+          "explanation": "That re-uploads certificates on an existing control plane node."
+        },
+        {
+          "id": "d",
+          "text": "sudo kubeadm init --pod-network-cidr <cidr>",
+          "correct": false,
+          "explanation": "This sets a Pod CIDR but gives no shared endpoint for HA."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "Three hours after `kubeadm init --upload-certs`, joining a control plane node with the saved `--certificate-key` fails. Why, and what fixes it?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The kubeadm-certs Secret and key expired after two hours; run kubeadm init phase upload-certs --upload-certs and use the new key",
+          "correct": true,
+          "explanation": "Uploaded certs are deleted after two hours; re-uploading prints a new key."
+        },
+        {
+          "id": "b",
+          "text": "The bootstrap token is missing; run kubectl -n kube-system rollout restart deployment coredns",
+          "correct": false,
+          "explanation": "Restarting CoreDNS has nothing to do with certificates."
+        },
+        {
+          "id": "c",
+          "text": "The load balancer must be removed; join directly to the first node IP",
+          "correct": false,
+          "explanation": "Control plane nodes should be reached via the load balancer endpoint."
+        },
+        {
+          "id": "d",
+          "text": "etcd must be restored from a snapshot",
+          "correct": false,
+          "explanation": "Nothing is wrong with etcd."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-06",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "Which flags must you add to a worker `kubeadm join` command to join a node as an extra control plane node (certs uploaded at init)? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "options": [
+        {
+          "id": "a",
+          "text": "--control-plane",
+          "correct": true,
+          "explanation": "It tells kubeadm join to create a new control plane instance."
+        },
+        {
+          "id": "b",
+          "text": "--certificate-key",
+          "correct": true,
+          "explanation": "It decrypts the certificates from the kubeadm-certs Secret."
+        },
+        {
+          "id": "c",
+          "text": "--upload-certs",
+          "correct": false,
+          "explanation": "That is used with kubeadm init (or its upload-certs phase), not join."
+        },
+        {
+          "id": "d",
+          "text": "--pod-network-cidr",
+          "correct": false,
+          "explanation": "That is an init flag for the Pod network."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "Testing the new API server load balancer with `nc -zv -w 2 <LB_IP> <PORT>` before `kubeadm init` returns \"connection refused\". What does that mean?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Expected: the API server isn't running yet",
+          "correct": true,
+          "explanation": "The guide says connection refused is expected at this point."
+        },
+        {
+          "id": "b",
+          "text": "The load balancer cannot reach the control plane node",
+          "correct": false,
+          "explanation": "A timeout would indicate that."
+        },
+        {
+          "id": "c",
+          "text": "Port 6443 is blocked by a firewall on the client",
+          "correct": false,
+          "explanation": "The page treats refused as the normal pre-init result."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-08",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "True or false: When using a kubeadm config file on init, you can still pass `--certificate-key` on the command line.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "They cannot be mixed."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. Put certificateKey in the config file instead."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "For an external etcd cluster, where do you tell kubeadm the etcd endpoints?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "options": [
+        {
+          "id": "a",
+          "text": "In ClusterConfiguration under etcd.external.endpoints, with caFile, certFile and keyFile",
+          "correct": true,
+          "explanation": "External etcd requires a config file with these fields."
+        },
+        {
+          "id": "b",
+          "text": "With kubeadm init --control-plane-endpoint",
+          "correct": false,
+          "explanation": "That is the API server load balancer endpoint."
+        },
+        {
+          "id": "c",
+          "text": "kubeadm discovers them automatically",
+          "correct": false,
+          "explanation": "Automatic management only applies to stacked etcd."
+        },
+        {
+          "id": "d",
+          "text": "With kubeadm join --certificate-key",
+          "correct": false,
+          "explanation": "That decrypts uploaded control plane certificates."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-10",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ca-ha",
+      "stem": "You chose not to use `--upload-certs`. Which files do you copy from the first control plane node to the others? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "options": [
+        {
+          "id": "a",
+          "text": "/etc/kubernetes/pki/ca.crt and ca.key",
+          "correct": true,
+          "explanation": "Cluster CA files are in the copy list."
+        },
+        {
+          "id": "b",
+          "text": "/etc/kubernetes/pki/sa.key and sa.pub",
+          "correct": true,
+          "explanation": "Service account key pair is in the list."
+        },
+        {
+          "id": "c",
+          "text": "/etc/kubernetes/pki/front-proxy-ca.crt and front-proxy-ca.key",
+          "correct": true,
+          "explanation": "Front proxy CA files are in the list."
+        },
+        {
+          "id": "d",
+          "text": "Every file in /etc/kubernetes/pki",
+          "correct": false,
+          "explanation": "Copying all certs can make joins fail due to missing SANs."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-11",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ca-ha",
+      "stem": "Why does the guide favour an odd number of control plane nodes?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It helps leader selection after a machine or zone failure",
+          "correct": true,
+          "explanation": "Stated in the prerequisites."
+        },
+        {
+          "id": "b",
+          "text": "kubeadm refuses to join an even number",
+          "correct": false,
+          "explanation": "No such restriction is described."
+        },
+        {
+          "id": "c",
+          "text": "The load balancer needs an odd target count",
+          "correct": false,
+          "explanation": "The load balancer has no such need."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "After joining two more control plane nodes, all CoreDNS Pods still run on the first node. What does the guide suggest?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl -n kube-system rollout restart deployment coredns",
+          "correct": true,
+          "explanation": "Restarting the Deployment lets the Pods spread to the new nodes."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get pod -n kube-system -w",
+          "correct": false,
+          "explanation": "This only watches Pods."
+        },
+        {
+          "id": "c",
+          "text": "sudo kubeadm init phase upload-certs --upload-certs",
+          "correct": false,
+          "explanation": "This re-uploads certificates."
+        }
+      ]
+    },
+    {
+      "id": "ha-control-plane-q-13",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ca-ha",
+      "stem": "True or false: In the stacked topology, each etcd member talks to the kube-apiserver of every control plane node.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "That describes external etcd."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. A stacked etcd member talks only to its own node's kube-apiserver."
+        }
+      ]
+    }
+  ]
+}

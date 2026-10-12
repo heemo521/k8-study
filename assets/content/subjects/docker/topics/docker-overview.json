@@ -1,0 +1,463 @@
+{
+  "id": "docker-overview",
+  "title": "Docker Overview & Architecture",
+  "summary": "What Docker is for, how the client talks to the daemon, and how registries, images and containers fit together.",
+  "order": 1,
+  "domainIds": ["docker-concepts"],
+  "competencyIds": ["dk-arch"],
+  "prerequisites": [],
+  "estMinutes": 12,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "docker-overview-platform",
+      "heading": "What Docker is for",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "sourceTitle": "What is Docker?",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Docker is an open platform to **develop, ship and run** applications. It packages an app into a **container**: a loosely isolated environment holding everything the app needs, so it doesn't depend on what the host has installed."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Consistent delivery:** developers share containers, push them to test, and ship a fix by pushing an updated image. A good fit for CI/CD.",
+            "**Portability and scaling:** the same container runs on a laptop, physical or virtual machines in a data center, or a cloud provider.",
+            "**Density:** containers are lightweight, a cost-effective alternative to hypervisor-based virtual machines."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "docker-overview-arch",
+      "heading": "Client, daemon and API",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "sourceTitle": "What is Docker?",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Docker uses a **client-server architecture**. The client sends requests; the daemon does the heavy lifting of building, running and distributing containers. They talk over a **REST API**, using UNIX sockets or a network interface, and may run on the same machine or the client can target a remote daemon."
+        },
+        {
+          "type": "table",
+          "header": ["Component", "Role"],
+          "rows": [
+            ["Docker daemon (`dockerd`)", "Listens for Docker API requests; manages images, containers, networks and volumes. Can talk to other daemons to manage Docker services."],
+            ["Docker client (`docker`)", "Main way users interact. `docker run` is sent to `dockerd`, which carries it out. One client can talk to more than one daemon."],
+            ["Docker Compose", "Another client, for apps made of a set of containers."],
+            ["Docker Desktop", "Mac/Windows/Linux app bundling `dockerd`, `docker`, Compose, Docker Content Trust, Kubernetes and Credential Helper."]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "The `docker` CLI does no work itself. It calls the Docker API, and `dockerd` executes the request."
+        }
+      ]
+    },
+    {
+      "id": "docker-overview-objects",
+      "heading": "Images vs containers",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "sourceTitle": "What is Docker?",
+      "blocks": [
+        {
+          "type": "table",
+          "header": ["Object", "What it is"],
+          "rows": [
+            ["Image", "A **read-only template** with instructions for creating a container. Often based on another image plus customization. Built from a Dockerfile; each instruction creates a layer, and only changed layers are rebuilt."],
+            ["Container", "A **runnable instance of an image**. Create, start, stop, move or delete it via the CLI or API; attach networks and storage, or make a new image from its current state."]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "A container is defined by its image plus the configuration given when it is created or started. When a container is removed, state changes not kept in persistent storage are lost."
+        },
+        {
+          "type": "p",
+          "text": "Other Docker objects include networks, volumes and plugins."
+        }
+      ]
+    },
+    {
+      "id": "docker-overview-run",
+      "heading": "What docker run does",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "sourceTitle": "What is Docker?",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker run -i -t ubuntu /bin/bash"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Pulls `ubuntu` from the configured registry if it isn't local (like `docker pull ubuntu`).",
+            "Creates a container (like `docker container create`).",
+            "Adds a **read-write filesystem** as the container's final layer.",
+            "Creates a network interface on the default network and assigns an IP address.",
+            "Starts the container and runs `/bin/bash`; `-i` and `-t` attach it interactively to your terminal.",
+            "Typing `exit` stops the container, but it **isn't removed**; you can start or remove it later."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "**Under the hood:** Docker is written in Go and uses Linux kernel features. It creates a set of **namespaces** for each container; each aspect of the container runs in its own namespace, which limits its access."
+        }
+      ]
+    },
+    {
+      "id": "docker-overview-container",
+      "heading": "What a container is",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/",
+      "sourceTitle": "What is a container?",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A container is an **isolated process** with all the files it needs. Each app component (frontend, API, database) can run in its own container. Containers are:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Self-contained:** no reliance on dependencies pre-installed on the host.",
+            "**Isolated:** minimal influence on the host and other containers.",
+            "**Independent:** deleting one doesn't affect the others.",
+            "**Portable:** runs the same on a dev machine, a data center or the cloud."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "**Containers vs VMs:** a VM is a whole OS with its own kernel, drivers and programs. Containers **share the host kernel**, so more apps fit on less infrastructure. They are often combined: a cloud VM with a container runtime runs many containerized apps."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker run -d -p 8080:80 docker/welcome-to-docker   # prints the full container ID\ndocker ps                      # running containers only\ndocker ps -a                   # include stopped containers\ndocker stop <the-container-id>"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "You don't need the full ID: enough leading characters to be unique works, e.g. `docker stop a1f`. If a container seems to be missing, check `docker ps -a`, because plain `docker ps` hides stopped ones."
+        }
+      ]
+    },
+    {
+      "id": "docker-overview-image",
+      "heading": "What an image is",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/",
+      "sourceTitle": "What is an image?",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A container image is a standardized package of all the files, binaries, libraries and configuration a container needs. Two principles:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Images are immutable.** Once created they can't be modified; you make a new image or add changes on top.",
+            "**Images are made of layers.** Each layer is a set of filesystem changes (add, remove or modify files)."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Docker Hub is the default place to find images. Its **Docker Official Images** (e.g. Redis, Memcached) are a curated set and a common starting point; other trusted content includes Docker Hardened Images, Verified Publishers and Docker-Sponsored Open Source."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker search docker/welcome-to-docker\ndocker pull docker/welcome-to-docker          # no tag given: uses latest\ndocker image ls                                # SIZE is uncompressed\ndocker image history docker/welcome-to-docker  # add --no-trunc for full commands"
+        }
+      ]
+    },
+    {
+      "id": "docker-overview-registry",
+      "heading": "Registries and repositories",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-registry/",
+      "sourceTitle": "What is a registry?",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "An **image registry** is a central place to store and share images, public or private. **Docker Hub** is public and is the **default** registry. Alternatives include Amazon ECR, Azure ACR and Google GCR, or a self-hosted one such as Harbor, JFrog Artifactory or GitLab Container registry."
+        },
+        {
+          "type": "table",
+          "header": ["Term", "Meaning"],
+          "rows": [
+            ["Registry", "The service that stores and manages images."],
+            ["Repository", "A collection of related images inside a registry, like a project folder (e.g. `project-a:v1.0`, `project-a:v2.0`)."]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "docker build -t <YOUR_DOCKER_USERNAME>/docker-quickstart .\ndocker tag <YOUR_DOCKER_USERNAME>/docker-quickstart <YOUR_DOCKER_USERNAME>/docker-quickstart:1.0\ndocker push <YOUR_DOCKER_USERNAME>/docker-quickstart:1.0"
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Don't forget the trailing `.` in `docker build`: it tells Docker where to find the Dockerfile."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "docker-overview-fc-01",
+      "front": "What architecture does Docker use?",
+      "back": "Client-server: the `docker` client sends requests to the Docker daemon (`dockerd`), which does the building, running and distributing.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/"
+    },
+    {
+      "id": "docker-overview-fc-02",
+      "front": "How do the Docker client and daemon communicate?",
+      "back": "Through a REST API, over UNIX sockets or a network interface.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/"
+    },
+    {
+      "id": "docker-overview-fc-03",
+      "front": "What does `dockerd` manage?",
+      "back": "Docker objects such as images, containers, networks and volumes. It listens for Docker API requests.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/"
+    },
+    {
+      "id": "docker-overview-fc-04",
+      "front": "Image vs container in one line each?",
+      "back": "Image: read-only template for creating containers. Container: a runnable instance of an image.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/"
+    },
+    {
+      "id": "docker-overview-fc-05",
+      "front": "What happens to a container's changes when the container is removed?",
+      "back": "Any state changes not stored in persistent storage disappear.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/"
+    },
+    {
+      "id": "docker-overview-fc-06",
+      "front": "Which Linux kernel feature gives a container its isolated workspace?",
+      "back": "Namespaces. Docker creates a set of namespaces for each container.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/"
+    },
+    {
+      "id": "docker-overview-fc-07",
+      "front": "After `docker run -i -t ubuntu /bin/bash`, you type `exit`. What state is the container in?",
+      "back": "Stopped but not removed. You can start it again or remove it.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/"
+    },
+    {
+      "id": "docker-overview-fc-08",
+      "front": "Key difference between a container and a VM?",
+      "back": "A VM runs a whole OS with its own kernel; containers are isolated processes that share the host's kernel.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/"
+    },
+    {
+      "id": "docker-overview-fc-09",
+      "front": "How do you list stopped containers too?",
+      "back": "`docker ps -a` (plain `docker ps` shows only running ones).",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/"
+    },
+    {
+      "id": "docker-overview-fc-10",
+      "front": "Two core principles of container images?",
+      "back": "Images are immutable, and they are composed of layers (each a set of filesystem changes).",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/"
+    },
+    {
+      "id": "docker-overview-fc-11",
+      "front": "Which command shows the layers of an image?",
+      "back": "`docker image history <image>` (add `--no-trunc` to see full commands).",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/"
+    },
+    {
+      "id": "docker-overview-fc-12",
+      "front": "Registry vs repository?",
+      "back": "A registry stores and manages images; a repository is a collection of related images inside a registry.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-registry/"
+    },
+    {
+      "id": "docker-overview-fc-13",
+      "front": "What is Docker's default registry?",
+      "back": "Docker Hub, a public registry anyone can use.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-registry/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "docker-overview-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-arch",
+      "stem": "You type `docker run` in a terminal. Which component actually creates and starts the container?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "options": [
+        { "id": "a", "text": "The Docker daemon (dockerd)", "correct": true, "explanation": "The client sends the command to dockerd, which carries it out." },
+        { "id": "b", "text": "The docker client process itself", "correct": false, "explanation": "The client only sends requests through the Docker API." },
+        { "id": "c", "text": "Docker Hub", "correct": false, "explanation": "Docker Hub is a registry that stores images; it doesn't run containers." },
+        { "id": "d", "text": "Docker Compose", "correct": false, "explanation": "Compose is another client, for multi-container apps." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-02",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "dk-arch",
+      "stem": "Which statements about the Docker client and daemon are true? Select 3.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "options": [
+        { "id": "a", "text": "They communicate using a REST API", "correct": true, "explanation": "The API runs over UNIX sockets or a network interface." },
+        { "id": "b", "text": "A client can connect to a remote daemon", "correct": true, "explanation": "They can be on the same system or the client can target a remote daemon." },
+        { "id": "c", "text": "One client can communicate with more than one daemon", "correct": true, "explanation": "The overview states this explicitly." },
+        { "id": "d", "text": "They must always run on the same machine", "correct": false, "explanation": "Remote daemons are supported." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-03",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-arch",
+      "stem": "Which best describes a Docker image?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "options": [
+        { "id": "a", "text": "A read-only template with instructions for creating a container", "correct": true, "explanation": "That is the overview's definition." },
+        { "id": "b", "text": "A runnable instance that you start and stop", "correct": false, "explanation": "That describes a container." },
+        { "id": "c", "text": "A service that stores and distributes images", "correct": false, "explanation": "That describes a registry." },
+        { "id": "d", "text": "The process that listens for API requests", "correct": false, "explanation": "That's the daemon, dockerd." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-04",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "dk-arch",
+      "stem": "When a container is removed, changes to its state that weren't saved to persistent storage are lost.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "options": [
+        { "id": "a", "text": "True", "correct": true, "explanation": "The overview says such changes disappear on removal." },
+        { "id": "b", "text": "False", "correct": false, "explanation": "Only persistent storage survives removal." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-05",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "dk-arch",
+      "stem": "You run `docker run -i -t ubuntu /bin/bash` on a host that has never pulled ubuntu, with default settings. What does Docker do? Select 3.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "options": [
+        { "id": "a", "text": "Pulls the ubuntu image from the configured registry", "correct": true, "explanation": "As if you had run docker pull ubuntu." },
+        { "id": "b", "text": "Adds a read-write filesystem as the container's final layer", "correct": true, "explanation": "This lets the container create or modify files." },
+        { "id": "c", "text": "Connects the container to the default network and assigns it an IP", "correct": true, "explanation": "No network options were given, so the default network is used." },
+        { "id": "d", "text": "Removes the container automatically when you type exit", "correct": false, "explanation": "The container stops but isn't removed." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-arch",
+      "stem": "Which technology does Docker use to give each container its isolated workspace?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
+      "options": [
+        { "id": "a", "text": "Linux namespaces", "correct": true, "explanation": "Docker creates a set of namespaces per container." },
+        { "id": "b", "text": "A separate guest kernel per container", "correct": false, "explanation": "That's how VMs work; containers share the host kernel." },
+        { "id": "c", "text": "Docker Content Trust", "correct": false, "explanation": "Content Trust is a component bundled with Docker Desktop, not the isolation mechanism." },
+        { "id": "d", "text": "The REST API", "correct": false, "explanation": "The API is how the client talks to the daemon." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-07",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-arch",
+      "stem": "Why can a host fit more containers than VMs for the same apps?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/",
+      "options": [
+        { "id": "a", "text": "Containers share the host kernel instead of each running a full OS", "correct": true, "explanation": "A VM carries its own kernel, drivers and programs." },
+        { "id": "b", "text": "Containers have no isolation at all", "correct": false, "explanation": "Containers are isolated processes." },
+        { "id": "c", "text": "Containers always run inside a VM", "correct": false, "explanation": "They can be combined with VMs, but that isn't required." },
+        { "id": "d", "text": "Containers can't use networking", "correct": false, "explanation": "Containers can publish ports and join networks." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-arch",
+      "stem": "You started a container earlier, but it doesn't appear in `docker ps`. What should you run to check whether it exists but has stopped?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/",
+      "options": [
+        { "id": "a", "text": "docker ps -a", "correct": true, "explanation": "-a lists all containers, including stopped ones." },
+        { "id": "b", "text": "docker image ls", "correct": false, "explanation": "That lists images, not containers." },
+        { "id": "c", "text": "docker search", "correct": false, "explanation": "That searches Docker Hub for images." },
+        { "id": "d", "text": "docker stop", "correct": false, "explanation": "That stops a running container." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-09",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "dk-arch",
+      "stem": "To stop a container by ID you must type the full container ID.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/",
+      "options": [
+        { "id": "a", "text": "True", "correct": false, "explanation": "Enough of the ID to be unique is sufficient, e.g. docker stop a1f." },
+        { "id": "b", "text": "False", "correct": true, "explanation": "A unique prefix of the ID works." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-10",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "dk-arch",
+      "stem": "Which statements about container images are correct? Select 2.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/",
+      "options": [
+        { "id": "a", "text": "Once created, an image can't be modified", "correct": true, "explanation": "Images are immutable; you build a new one or add on top." },
+        { "id": "b", "text": "Each layer is a set of filesystem changes", "correct": true, "explanation": "Layers add, remove or modify files." },
+        { "id": "c", "text": "Running a container edits the image's layers in place", "correct": false, "explanation": "Images are immutable; once created they can't be modified." },
+        { "id": "d", "text": "The SIZE shown by docker image ls is the download size", "correct": false, "explanation": "It's the uncompressed image size." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-11",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "dk-arch",
+      "stem": "Which command lists an image's layers and the command that created each one?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/",
+      "options": [
+        { "id": "a", "text": "docker image history <image>", "correct": true, "explanation": "It shows layers, sizes and the creating command." },
+        { "id": "b", "text": "docker image ls", "correct": false, "explanation": "That lists images, not their layers." },
+        { "id": "c", "text": "docker search <image>", "correct": false, "explanation": "That searches Docker Hub." },
+        { "id": "d", "text": "docker ps", "correct": false, "explanation": "That lists running containers." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "dk-arch",
+      "stem": "Your team keeps `project-a:v1.0` and `project-a:v2.0` together on Docker Hub. What is the grouping that holds them called?",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-registry/",
+      "options": [
+        { "id": "a", "text": "A repository", "correct": true, "explanation": "A repository is a collection of related images within a registry." },
+        { "id": "b", "text": "A registry", "correct": false, "explanation": "The registry (Docker Hub) holds many repositories." },
+        { "id": "c", "text": "A container", "correct": false, "explanation": "A container is a running instance of an image." },
+        { "id": "d", "text": "A layer", "correct": false, "explanation": "A layer is a set of filesystem changes inside one image." }
+      ]
+    },
+    {
+      "id": "docker-overview-q-13",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "dk-arch",
+      "stem": "Docker Hub is the default registry, but you can also run a private registry.",
+      "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-registry/",
+      "options": [
+        { "id": "a", "text": "True", "correct": true, "explanation": "Private registries can run locally or inside an organization, e.g. Harbor." },
+        { "id": "b", "text": "False", "correct": false, "explanation": "Registries can be public or private." }
+      ]
+    }
+  ]
+}

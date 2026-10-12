@@ -1,0 +1,703 @@
+{
+  "id": "ingress",
+  "title": "Ingress & Ingress Controllers",
+  "summary": "Route outside HTTP(S) traffic to Services by host and path, pick a controller with IngressClass, and terminate TLS.",
+  "order": 4,
+  "domainIds": [
+    "services-networking"
+  ],
+  "competencyIds": [
+    "sn-ingress"
+  ],
+  "prerequisites": [
+    "services"
+  ],
+  "estMinutes": 16,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "ingress-what",
+      "heading": "What an Ingress is (and isn't)",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "sourceTitle": "Ingress",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "An Ingress is an API object (`networking.k8s.io/v1`) that manages **external access to Services**, typically HTTP. Rules on the Ingress decide which Service gets each request."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "It can give Services externally reachable URLs, load balance, terminate SSL/TLS and do **name-based virtual hosting**.",
+            "It handles **HTTP and HTTPS only**. It does not expose arbitrary ports or protocols. For other traffic use a Service of type `NodePort` or `LoadBalancer`.",
+            "An **Ingress controller** fulfils the Ingress, usually with a load balancer. Creating only the Ingress resource **has no effect**."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "The Kubernetes project **recommends Gateway API instead of Ingress**. The Ingress API is **frozen**: it stays GA with no plans for removal, but it gets no further changes."
+        }
+      ]
+    },
+    {
+      "id": "ingress-controllers",
+      "heading": "Ingress controllers",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/",
+      "sourceTitle": "Ingress Controllers",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "An Ingress only works if an ingress controller is **running in the cluster**. You choose at least one and set it up yourself."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The Kubernetes project itself supports and maintains the **AWS** and **GCE** ingress controllers.",
+            "Many third-party controllers exist, for example the NGINX Ingress Controller, Traefik, HAProxy, Contour (Envoy-based) and Istio Ingress.",
+            "You can run **any number** of controllers. Each Ingress picks one by setting `ingressClassName` to the `.metadata.name` of an IngressClass.",
+            "`ingressClassName` replaces the older annotation method.",
+            "Controllers behave slightly differently, so read your controller's docs for its caveats."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ingress-resource",
+      "heading": "The Ingress resource and its rules",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "sourceTitle": "Ingress",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: <ingress-name>\nspec:\n  ingressClassName: <class-name>\n  rules:\n  - host: <host>            # optional\n    http:\n      paths:\n      - path: /<path>\n        pathType: Prefix\n        backend:\n          service:\n            name: <service-name>\n            port:\n              number: <port>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**host** is optional. With no host, the rule applies to all inbound HTTP traffic on the controller's IP.",
+            "Each **path** has a backend: `service.name` plus `service.port.name` or `service.port.number`.",
+            "Both host and path must match before traffic goes to the backend.",
+            "A backend can instead be a **resource** (an ObjectRef to another object in the same namespace, such as a CRD). `resource` and `service` are mutually exclusive; setting both fails validation.",
+            "Controllers often read **annotations** for extra behaviour. Which ones depends on the controller.",
+            "The Ingress name must be a valid DNS subdomain name."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ingress-paths",
+      "heading": "Path types and host matching",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "sourceTitle": "Ingress",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Every path **must** have a `pathType`; a path without one fails validation."
+        },
+        {
+          "type": "table",
+          "header": [
+            "pathType",
+            "How it matches"
+          ],
+          "rows": [
+            [
+              "Exact",
+              "The whole URL path, case sensitive. `/foo` does not match `/foo/`"
+            ],
+            [
+              "Prefix",
+              "Element by element, split on `/`, case sensitive. `/foo/bar` matches `/foo/bar/baz` but not `/foo/barbaz`"
+            ],
+            [
+              "ImplementationSpecific",
+              "Up to the IngressClass; may act like Prefix, Exact or something else"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Trailing slashes are ignored for Prefix: `/aaa/bbb/` matches a request for `/aaa/bbb`.",
+            "When several paths match, the **longest path wins**. On a tie, **Exact beats Prefix**.",
+            "Hosts can be exact (`foo.bar.com`) or wildcard (`*.foo.com`). A wildcard covers **one DNS label only**: `bar.foo.com` matches, but `baz.bar.foo.com` and `foo.com` do not."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ingress-class",
+      "heading": "IngressClass and the default class",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "sourceTitle": "Ingress",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "An **IngressClass** names the controller that implements it (`.spec.controller`) and can point at extra config through `.spec.parameters`. The IngressClass API is always **cluster-scoped**."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: networking.k8s.io/v1\nkind: IngressClass\nmetadata:\n  name: <class-name>\n  annotations:\n    ingressclass.kubernetes.io/is-default-class: \"true\"\nspec:\n  controller: <controller-name>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`.spec.parameters.scope` is `Cluster` (the default) or `Namespace`. With `Namespace` you must also set the `namespace` field inside `.spec.parameters`.",
+            "New Ingresses without `ingressClassName` get the class annotated `ingressclass.kubernetes.io/is-default-class: \"true\"`.",
+            "Before 1.18, classes were set with the `kubernetes.io/ingress.class` annotation. It was never formally defined; `ingressClassName` replaces it but is not an exact equivalent."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "If **more than one** IngressClass is marked default, the admission controller rejects new Ingresses that have no `ingressClassName`. Keep at most one default."
+        }
+      ]
+    },
+    {
+      "id": "ingress-types",
+      "heading": "Default backend, fanout and virtual hosts",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "sourceTitle": "Ingress",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "**`.spec.defaultBackend`** handles requests that match no rule. If `.spec.rules` is empty, `.spec.defaultBackend` is **required**. If it isn't set, unmatched requests are handled however the controller decides.",
+            "**Single Service:** an Ingress with only a default backend and no rules.",
+            "**Simple fanout:** one host, several paths, each to a different Service. Keeps the number of load balancers down.",
+            "**Name-based virtual hosting:** several `host` rules on the same IP, routed by the Host header. A rule with no host catches everything else."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl apply -f <ingress.yaml>\nkubectl get ingress <ingress-name>        # ADDRESS may show <pending> for a minute or two\nkubectl describe ingress <ingress-name>   # rules, backends, default backend\nkubectl edit ingress <ingress-name>       # e.g. add a new host"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "To change a live Ingress, use `kubectl edit ingress <name>` (or `kubectl replace -f` with a modified file), then confirm with `kubectl describe ingress <name>`. The controller reconfigures the load balancer when the object changes."
+        }
+      ]
+    },
+    {
+      "id": "ingress-tls",
+      "heading": "TLS",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "sourceTitle": "Ingress",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Secure an Ingress by referencing a Secret of type `kubernetes.io/tls` whose keys are **`tls.crt`** and **`tls.key`**."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "spec:\n  tls:\n  - hosts:\n      - <host>\n    secretName: <tls-secret-name>\n  rules:\n  - host: <host>          # must match the tls host\n    http: ..."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Ingress supports a **single TLS port, 443**, and terminates TLS at the ingress point. Traffic to the Service and Pods is plaintext.",
+            "Different TLS hosts share port 443 using **SNI**, if the controller supports it.",
+            "TLS does not work on the default (host-less) rule, so `tls` hosts must explicitly match hosts in `rules`.",
+            "TLS features vary between controllers.",
+            "Advanced load balancing (persistent sessions, dynamic weights) is not exposed through Ingress. Health checks aren't either; readiness probes give a similar result."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "ingress-fc-01",
+      "front": "Which protocols does an Ingress route?",
+      "back": "HTTP and HTTPS only. Other traffic needs a NodePort or LoadBalancer Service.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-02",
+      "front": "What happens if you create an Ingress but no controller is running?",
+      "back": "Nothing. The Ingress resource on its own has no effect.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-03",
+      "front": "Which ingress controllers does the Kubernetes project itself maintain?",
+      "back": "AWS and GCE.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/"
+    },
+    {
+      "id": "ingress-fc-04",
+      "front": "The three Ingress pathType values?",
+      "back": "Exact, Prefix, ImplementationSpecific. A path without a pathType fails validation.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-05",
+      "front": "Two paths both match a request. Which wins?",
+      "back": "The longest matching path. If still tied, Exact beats Prefix.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-06",
+      "front": "Does host `*.foo.com` match `baz.bar.foo.com`?",
+      "back": "No. A wildcard covers a single DNS label only.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-07",
+      "front": "Annotation that makes an IngressClass the cluster default?",
+      "back": "ingressclass.kubernetes.io/is-default-class: \"true\"",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-08",
+      "front": "Key names required in an Ingress TLS Secret?",
+      "back": "tls.crt and tls.key (Secret type kubernetes.io/tls).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-09",
+      "front": "Which port does Ingress TLS use, and where is TLS terminated?",
+      "back": "A single port, 443. TLS ends at the ingress point; traffic to the Service is plaintext.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-10",
+      "front": "When is `.spec.defaultBackend` mandatory?",
+      "back": "When the Ingress has no `.spec.rules`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-11",
+      "front": "Ingress vs Gateway API: what does the Kubernetes project recommend?",
+      "back": "Gateway API. The Ingress API is frozen: still GA, not being removed, but no further changes.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    },
+    {
+      "id": "ingress-fc-12",
+      "front": "Is the IngressClass API namespaced or cluster-scoped?",
+      "back": "Always cluster-scoped. Only its parameters can be namespaced (scope: Namespace).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "ingress-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-ingress",
+      "stem": "You apply a valid Ingress to a fresh cluster but nothing routes traffic. What is the most likely cause?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "No Ingress controller is running in the cluster",
+          "correct": true,
+          "explanation": "An Ingress needs a controller to satisfy it; the resource alone has no effect."
+        },
+        {
+          "id": "b",
+          "text": "The backend Service is of type ClusterIP",
+          "correct": false,
+          "explanation": "Ingress backends are ordinary Services; nothing on the page requires another type."
+        },
+        {
+          "id": "c",
+          "text": "The rule has no host field",
+          "correct": false,
+          "explanation": "host is optional; without it the rule applies to all inbound HTTP traffic."
+        },
+        {
+          "id": "d",
+          "text": "The Ingress has no tls section",
+          "correct": false,
+          "explanation": "TLS is optional; plain HTTP Ingresses work without it."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-02",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-ingress",
+      "stem": "You need to expose a non-HTTP TCP service to the internet. What does the Ingress page suggest?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A Service of type NodePort or LoadBalancer",
+          "correct": true,
+          "explanation": "Ingress handles only HTTP/HTTPS; other protocols typically use NodePort or LoadBalancer Services."
+        },
+        {
+          "id": "b",
+          "text": "An Ingress with pathType ImplementationSpecific",
+          "correct": false,
+          "explanation": "pathType changes path matching only; Ingress still only routes HTTP(S)."
+        },
+        {
+          "id": "c",
+          "text": "An Ingress with a tls section on port 443",
+          "correct": false,
+          "explanation": "TLS on Ingress is still HTTPS, not arbitrary TCP."
+        },
+        {
+          "id": "d",
+          "text": "An IngressClass with scope: Namespace",
+          "correct": false,
+          "explanation": "Scope controls where class parameters live, not which protocols are supported."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-ingress",
+      "stem": "An Ingress path is `/foo` with pathType Exact. Which request matches?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "/foo",
+          "correct": true,
+          "explanation": "Exact matches the full path exactly and case sensitively."
+        },
+        {
+          "id": "b",
+          "text": "/foo/",
+          "correct": false,
+          "explanation": "The docs' table shows Exact /foo does not match /foo/."
+        },
+        {
+          "id": "c",
+          "text": "/foo/bar",
+          "correct": false,
+          "explanation": "Subpaths only match with Prefix."
+        },
+        {
+          "id": "d",
+          "text": "/FOO",
+          "correct": false,
+          "explanation": "Exact matching is case sensitive."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-ingress",
+      "stem": "An Ingress has path `/aaa/bbb` with pathType Prefix. Which requests match? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "/aaa/bbb/ccc",
+          "correct": true,
+          "explanation": "Prefix matches subpaths element by element."
+        },
+        {
+          "id": "b",
+          "text": "/aaa/bbb/",
+          "correct": true,
+          "explanation": "Prefix matches the trailing slash."
+        },
+        {
+          "id": "c",
+          "text": "/aaa/bbbxyz",
+          "correct": false,
+          "explanation": "Prefix is not a string prefix; bbbxyz is a different path element."
+        },
+        {
+          "id": "d",
+          "text": "/aaa",
+          "correct": false,
+          "explanation": "The request is shorter than the rule path, so /aaa/bbb is not a prefix of it."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-ingress",
+      "stem": "Paths `/foo` (Prefix) and `/foo` (Exact) both exist. A request for `/foo` arrives. Which is used?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The Exact path",
+          "correct": true,
+          "explanation": "Equal-length matches prefer the Exact path type over Prefix."
+        },
+        {
+          "id": "b",
+          "text": "The Prefix path",
+          "correct": false,
+          "explanation": "On a tie, Exact has precedence."
+        },
+        {
+          "id": "c",
+          "text": "Whichever was listed first",
+          "correct": false,
+          "explanation": "Precedence is by longest path, then path type, not by order."
+        },
+        {
+          "id": "d",
+          "text": "The default backend",
+          "correct": false,
+          "explanation": "The default backend is only used when nothing matches."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-06",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "sn-ingress",
+      "stem": "An Ingress rule for host `*.foo.com` matches a request with Host header `foo.com`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "The wildcard covers exactly one DNS label, so foo.com does not match."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: only hosts like bar.foo.com match *.foo.com."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-ingress",
+      "stem": "A cluster has two IngressClasses annotated as default. A user creates an Ingress without ingressClassName. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The admission controller prevents the Ingress from being created",
+          "correct": true,
+          "explanation": "With more than one default IngressClass, new Ingresses lacking ingressClassName are blocked."
+        },
+        {
+          "id": "b",
+          "text": "The oldest default class is assigned",
+          "correct": false,
+          "explanation": "No tie-break exists; creation is prevented."
+        },
+        {
+          "id": "c",
+          "text": "Both controllers implement the Ingress",
+          "correct": false,
+          "explanation": "The Ingress is not created at all."
+        },
+        {
+          "id": "d",
+          "text": "The Ingress is created with no class and ignored",
+          "correct": false,
+          "explanation": "The admission controller rejects it instead."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-ingress",
+      "stem": "Which statements about Ingress TLS are correct? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The Secret must contain keys tls.crt and tls.key",
+          "correct": true,
+          "explanation": "Those are the required key names."
+        },
+        {
+          "id": "b",
+          "text": "Ingress supports a single TLS port, 443",
+          "correct": true,
+          "explanation": "The page states only port 443 is supported."
+        },
+        {
+          "id": "c",
+          "text": "TLS is terminated at the ingress point",
+          "correct": true,
+          "explanation": "Traffic from the ingress to the Service and Pods is plaintext."
+        },
+        {
+          "id": "d",
+          "text": "TLS works on the default rule with no host",
+          "correct": false,
+          "explanation": "TLS won't work on the default rule; tls hosts must match rule hosts."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-09",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-ingress",
+      "stem": "You run two ingress controllers. How does an Ingress choose which one implements it?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Set spec.ingressClassName to the name of an IngressClass",
+          "correct": true,
+          "explanation": "ingressClassName references the IngressClass's .metadata.name."
+        },
+        {
+          "id": "b",
+          "text": "Set spec.defaultBackend to the controller's Service",
+          "correct": false,
+          "explanation": "defaultBackend handles unmatched requests; it does not pick a controller."
+        },
+        {
+          "id": "c",
+          "text": "Set pathType to the controller name",
+          "correct": false,
+          "explanation": "pathType only accepts Exact, Prefix or ImplementationSpecific."
+        },
+        {
+          "id": "d",
+          "text": "Only one ingress controller may run per cluster",
+          "correct": false,
+          "explanation": "You may deploy any number of ingress controllers."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-10",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "sn-ingress",
+      "stem": "The Kubernetes project plans to remove the Ingress API now that Gateway API exists.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "The page says there are no plans to remove Ingress; it is frozen, not deprecated for removal."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: Ingress stays GA but gets no further changes; Gateway is recommended."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-ingress",
+      "stem": "An Ingress has no `.spec.rules`. Which field must it set?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": ".spec.defaultBackend",
+          "correct": true,
+          "explanation": "Without rules, all traffic goes to the default backend, so it is required."
+        },
+        {
+          "id": "b",
+          "text": ".spec.tls",
+          "correct": false,
+          "explanation": "TLS is always optional."
+        },
+        {
+          "id": "c",
+          "text": ".spec.ingressClassName",
+          "correct": false,
+          "explanation": "It can be omitted when a default IngressClass exists."
+        },
+        {
+          "id": "d",
+          "text": ".spec.parameters",
+          "correct": false,
+          "explanation": "parameters is a field of IngressClass, not Ingress."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-12",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-ingress",
+      "stem": "A backend specifies both `service` and `resource`. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The Ingress fails validation",
+          "correct": true,
+          "explanation": "Resource and Service are mutually exclusive in a backend."
+        },
+        {
+          "id": "b",
+          "text": "The service is used and resource is ignored",
+          "correct": false,
+          "explanation": "There is no fallback; both together is invalid."
+        },
+        {
+          "id": "c",
+          "text": "Traffic is split between them",
+          "correct": false,
+          "explanation": "Ingress doesn't expose weighting; the combination is rejected."
+        },
+        {
+          "id": "d",
+          "text": "The resource takes precedence over the service",
+          "correct": false,
+          "explanation": "Neither wins; specifying both fails validation."
+        }
+      ]
+    },
+    {
+      "id": "ingress-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-ingress",
+      "stem": "You must add a new host rule to an existing Ingress named `web` in place. Which command fits?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl edit ingress web",
+          "correct": true,
+          "explanation": "The page updates an Ingress by editing it, then checks with kubectl describe."
+        },
+        {
+          "id": "b",
+          "text": "kubectl describe ingress web",
+          "correct": false,
+          "explanation": "describe shows the rules but doesn't change them."
+        },
+        {
+          "id": "c",
+          "text": "kubectl get ingress web",
+          "correct": false,
+          "explanation": "get only lists the Ingress and its address."
+        }
+      ]
+    }
+  ]
+}

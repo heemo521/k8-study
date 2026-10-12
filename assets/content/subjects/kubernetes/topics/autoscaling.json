@@ -1,0 +1,731 @@
+{
+  "id": "autoscaling",
+  "title": "Workload Autoscaling",
+  "summary": "Scale Pods out with the HorizontalPodAutoscaler (backed by Metrics Server), and know where VPA and other autoscalers fit.",
+  "order": 5,
+  "domainIds": [
+    "workloads-scheduling"
+  ],
+  "competencyIds": [
+    "ws-autoscaling"
+  ],
+  "prerequisites": [
+    "deployments"
+  ],
+  "estMinutes": 16,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "autoscaling-overview",
+      "heading": "Horizontal vs vertical, and who does what",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/autoscaling/",
+      "sourceTitle": "Autoscaling Workloads",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "**Horizontal** scaling changes the number of replicas. **Vertical** scaling changes the CPU and memory given to each replica. Manually, you scale horizontally with kubectl and vertically by patching the workload's resource definition."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Autoscaler",
+            "What it does",
+            "Built in?"
+          ],
+          "rows": [
+            [
+              "HorizontalPodAutoscaler (HPA)",
+              "Adjusts replica count to match observed usage such as CPU or memory",
+              "Yes (API resource + controller)"
+            ],
+            [
+              "VerticalPodAutoscaler (VPA)",
+              "Adjusts the resources of the managed replicas, configured through CRDs",
+              "No, an add-on; also needs Metrics Server"
+            ],
+            [
+              "Cluster Proportional Autoscaler",
+              "Scales replicas with the number of schedulable nodes and cores (e.g. cluster DNS)",
+              "No, separate project"
+            ],
+            [
+              "KEDA",
+              "Scales on events, such as messages in a queue; its Cron scaler scales on a schedule",
+              "No, CNCF project"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "In-place Pod resize is stable, but as of Kubernetes 1.37 the VPA doesn't resize Pods in place.",
+            "If scaling workloads isn't enough, scale the cluster itself by adding or removing nodes (node autoscaling)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-hpa-how",
+      "heading": "How the HPA decides",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "sourceTitle": "Horizontal Pod Autoscaling",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The HPA controller runs in the control plane as a loop, every **15 seconds** by default (`--horizontal-pod-autoscaler-sync-period` on kube-controller-manager). It finds the target via `scaleTargetRef`, selects its Pods by the target's selector, reads metrics, and sets the target's replicas through its `scale` subresource."
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "text": "desiredReplicas = ceil[ currentReplicas × ( currentMetricValue / desiredMetricValue ) ]"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Example: current 200m, target 100m → replicas double. Current 50m → replicas halve.",
+            "No action if the ratio is within the tolerance of 1.0 (**0.1** by default).",
+            "Utilization is measured against the container **resource requests**. If a container lacks the request, CPU utilization is undefined and the HPA takes no action on that metric.",
+            "With several metrics, the HPA computes a count for each and uses the **largest**.",
+            "Scale-downs are smoothed by a 5-minute stabilization window (`--horizontal-pod-autoscaler-downscale-stabilization`).",
+            "Objects that can't be scaled, such as a **DaemonSet**, can't be autoscaled."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Resource metrics come from the `metrics.k8s.io` API, usually provided by the **Metrics Server** add-on, which you launch separately. Custom and external metrics use `custom.metrics.k8s.io` and `external.metrics.k8s.io`, served by adapters."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-walkthrough",
+      "heading": "Create and watch an HPA",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/",
+      "sourceTitle": "HorizontalPodAutoscaler Walkthrough",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Prerequisite: a cluster with **Metrics Server** deployed. It collects resource metrics from the kubelets and exposes them through the Kubernetes API. On minikube: `minikube addons enable metrics-server`. The target Pods should set CPU requests."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl autoscale deployment <name> --cpu=50% --min=1 --max=10\nkubectl get hpa                    # TARGET shows current% / target%\nkubectl get hpa <name> --watch\nkubectl describe hpa <name>        # status conditions\nkubectl get hpa <name> -o yaml     # autoscaling/v2 form"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "`kubectl autoscale deployment <name> --cpu=50% --min=1 --max=10` creates an HPA that keeps average CPU around 50% of requests with 1 to 10 replicas. `hpa` is the short name for `horizontalpodautoscaler`."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Condition",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "AbleToScale",
+              "The HPA can fetch and update scales; no backoff is blocking it"
+            ],
+            [
+              "ScalingActive",
+              "The HPA is enabled and can compute a scale. False usually means metric-fetching problems"
+            ],
+            [
+              "ScalingLimited",
+              "The desired scale was capped by min or max replicas"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Scaling takes time: in the walkthrough, replicas rise within a minute or so of load, and drop back to the minimum a few minutes after load stops."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-v2",
+      "heading": "autoscaling/v2 manifests and metric types",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/",
+      "sourceTitle": "HorizontalPodAutoscaler Walkthrough",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: <name>\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: <deployment>\n  minReplicas: 1\n  maxReplicas: 10\n  metrics:\n  - type: Resource\n    resource:\n      name: cpu\n      target:\n        type: Utilization\n        averageUtilization: 50"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "In v2 the old `targetCPUUtilizationPercentage` field is replaced by the `metrics` list.",
+            "Resource metrics: `cpu`, and by default also `memory`. Target type `Utilization` (percent of request) or `AverageValue` (raw value, e.g. `500Mi`).",
+            "`Pods` metrics are custom per-Pod metrics averaged across Pods; they only support `AverageValue`.",
+            "`Object` metrics describe another object in the namespace (e.g. an Ingress) and support `Value` or `AverageValue`.",
+            "`External` metrics come from outside the cluster, such as a hosted queue.",
+            "Create from a file with `kubectl create -f <file>` instead of `kubectl autoscale`."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-behavior",
+      "heading": "Tuning behaviour and avoiding flapping",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "sourceTitle": "Horizontal Pod Autoscaling",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "In autoscaling/v2, `spec.behavior.scaleUp` and `spec.behavior.scaleDown` control the rate of change separately. Only set what you need; the rest keeps the defaults."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "behavior:\n  scaleDown:\n    stabilizationWindowSeconds: 300   # default for scale-down\n    policies:\n    - type: Percent\n      value: 10\n      periodSeconds: 60     # max 1800\n    selectPolicy: Min        # Max (default) | Min | Disabled"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Default scale-up has **no** stabilization window: up to 100% or 4 Pods (whichever is more) every 15 seconds.",
+            "Default scale-down: 300-second window, and may remove up to 100% of replicas (down to minReplicas).",
+            "With several policies, the one allowing the **most** change wins unless `selectPolicy: Min`. `Disabled` turns off scaling in that direction.",
+            "A per-direction `tolerance` (e.g. `0.05`) overrides the cluster-wide 10% default."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "When an HPA manages a Deployment or StatefulSet, remove `spec.replicas` from its manifest. Otherwise each `kubectl apply` resets the replica count and causes flapping."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "autoscaling-fc-01",
+      "front": "Horizontal vs vertical scaling?",
+      "back": "Horizontal changes the replica count; vertical changes CPU/memory per replica.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/autoscaling/"
+    },
+    {
+      "id": "autoscaling-fc-02",
+      "front": "Is the VerticalPodAutoscaler part of core Kubernetes?",
+      "back": "No. It's an add-on you deploy, and it needs Metrics Server.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/autoscaling/"
+    },
+    {
+      "id": "autoscaling-fc-03",
+      "front": "Which project scales workloads on event counts, like queue length?",
+      "back": "KEDA (Kubernetes Event Driven Autoscaler).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/autoscaling/"
+    },
+    {
+      "id": "autoscaling-fc-04",
+      "front": "Which API serves resource metrics to the HPA, and what usually provides it?",
+      "back": "metrics.k8s.io, usually provided by the Metrics Server add-on.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "autoscaling-fc-05",
+      "front": "HPA core formula?",
+      "back": "desiredReplicas = ceil[currentReplicas × currentMetricValue / desiredMetricValue]",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "autoscaling-fc-06",
+      "front": "Default HPA sync period?",
+      "back": "15 seconds (--horizontal-pod-autoscaler-sync-period on kube-controller-manager).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "autoscaling-fc-07",
+      "front": "What must Pods set for CPU utilization-based HPA to work?",
+      "back": "CPU resource requests on their containers.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "autoscaling-fc-08",
+      "front": "HPA with several metrics: which result wins?",
+      "back": "The largest desired replica count.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "autoscaling-fc-09",
+      "front": "Default scale-down stabilization window?",
+      "back": "300 seconds (5 minutes).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/"
+    },
+    {
+      "id": "autoscaling-fc-10",
+      "front": "Create an HPA for a Deployment at 50% CPU, 1–10 replicas?",
+      "back": "kubectl autoscale deployment <name> --cpu=50% --min=1 --max=10",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/"
+    },
+    {
+      "id": "autoscaling-fc-11",
+      "front": "Enable Metrics Server on minikube?",
+      "back": "minikube addons enable metrics-server",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/"
+    },
+    {
+      "id": "autoscaling-fc-12",
+      "front": "Which HPA condition shows the scale was capped by min/max?",
+      "back": "ScalingLimited.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "autoscaling-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ws-autoscaling",
+      "stem": "Deployment `web` should keep average CPU near 50% of requests, with 2 to 8 replicas. Which command creates that?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl autoscale deployment web --cpu=50% --min=2 --max=8",
+          "correct": true,
+          "explanation": "kubectl autoscale creates an HPA with a CPU target and replica bounds."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get hpa web --watch",
+          "correct": false,
+          "explanation": "That watches existing HPAs; it doesn't create one."
+        },
+        {
+          "id": "c",
+          "text": "minikube addons enable metrics-server",
+          "correct": false,
+          "explanation": "That installs Metrics Server, a prerequisite, but creates no autoscaler."
+        },
+        {
+          "id": "d",
+          "text": "kubectl describe hpa web",
+          "correct": false,
+          "explanation": "That shows an existing HPA's details and conditions."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-autoscaling",
+      "stem": "You created a CPU-based HPA, but `kubectl get hpa` shows no current CPU value and nothing scales. Metrics Server isn't installed. Why does that matter?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The HPA reads resource metrics from the metrics.k8s.io API, which Metrics Server usually provides",
+          "correct": true,
+          "explanation": "Metrics Server is a separate add-on that serves metrics.k8s.io."
+        },
+        {
+          "id": "b",
+          "text": "The HPA reads CPU straight from the container runtime, so Metrics Server is irrelevant",
+          "correct": false,
+          "explanation": "The HPA uses the resource metrics API, not the runtime directly."
+        },
+        {
+          "id": "c",
+          "text": "Metrics Server is part of kube-controller-manager, so it must be restarted",
+          "correct": false,
+          "explanation": "Metrics Server is an add-on launched separately."
+        },
+        {
+          "id": "d",
+          "text": "HPAs only work with custom.metrics.k8s.io",
+          "correct": false,
+          "explanation": "Resource metrics come from metrics.k8s.io."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-autoscaling",
+      "stem": "An HPA targets 100m CPU per Pod. There are 4 replicas and the current average is 200m. How many replicas does the formula ask for?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "options": [
+        {
+          "id": "a",
+          "text": "8",
+          "correct": true,
+          "explanation": "ceil(4 × 200/100) = 8."
+        },
+        {
+          "id": "b",
+          "text": "2",
+          "correct": false,
+          "explanation": "That would be the result if usage were half the target."
+        },
+        {
+          "id": "c",
+          "text": "6",
+          "correct": false,
+          "explanation": "The ratio is 2.0, so replicas double."
+        },
+        {
+          "id": "d",
+          "text": "4, no change",
+          "correct": false,
+          "explanation": "A ratio of 2.0 is far outside the 0.1 tolerance."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-autoscaling",
+      "stem": "A CPU-utilization HPA never acts. The Deployment's containers have no CPU requests. What's the cause?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Utilization is a percentage of the request, so without requests it's undefined and the HPA does nothing for that metric",
+          "correct": true,
+          "explanation": "The docs say the autoscaler takes no action for that metric."
+        },
+        {
+          "id": "b",
+          "text": "HPAs need CPU limits, not requests",
+          "correct": false,
+          "explanation": "Utilization is computed against requests."
+        },
+        {
+          "id": "c",
+          "text": "The HPA sync period is too long",
+          "correct": false,
+          "explanation": "The loop runs every 15 seconds by default; that isn't the issue."
+        },
+        {
+          "id": "d",
+          "text": "Deployments can't be autoscaled",
+          "correct": false,
+          "explanation": "Deployments are the most common HPA target."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-05",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ws-autoscaling",
+      "stem": "True or false: You can attach a HorizontalPodAutoscaler to a DaemonSet.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "HPA doesn't apply to objects that can't be scaled, such as a DaemonSet."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "A DaemonSet's Pod count follows nodes, not a replica field."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-autoscaling",
+      "stem": "An HPA uses CPU and a custom metric. CPU suggests 4 replicas and the custom metric suggests 7. What does the HPA set?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "options": [
+        {
+          "id": "a",
+          "text": "7, the largest recommendation (within the configured maximum)",
+          "correct": true,
+          "explanation": "The HPA takes the maximum across metrics."
+        },
+        {
+          "id": "b",
+          "text": "4, the smallest",
+          "correct": false,
+          "explanation": "It picks the largest, not the smallest."
+        },
+        {
+          "id": "c",
+          "text": "6, the average rounded up",
+          "correct": false,
+          "explanation": "Recommendations aren't averaged."
+        },
+        {
+          "id": "d",
+          "text": "11, the sum",
+          "correct": false,
+          "explanation": "Recommendations aren't summed."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-07",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ws-autoscaling",
+      "stem": "Which statements about the VerticalPodAutoscaler are correct according to the docs? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/autoscaling/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It's an add-on that must be deployed before you can use it",
+          "correct": true,
+          "explanation": "Unlike the HPA, it doesn't come with Kubernetes."
+        },
+        {
+          "id": "b",
+          "text": "It needs Metrics Server installed",
+          "correct": true,
+          "explanation": "The page notes Metrics Server is required."
+        },
+        {
+          "id": "c",
+          "text": "It changes the number of replicas",
+          "correct": false,
+          "explanation": "That's horizontal scaling; the VPA adjusts resources."
+        },
+        {
+          "id": "d",
+          "text": "As of 1.37 it resizes Pods in place",
+          "correct": false,
+          "explanation": "The page says VPA doesn't yet support in-place resizing."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-autoscaling",
+      "stem": "You need to scale consumers based on the number of messages waiting in a queue. Which option does the autoscaling page point to?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/autoscaling/",
+      "options": [
+        {
+          "id": "a",
+          "text": "KEDA",
+          "correct": true,
+          "explanation": "KEDA scales workloads on event counts such as queue messages."
+        },
+        {
+          "id": "b",
+          "text": "Cluster Proportional Autoscaler",
+          "correct": false,
+          "explanation": "That scales with the number of nodes and cores."
+        },
+        {
+          "id": "c",
+          "text": "VerticalPodAutoscaler",
+          "correct": false,
+          "explanation": "VPA adjusts per-Pod resources, not replicas."
+        },
+        {
+          "id": "d",
+          "text": "A DaemonSet",
+          "correct": false,
+          "explanation": "A DaemonSet runs one Pod per node; it isn't an autoscaler."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-09",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ws-autoscaling",
+      "stem": "Your HPA removes Pods too quickly after brief traffic dips. Which field slows scale-down by using the highest recommendation from a recent time window?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "options": [
+        {
+          "id": "a",
+          "text": "behavior.scaleDown.stabilizationWindowSeconds",
+          "correct": true,
+          "explanation": "It looks back over the window and uses the highest desired state."
+        },
+        {
+          "id": "b",
+          "text": "behavior.scaleUp.selectPolicy: Disabled",
+          "correct": false,
+          "explanation": "That disables scaling up, not slowing scale-down."
+        },
+        {
+          "id": "c",
+          "text": "behavior.scaleUp.stabilizationWindowSeconds",
+          "correct": false,
+          "explanation": "That applies to scaling up, not down."
+        },
+        {
+          "id": "d",
+          "text": "metrics[].resource.target.averageUtilization",
+          "correct": false,
+          "explanation": "That changes the target, not the scale-down rate."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-10",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "ws-autoscaling",
+      "stem": "Which are default HPA behaviours? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Scale-down stabilization window of 300 seconds",
+          "correct": true,
+          "explanation": "That's the default scaleDown window."
+        },
+        {
+          "id": "b",
+          "text": "No stabilization window for scale-up",
+          "correct": true,
+          "explanation": "Scale-up happens immediately by default."
+        },
+        {
+          "id": "c",
+          "text": "Tolerance of 0.1 around the target ratio",
+          "correct": true,
+          "explanation": "The default cluster-wide tolerance is 10%."
+        },
+        {
+          "id": "d",
+          "text": "selectPolicy: Min",
+          "correct": false,
+          "explanation": "The default picks the policy allowing the most change (Max)."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-autoscaling",
+      "stem": "After you add an HPA, every `kubectl apply -f deployment.yaml` resets the Pod count and replicas flap. What's the recommended fix?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Remove spec.replicas from the Deployment manifest",
+          "correct": true,
+          "explanation": "Let the HPA own the replicas field."
+        },
+        {
+          "id": "b",
+          "text": "Keep spec.replicas but set it to 1",
+          "correct": false,
+          "explanation": "Any value in the manifest still overrides the HPA on each apply."
+        },
+        {
+          "id": "c",
+          "text": "Delete and recreate the HPA after each apply",
+          "correct": false,
+          "explanation": "That doesn't fix the conflict over the replicas field."
+        },
+        {
+          "id": "d",
+          "text": "Switch the HPA to autoscaling/v1",
+          "correct": false,
+          "explanation": "The API version doesn't change who owns spec.replicas."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-autoscaling",
+      "stem": "In an autoscaling/v2 HPA, you want to scale on average memory of 500Mi per Pod (a raw value, not a percentage). Which target type do you use?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/",
+      "options": [
+        {
+          "id": "a",
+          "text": "AverageValue with averageValue: 500Mi",
+          "correct": true,
+          "explanation": "AverageValue uses direct values instead of a percentage of requests."
+        },
+        {
+          "id": "b",
+          "text": "Utilization with averageUtilization: 500",
+          "correct": false,
+          "explanation": "Utilization is a percentage of the request."
+        },
+        {
+          "id": "c",
+          "text": "targetCPUUtilizationPercentage: 500",
+          "correct": false,
+          "explanation": "That's the old CPU-only field, replaced by metrics in v2."
+        },
+        {
+          "id": "d",
+          "text": "type: External",
+          "correct": false,
+          "explanation": "External is for metrics from outside the cluster."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ws-autoscaling",
+      "stem": "`kubectl describe hpa` shows `ScalingActive False`. What does that usually indicate?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A problem fetching metrics",
+          "correct": true,
+          "explanation": "False generally points to metric-fetching problems."
+        },
+        {
+          "id": "b",
+          "text": "The desired count was capped by maxReplicas",
+          "correct": false,
+          "explanation": "That's what ScalingLimited reports."
+        },
+        {
+          "id": "c",
+          "text": "The HPA is healthy and idle",
+          "correct": false,
+          "explanation": "A healthy HPA shows ScalingActive True."
+        },
+        {
+          "id": "d",
+          "text": "The last scale was too recent",
+          "correct": false,
+          "explanation": "That relates to AbleToScale."
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-q-14",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ws-autoscaling",
+      "stem": "True or false: The HorizontalPodAutoscaler ships with Kubernetes as an API resource and controller, while the VerticalPodAutoscaler does not.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/autoscaling/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "HPA is built in; VPA is an add-on."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "The page says the VPA doesn't come with Kubernetes by default."
+        }
+      ]
+    }
+  ]
+}

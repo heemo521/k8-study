@@ -1,0 +1,725 @@
+{
+  "id": "services",
+  "title": "Services & EndpointSlices",
+  "summary": "Give a changing set of Pods one stable address: selectors, Service types, ports, headless Services, EndpointSlices and discovery.",
+  "order": 2,
+  "domainIds": [
+    "services-networking"
+  ],
+  "competencyIds": [
+    "sn-service-types"
+  ],
+  "prerequisites": [
+    "cluster-networking"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "services-basics",
+      "heading": "Services and selectors",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "sourceTitle": "Service",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Pods are ephemeral and their IPs change. A **Service** puts one stable address in front of a group of Pods. Its **selector** picks the Pods by label, and a controller keeps the Service's **EndpointSlices** in sync with the matching Pods."
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: v1\nkind: Service\nmetadata:\n  name: <service-name>\nspec:\n  selector:\n    app.kubernetes.io/name: <app-label>\n  ports:\n    - protocol: TCP\n      port: <service-port>\n      targetPort: <container-port>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "No `type` means the default, **ClusterIP**.",
+            "If you leave out `targetPort`, it defaults to the value of `port`.",
+            "`targetPort` can be a **port name** defined in the Pod (for example `http-web-svc`), so backends can change port numbers without breaking clients.",
+            "Default protocol is **TCP**.",
+            "With **multiple ports**, every port must have a name (lowercase alphanumerics and `-`, starting and ending with an alphanumeric)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "services-types",
+      "heading": "Service types",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "sourceTitle": "Service",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Type",
+            "What it does"
+          ],
+          "rows": [
+            [
+              "ClusterIP (default)",
+              "Cluster-internal virtual IP; reachable only inside the cluster"
+            ],
+            [
+              "NodePort",
+              "ClusterIP **plus** the same static port opened on every node"
+            ],
+            [
+              "LoadBalancer",
+              "NodePort **plus** an external load balancer (from a cloud provider or one you provide)"
+            ],
+            [
+              "ExternalName",
+              "DNS **CNAME** to the `externalName` hostname; no proxying"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "NodePort ports come from `--service-node-port-range`, **default 30000-32767**. The port is shown in `.spec.ports[*].nodePort`; you can request one with `nodePort`.",
+            "For LoadBalancer, the cloud-controller-manager points the external balancer at the node port. Details appear in `.status.loadBalancer`.",
+            "Set `spec.allocateLoadBalancerNodePorts: false` to skip node ports (only if the balancer routes straight to Pods).",
+            "You can pick a specific `.spec.clusterIP`; it must lie inside `service-cluster-ip-range`, or the API server returns 422.",
+            "ExternalName expects a hostname. A value that looks like an IPv4 address isn't resolved. HTTP and TLS can break because the hostname differs."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "services-ports",
+      "heading": "port vs targetPort vs nodePort",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "sourceTitle": "Service",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Field",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "port",
+              "The port the Service listens on (with its ClusterIP)"
+            ],
+            [
+              "targetPort",
+              "The Pod port traffic goes to; a number or a named `containerPort`"
+            ],
+            [
+              "nodePort",
+              "The port opened on every node for NodePort/LoadBalancer"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "spec:\n  type: NodePort\n  selector:\n    app.kubernetes.io/name: <app-label>\n  ports:\n    - port: <service-port>\n      targetPort: <container-port>\n      nodePort: <port-in-30000-32767>"
+        }
+      ]
+    },
+    {
+      "id": "services-headless",
+      "heading": "Headless and selectorless Services",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "sourceTitle": "Service",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "**Headless:** set `.spec.clusterIP: None`. No cluster IP is allocated, kube-proxy ignores the Service and nothing is load-balanced. DNS returns the **Pod IPs** directly (A/AAAA records). `None` is not the same as leaving the field empty."
+        },
+        {
+          "type": "p",
+          "text": "**No selector:** Kubernetes creates no EndpointSlices. Add one yourself and link it with the `kubernetes.io/service-name: <service-name>` label. Useful for an external database or a backend in another namespace or cluster."
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Manual endpoint IPs can't be loopback, link-local, or another Service's cluster IP. `kubectl port-forward` to a selectorless Service fails."
+        }
+      ]
+    },
+    {
+      "id": "services-endpointslices",
+      "heading": "EndpointSlices",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/",
+      "sourceTitle": "EndpointSlices",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "The control plane creates EndpointSlices automatically for every Service **with a selector**.",
+            "They are linked to their Service by the `kubernetes.io/service-name` label and an owner reference.",
+            "Default limit is **100 endpoints per slice**, changeable with the kube-controller-manager flag `--max-endpoints-per-slice` (max 1000).",
+            "IPv4 and IPv6 go in separate slices, so a dual-stack Service has at least two.",
+            "Each endpoint carries `nodeName` and `zone`, plus conditions: **ready**, **serving**, **terminating**.",
+            "`ready` is roughly \"serving and not terminating\". For Pods, `serving` follows the Pod's Ready condition.",
+            "kube-proxy uses EndpointSlices as its **source of truth** for routing.",
+            "Slices managed by the controller have `endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io`.",
+            "They replace the older **Endpoints** API; mirroring Endpoints into slices is deprecated since v1.33."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "services-expose",
+      "heading": "kubectl expose",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/",
+      "sourceTitle": "kubectl expose",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Creates a Service by copying the **selector** of an existing pod, service, replicationcontroller, deployment or replicaset."
+        },
+        {
+          "type": "code",
+          "lang": "sh",
+          "text": "kubectl expose deployment <name> --port=<service-port> --target-port=<container-port>\nkubectl expose pod <pod-name> --port=<service-port> --name=<service-name>\nkubectl expose deployment <name> --port=<service-port> --type=NodePort"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`--type`: ClusterIP, NodePort, LoadBalancer or ExternalName. **Default ClusterIP.**",
+            "`--port` is copied from the resource if you leave it out.",
+            "`--cluster-ip=None` creates a headless Service.",
+            "A Deployment or ReplicaSet can be exposed only if its selector uses `matchLabels` alone."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "`kubectl expose` is the fastest way to create a Service. Add `--dry-run=client -o yaml` to get a manifest you can edit, for example to set a fixed `nodePort`."
+        }
+      ]
+    },
+    {
+      "id": "services-discovery",
+      "heading": "Finding a Service: env vars and DNS",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "sourceTitle": "Service",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "**Environment variables:** the kubelet adds `{SVCNAME}_SERVICE_HOST` and `{SVCNAME}_SERVICE_PORT` for each active Service (name upper-cased, dashes become underscores).",
+            "Env vars are only set if the Service **existed before** the Pod started. DNS has no such ordering problem.",
+            "**DNS:** with a cluster DNS add-on such as CoreDNS, a Service `<service>` in namespace `<ns>` resolves as `<service>` from the same namespace and `<service>.<ns>` from anywhere.",
+            "Named ports get **SRV** records, for example `_http._tcp.<service>.<ns>`.",
+            "ExternalName Services can only be reached through DNS."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "services-fc-01",
+      "front": "Default Service type?",
+      "back": "ClusterIP: a virtual IP reachable only inside the cluster.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "services-fc-02",
+      "front": "Default value of targetPort when omitted?",
+      "back": "The same value as port.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "services-fc-03",
+      "front": "Default NodePort range, and the flag that sets it?",
+      "back": "30000-32767, set with --service-node-port-range.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "services-fc-04",
+      "front": "How do NodePort and LoadBalancer build on each other?",
+      "back": "NodePort adds a node port on top of a ClusterIP; LoadBalancer adds an external balancer on top of a NodePort.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "services-fc-05",
+      "front": "What does an ExternalName Service return?",
+      "back": "A DNS CNAME record for the externalName value. No proxying.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "services-fc-06",
+      "front": "How do you make a headless Service?",
+      "back": "Set .spec.clusterIP to None. DNS then returns the Pod IPs.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "services-fc-07",
+      "front": "Which label links an EndpointSlice to its Service?",
+      "back": "kubernetes.io/service-name: <service-name>",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/"
+    },
+    {
+      "id": "services-fc-08",
+      "front": "Default maximum endpoints per EndpointSlice?",
+      "back": "100. Change with kube-controller-manager --max-endpoints-per-slice (up to 1000).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/"
+    },
+    {
+      "id": "services-fc-09",
+      "front": "Three EndpointSlice endpoint conditions?",
+      "back": "ready, serving, terminating.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/"
+    },
+    {
+      "id": "services-fc-10",
+      "front": "kubectl expose: default --type?",
+      "back": "ClusterIP.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/"
+    },
+    {
+      "id": "services-fc-11",
+      "front": "Env vars the kubelet injects for a Service named redis-primary?",
+      "back": "REDIS_PRIMARY_SERVICE_HOST and REDIS_PRIMARY_SERVICE_PORT (plus Docker-link-style vars).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    },
+    {
+      "id": "services-fc-12",
+      "front": "A Pod in another namespace needs Service my-service in namespace my-ns. Which DNS name?",
+      "back": "my-service.my-ns (the short name my-service only works from inside my-ns).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "services-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-service-types",
+      "stem": "A Service manifest has no type field. Which type is it?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ClusterIP",
+          "correct": true,
+          "explanation": "ClusterIP is the default type."
+        },
+        {
+          "id": "b",
+          "text": "NodePort",
+          "correct": false,
+          "explanation": "NodePort has to be set explicitly."
+        },
+        {
+          "id": "c",
+          "text": "LoadBalancer",
+          "correct": false,
+          "explanation": "LoadBalancer has to be set explicitly."
+        },
+        {
+          "id": "d",
+          "text": "Headless",
+          "correct": false,
+          "explanation": "Headless isn't a type; it's clusterIP: None."
+        }
+      ]
+    },
+    {
+      "id": "services-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-service-types",
+      "stem": "Pods listen on TCP 9376. Clients inside the cluster should connect to the Service on port 80. Which ports block is right?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "port: 80, targetPort: 9376",
+          "correct": true,
+          "explanation": "port is what the Service exposes; targetPort is the Pod's port."
+        },
+        {
+          "id": "b",
+          "text": "port: 9376, targetPort: 80",
+          "correct": false,
+          "explanation": "This is reversed: it would send traffic to Pod port 80."
+        },
+        {
+          "id": "c",
+          "text": "port: 80, nodePort: 9376",
+          "correct": false,
+          "explanation": "nodePort is a node-level port from the NodePort range, not the Pod port."
+        },
+        {
+          "id": "d",
+          "text": "port: 80 only",
+          "correct": false,
+          "explanation": "targetPort would default to 80, but the Pods listen on 9376."
+        }
+      ]
+    },
+    {
+      "id": "services-q-03",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-service-types",
+      "stem": "With the default settings, which nodePort value can you request?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "30007",
+          "correct": true,
+          "explanation": "It falls inside the default range 30000-32767."
+        },
+        {
+          "id": "b",
+          "text": "9376",
+          "correct": false,
+          "explanation": "Outside the default NodePort range."
+        },
+        {
+          "id": "c",
+          "text": "443",
+          "correct": false,
+          "explanation": "Outside the default NodePort range."
+        },
+        {
+          "id": "d",
+          "text": "80",
+          "correct": false,
+          "explanation": "Outside the default NodePort range."
+        }
+      ]
+    },
+    {
+      "id": "services-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-service-types",
+      "stem": "Which statements about a type: LoadBalancer Service are true by default? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It also gets a cluster IP and node ports",
+          "correct": true,
+          "explanation": "Types are nested: LoadBalancer builds on NodePort, which builds on ClusterIP."
+        },
+        {
+          "id": "b",
+          "text": "The provisioned balancer is reported in .status.loadBalancer",
+          "correct": true,
+          "explanation": "Creation is asynchronous; details land in the status."
+        },
+        {
+          "id": "c",
+          "text": "Kubernetes ships its own load balancer component",
+          "correct": false,
+          "explanation": "You must provide one or integrate with a cloud provider."
+        },
+        {
+          "id": "d",
+          "text": "Node ports are never allocated",
+          "correct": false,
+          "explanation": "allocateLoadBalancerNodePorts defaults to true."
+        }
+      ]
+    },
+    {
+      "id": "services-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-service-types",
+      "stem": "Your app should reach an external database by a stable in-cluster name. The database has a DNS hostname. Which Service type fits?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ExternalName",
+          "correct": true,
+          "explanation": "It maps the Service to a DNS name with a CNAME record."
+        },
+        {
+          "id": "b",
+          "text": "NodePort",
+          "correct": false,
+          "explanation": "NodePort exposes in-cluster Pods on node ports."
+        },
+        {
+          "id": "c",
+          "text": "LoadBalancer",
+          "correct": false,
+          "explanation": "LoadBalancer exposes in-cluster Pods externally."
+        }
+      ]
+    },
+    {
+      "id": "services-q-06",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "sn-service-types",
+      "stem": "For a headless Service (clusterIP: None), kube-proxy load-balances traffic across the Pods.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "kube-proxy does not handle headless Services."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. DNS returns the Pod IPs and clients connect directly."
+        }
+      ]
+    },
+    {
+      "id": "services-q-07",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-service-types",
+      "stem": "You create a Service with no selector for an external backend. Traffic goes nowhere. What is missing?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "An EndpointSlice you create yourself, labelled kubernetes.io/service-name with the Service name",
+          "correct": true,
+          "explanation": "Without a selector, no EndpointSlices are created automatically."
+        },
+        {
+          "id": "b",
+          "text": "Setting type: NodePort",
+          "correct": false,
+          "explanation": "The type doesn't create endpoints."
+        },
+        {
+          "id": "c",
+          "text": "Setting clusterIP: None",
+          "correct": false,
+          "explanation": "That makes it headless but still gives no endpoints."
+        },
+        {
+          "id": "d",
+          "text": "Restarting kube-proxy",
+          "correct": false,
+          "explanation": "kube-proxy has no endpoints to route to."
+        }
+      ]
+    },
+    {
+      "id": "services-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-service-types",
+      "stem": "How many endpoints does an EndpointSlice hold at most, by default?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/",
+      "options": [
+        {
+          "id": "a",
+          "text": "100",
+          "correct": true,
+          "explanation": "The default; configurable up to 1000."
+        },
+        {
+          "id": "b",
+          "text": "1000",
+          "correct": false,
+          "explanation": "1000 is the maximum you can configure, not the default."
+        },
+        {
+          "id": "c",
+          "text": "10",
+          "correct": false,
+          "explanation": "The default is 100."
+        },
+        {
+          "id": "d",
+          "text": "No limit",
+          "correct": false,
+          "explanation": "The default limit is 100."
+        }
+      ]
+    },
+    {
+      "id": "services-q-09",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-service-types",
+      "stem": "Which are conditions stored on EndpointSlice endpoints? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ready",
+          "correct": true,
+          "explanation": "One of the three conditions."
+        },
+        {
+          "id": "b",
+          "text": "serving",
+          "correct": true,
+          "explanation": "One of the three conditions."
+        },
+        {
+          "id": "c",
+          "text": "terminating",
+          "correct": true,
+          "explanation": "One of the three conditions."
+        },
+        {
+          "id": "d",
+          "text": "scheduled",
+          "correct": false,
+          "explanation": "Not one of the three conditions EndpointSlices store."
+        }
+      ]
+    },
+    {
+      "id": "services-q-10",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "sn-service-types",
+      "stem": "A dual-stack Service has at least two EndpointSlices: one for IPv4 and one for IPv6.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": true,
+          "explanation": "Each EndpointSlice holds one address type."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": false,
+          "explanation": "Each slice is a single address type, so dual-stack needs two or more."
+        }
+      ]
+    },
+    {
+      "id": "services-q-11",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-service-types",
+      "stem": "Which command creates a Service on port 80 for Deployment nginx whose containers listen on 8000?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl expose deployment nginx --port=80 --target-port=8000",
+          "correct": true,
+          "explanation": "--port is the Service port; --target-port is the container port."
+        },
+        {
+          "id": "b",
+          "text": "kubectl expose deployment nginx --port=8000 --target-port=80",
+          "correct": false,
+          "explanation": "The ports are reversed."
+        },
+        {
+          "id": "c",
+          "text": "kubectl expose deployment nginx --port=80 --protocol=8000",
+          "correct": false,
+          "explanation": "--protocol sets TCP, UDP or SCTP, not a port."
+        },
+        {
+          "id": "d",
+          "text": "kubectl expose deployment nginx --port=80 --name=8000",
+          "correct": false,
+          "explanation": "--name sets the Service name."
+        }
+      ]
+    },
+    {
+      "id": "services-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-service-types",
+      "stem": "Which kubectl expose flag value creates a headless Service?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/",
+      "options": [
+        {
+          "id": "a",
+          "text": "--cluster-ip=None",
+          "correct": true,
+          "explanation": "Setting the cluster IP to None makes the Service headless."
+        },
+        {
+          "id": "b",
+          "text": "--type=ExternalName",
+          "correct": false,
+          "explanation": "That creates an ExternalName Service."
+        },
+        {
+          "id": "c",
+          "text": "--external-ip=None",
+          "correct": false,
+          "explanation": "--external-ip adds an extra external IP to accept."
+        }
+      ]
+    },
+    {
+      "id": "services-q-13",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-service-types",
+      "stem": "A client Pod's code reads MY_DB_SERVICE_HOST, but the variable is missing. The my-db Service exists. What is the likely cause?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The client Pod was created before the Service",
+          "correct": true,
+          "explanation": "Service env vars are only injected for Services that exist when the Pod starts."
+        },
+        {
+          "id": "b",
+          "text": "Env vars only work for headless Services",
+          "correct": false,
+          "explanation": "The kubelet injects them for each active Service."
+        },
+        {
+          "id": "c",
+          "text": "The variable should be named MY-DB_SERVICE_HOST",
+          "correct": false,
+          "explanation": "Dashes are converted to underscores."
+        },
+        {
+          "id": "d",
+          "text": "CoreDNS isn't running",
+          "correct": false,
+          "explanation": "Env vars are injected by the kubelet, not by DNS."
+        }
+      ]
+    },
+    {
+      "id": "services-q-14",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-service-types",
+      "stem": "A Pod outside namespace my-ns must reach Service my-service in my-ns. Which name works?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "my-service.my-ns",
+          "correct": true,
+          "explanation": "Pods in other namespaces must qualify the name with the namespace."
+        },
+        {
+          "id": "b",
+          "text": "my-service",
+          "correct": false,
+          "explanation": "The short name only works from the Service's own namespace."
+        },
+        {
+          "id": "c",
+          "text": "my-ns.my-service",
+          "correct": false,
+          "explanation": "The Service name comes first, then the namespace."
+        }
+      ]
+    }
+  ]
+}

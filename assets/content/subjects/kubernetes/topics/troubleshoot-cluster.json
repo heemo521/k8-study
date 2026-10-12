@@ -1,0 +1,833 @@
+{
+  "id": "troubleshoot-cluster",
+  "title": "Troubleshooting Clusters & Nodes",
+  "summary": "NotReady nodes, component logs, static Pod manifests, kubelet checks, node debugging and kubeadm gotchas.",
+  "order": 3,
+  "domainIds": [
+    "troubleshooting"
+  ],
+  "competencyIds": [
+    "ts-clusters-nodes",
+    "ts-components"
+  ],
+  "prerequisites": [
+    "architecture"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "troubleshoot-cluster-nodes",
+      "heading": "Start with the nodes",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/",
+      "sourceTitle": "Troubleshooting Clusters",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "First confirm every node you expect is registered and **Ready**. Then dig into any node that isn't."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get nodes\nkubectl describe node <node-name>\nkubectl get node <node-name> -o yaml\nkubectl cluster-info dump        # detailed overall health"
+        },
+        {
+          "type": "p",
+          "text": "What a down node looks like (network cut, or a kubelet that died and won't restart):"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`STATUS` is `NotReady`.",
+            "Conditions `Ready`, `MemoryPressure`, `DiskPressure` and `PIDPressure` go to **Unknown** with the message that the kubelet stopped posting node status.",
+            "Taints `node.kubernetes.io/unreachable` with `NoExecute` and `NoSchedule` appear.",
+            "Its Pods are evicted after **five minutes** of NotReady."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "In `-o yaml`, `status.daemonEndpoints.kubeletEndpoint` shows the kubelet port (10250 in the example)."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-logfiles",
+      "heading": "Component log files",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/",
+      "sourceTitle": "Troubleshooting Clusters",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Going deeper means logging in to the machine. On systemd hosts you may need `journalctl` instead of these files."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Node",
+            "Log file",
+            "Component"
+          ],
+          "rows": [
+            [
+              "Control plane",
+              "`/var/log/kube-apiserver.log`",
+              "API server"
+            ],
+            [
+              "Control plane",
+              "`/var/log/kube-scheduler.log`",
+              "Scheduler"
+            ],
+            [
+              "Control plane",
+              "`/var/log/kube-controller-manager.log`",
+              "Most built-in controllers"
+            ],
+            [
+              "Worker",
+              "`/var/log/kubelet.log`",
+              "kubelet (runs containers)"
+            ],
+            [
+              "Worker",
+              "`/var/log/kube-proxy.log`",
+              "kube-proxy (Service traffic)"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-systemd",
+      "heading": "Who logs where",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/",
+      "sourceTitle": "Logging Architecture",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "The **kubelet and container runtime** don't run in containers. On Linux with systemd they write to **journald**: read with `journalctl -u kubelet`.",
+            "Without systemd they write `.log` files under `/var/log`.",
+            "The **API server, scheduler and controller manager** run in Pods, usually **static Pods**. etcd most commonly does too.",
+            "Components in Pods write files under `/var/log`, not the systemd journal.",
+            "kube-proxy, when used, typically runs as a **DaemonSet**."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "journalctl -u kubelet"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "On the node itself, read the kubelet with `journalctl -u kubelet` (systemd) and the Pod-based components through their files under `/var/log`."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-static",
+      "heading": "Static Pod manifests",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/",
+      "sourceTitle": "Create static Pods",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The kubelet itself runs static Pods from a directory set by `staticPodPath` in its config file. `/etc/kubernetes/manifests` is the example directory."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The kubelet scans the directory regularly. Add a file to start a Pod; move it out to stop it.",
+            "Each static Pod gets a **mirror Pod** in the API server. Deleting the mirror with kubectl does **not** stop the static Pod.",
+            "The kubelet reads **every** file not starting with a dot, whatever its extension. Keep backups such as `kube-apiserver.yaml.backup` **outside** the directory.",
+            "The deprecated flag form is `--pod-manifest-path=/etc/kubernetes/manifests/`."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "When the API server can't help, inspect containers on the node with crictl:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "crictl ps\ncrictl logs <container-id>\n# after editing kubelet config\nsystemctl restart kubelet"
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-kubelet",
+      "heading": "kubelet service checks (kubeadm)",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "sourceTitle": "Upgrading kubeadm clusters",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "systemctl status kubelet\njournalctl -xeu kubelet\nsudo systemctl daemon-reload\nsudo systemctl restart kubelet"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "kubeadm control plane nodes keep their component manifests in `/etc/kubernetes/manifests`.",
+            "During upgrades kubeadm backs up manifests and etcd data under `/etc/kubernetes/tmp`, which you can restore by hand if rollback fails."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-nodedebug",
+      "heading": "Shell on a node with kubectl debug",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/kubectl-node-debug/",
+      "sourceTitle": "Debugging Kubernetes Nodes With Kubectl",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "No SSH? Run a debugging Pod on the node:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl debug node/<node-name> -it --image=ubuntu\n# when done\nkubectl delete pod <node-debugger-pod-name> --now"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The node's root filesystem is at `/host`. Useful logs: `/host/var/log/kubelet.log`, `/host/var/log/kube-proxy.log`, `/host/var/log/containerd.log`, `/host/var/log/syslog`, `/host/var/log/kern.log`.",
+            "It shares the host IPC, network and PID namespaces but is **not privileged**, so `chroot /host` fails. Use `--profile=sysadmin` for privileges.",
+            "It won't work on a node that's down (network gone or kubelet dead)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-failures",
+      "heading": "Failure modes",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/",
+      "sourceTitle": "Troubleshooting Clusters",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Failure",
+            "Result"
+          ],
+          "rows": [
+            [
+              "API server down or crashing",
+              "Can't stop, update or start Pods/Services; running workloads keep going unless they need the API"
+            ],
+            [
+              "API server backing storage lost",
+              "kube-apiserver won't start healthy; kubelets keep running existing Pods; manual recovery needed"
+            ],
+            [
+              "Single node shuts down",
+              "Pods on that node stop"
+            ],
+            [
+              "kubelet software fault",
+              "No new Pods there; node marked unhealthy; replicas start elsewhere"
+            ],
+            [
+              "Network partition",
+              "Each side thinks the other is down"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Mitigations listed: automatic VM restart, reliable storage for API server + etcd, a high-availability control plane (with HA etcd), periodic volume snapshots, and controllers plus Services in front of Pods."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-kubeadm",
+      "heading": "Common kubeadm problems",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/troubleshooting-kubeadm/",
+      "sourceTitle": "Troubleshooting kubeadm",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Symptom",
+            "Likely cause / fix"
+          ],
+          "rows": [
+            [
+              "`kubeadm init` hangs waiting for the control plane",
+              "Network problems, or control plane containers crashlooping. Inspect them with the runtime (crictl)"
+            ],
+            [
+              "coredns stuck in Pending",
+              "Expected until you install a Pod network add-on"
+            ],
+            [
+              "Pods in RunContainerError / CrashLoopBackOff / Error after the add-on",
+              "The network add-on is probably broken"
+            ],
+            [
+              "`x509: certificate signed by unknown authority` from kubectl",
+              "Bad kubeconfig. `unset KUBECONFIG`, or `export KUBECONFIG=/etc/kubernetes/admin.conf`"
+            ],
+            [
+              "`kubeadm reset` blocks removing containers",
+              "Restart the container runtime, then rerun reset"
+            ],
+            [
+              "kubelet picks the wrong node IP",
+              "Set `--node-ip`, then `systemctl daemon-reload` and `systemctl restart kubelet`"
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "troubleshoot-cluster-fc-01",
+      "front": "First check when debugging a cluster?",
+      "back": "`kubectl get nodes`: all expected nodes present and Ready.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-02",
+      "front": "Command for a detailed dump of overall cluster health?",
+      "back": "`kubectl cluster-info dump`",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-03",
+      "front": "After how long NotReady are a node's Pods evicted (per the example)?",
+      "back": "Five minutes.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-04",
+      "front": "Which taints appear on an unreachable node?",
+      "back": "`node.kubernetes.io/unreachable` with `NoExecute` and `NoSchedule`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-05",
+      "front": "Log files for the control plane components?",
+      "back": "`/var/log/kube-apiserver.log`, `/var/log/kube-scheduler.log`, `/var/log/kube-controller-manager.log`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-06",
+      "front": "Log files on a worker node?",
+      "back": "`/var/log/kubelet.log` and `/var/log/kube-proxy.log`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-07",
+      "front": "Read kubelet logs on a systemd node?",
+      "back": "`journalctl -u kubelet`",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-08",
+      "front": "How do the API server, scheduler and controller manager usually run?",
+      "back": "In Pods, usually static Pods.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-09",
+      "front": "Which kubelet config field sets the static Pod directory?",
+      "back": "`staticPodPath` (example: `/etc/kubernetes/manifests`).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-10",
+      "front": "You `kubectl delete` a static Pod's mirror Pod. What happens?",
+      "back": "The kubelet keeps running the static Pod; it reappears.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-11",
+      "front": "Why not keep `kube-apiserver.yaml.backup` in the manifests directory?",
+      "back": "The kubelet reads every non-dot file and may run the stale backup.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-12",
+      "front": "Check the kubelet service and its recent logs?",
+      "back": "`systemctl status kubelet` and `journalctl -xeu kubelet`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-13",
+      "front": "Where is the node's filesystem inside a `kubectl debug node/...` Pod?",
+      "back": "Mounted at `/host`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/kubectl-node-debug/"
+    },
+    {
+      "id": "troubleshoot-cluster-fc-14",
+      "front": "coredns is Pending right after `kubeadm init`. Problem?",
+      "back": "No, it's expected until a Pod network add-on is installed.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/troubleshooting-kubeadm/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "troubleshoot-cluster-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ts-clusters-nodes",
+      "stem": "`kubectl get nodes` shows worker-2 as NotReady. Which command gives its conditions, taints and events?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl describe node worker-2",
+          "correct": true,
+          "explanation": "Describe shows conditions, taints, capacity and events."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get nodes",
+          "correct": false,
+          "explanation": "Only a one-line summary per node; no conditions or taints."
+        },
+        {
+          "id": "c",
+          "text": "Read /var/log/kube-scheduler.log on the control plane",
+          "correct": false,
+          "explanation": "That's the scheduler's log, not the node's status."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-clusters-nodes",
+      "stem": "In `kubectl describe node`, every condition shows Unknown with 'Kubelet stopped posting node status'. What does that point to?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The kubelet on that node is down or unreachable",
+          "correct": true,
+          "explanation": "The page shows this exact picture for a down node: network cut, or a kubelet that died and won't restart."
+        },
+        {
+          "id": "b",
+          "text": "The node has disk pressure",
+          "correct": false,
+          "explanation": "DiskPressure would be True, not Unknown."
+        },
+        {
+          "id": "c",
+          "text": "The scheduler crashed",
+          "correct": false,
+          "explanation": "The scheduler doesn't post node status."
+        },
+        {
+          "id": "d",
+          "text": "A Pod on the node hit its memory limit",
+          "correct": false,
+          "explanation": "That affects one container, not node conditions."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-components",
+      "stem": "On a systemd-based Linux node, how do you read the kubelet's logs?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/",
+      "options": [
+        {
+          "id": "a",
+          "text": "journalctl -u kubelet",
+          "correct": true,
+          "explanation": "The kubelet writes to journald on systemd nodes."
+        },
+        {
+          "id": "b",
+          "text": "kubectl logs kubelet",
+          "correct": false,
+          "explanation": "The kubelet isn't a Pod, so there are no container logs to fetch."
+        },
+        {
+          "id": "c",
+          "text": "Read the files in /var/log/pods",
+          "correct": false,
+          "explanation": "That directory holds container logs written by the runtime."
+        },
+        {
+          "id": "d",
+          "text": "Run kube-log-runner",
+          "correct": false,
+          "explanation": "A helper that can redirect kubelet logs elsewhere; it doesn't read them."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ts-components",
+      "stem": "Which usually run as static Pods on a control plane node? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/cluster-administration/logging/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kube-apiserver",
+          "correct": true,
+          "explanation": "Listed as running in (usually static) Pods."
+        },
+        {
+          "id": "b",
+          "text": "kube-scheduler",
+          "correct": true,
+          "explanation": "Same."
+        },
+        {
+          "id": "c",
+          "text": "kube-controller-manager",
+          "correct": true,
+          "explanation": "Same."
+        },
+        {
+          "id": "d",
+          "text": "kubelet",
+          "correct": false,
+          "explanation": "The kubelet runs directly on the host, not in a container."
+        },
+        {
+          "id": "e",
+          "text": "kube-proxy",
+          "correct": false,
+          "explanation": "Typically a DaemonSet."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-05",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ts-components",
+      "stem": "You fix a typo in the kube-scheduler static Pod manifest but save your old copy as `kube-scheduler.yaml.bak` in the same directory. What's the risk?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The kubelet reads both files, and the stale spec might win",
+          "correct": true,
+          "explanation": "No filtering by extension; same-named Pods give undefined behaviour."
+        },
+        {
+          "id": "b",
+          "text": "None, the kubelet only reads .yaml files",
+          "correct": false,
+          "explanation": "It processes every file not starting with a dot."
+        },
+        {
+          "id": "c",
+          "text": "The API server rejects both Pods",
+          "correct": false,
+          "explanation": "The kubelet creates static Pods itself."
+        },
+        {
+          "id": "d",
+          "text": "The kubelet deletes the backup automatically",
+          "correct": false,
+          "explanation": "It doesn't."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-06",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ts-components",
+      "stem": "True or false: Deleting a static Pod's mirror Pod with `kubectl delete pod` stops the static Pod.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "The kubelet keeps running it; the mirror Pod comes back."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. Remove the manifest from the static Pod directory to stop it."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-components",
+      "stem": "The API server is down on a kubeadm control plane node. Which command checks its container directly on the node?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/",
+      "options": [
+        {
+          "id": "a",
+          "text": "crictl ps (then crictl logs <container-id>)",
+          "correct": true,
+          "explanation": "crictl talks to the runtime and doesn't need the API server."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get pods -n kube-system",
+          "correct": false,
+          "explanation": "kubectl needs the API server."
+        },
+        {
+          "id": "c",
+          "text": "kubectl delete pod <mirror-pod-name>",
+          "correct": false,
+          "explanation": "Needs the API server, and wouldn't stop a static Pod anyway."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-clusters-nodes",
+      "stem": "How do you get a shell on a node without SSH, using only kubectl?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/kubectl-node-debug/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl debug node/<node-name> -it --image=ubuntu",
+          "correct": true,
+          "explanation": "Creates a debugging Pod on that node with an interactive shell."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get pods",
+          "correct": false,
+          "explanation": "Lists Pods; no shell."
+        },
+        {
+          "id": "c",
+          "text": "kubectl delete pod <name> --now",
+          "correct": false,
+          "explanation": "Used to clean up the debugging Pod afterwards."
+        },
+        {
+          "id": "d",
+          "text": "kubectl version",
+          "correct": false,
+          "explanation": "Prints versions only."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-09",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ts-clusters-nodes",
+      "stem": "Which are true about a `kubectl debug node/...` Pod? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/kubectl-node-debug/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The node's root filesystem is mounted at /host",
+          "correct": true,
+          "explanation": "Stated."
+        },
+        {
+          "id": "b",
+          "text": "It is not privileged unless you use something like --profile=sysadmin",
+          "correct": true,
+          "explanation": "So chroot /host fails by default."
+        },
+        {
+          "id": "c",
+          "text": "It works even if the node's kubelet is dead",
+          "correct": false,
+          "explanation": "It won't work on a down node."
+        },
+        {
+          "id": "d",
+          "text": "It runs in its own isolated network namespace",
+          "correct": false,
+          "explanation": "It uses the host's IPC, network and PID namespaces."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-clusters-nodes",
+      "stem": "Right after `kubeadm init`, CoreDNS Pods are Pending. What should you do?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/troubleshooting-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Install a Pod network add-on",
+          "correct": true,
+          "explanation": "CoreDNS can't deploy fully until the network exists."
+        },
+        {
+          "id": "b",
+          "text": "Delete the CoreDNS Pods",
+          "correct": false,
+          "explanation": "They'd come back Pending."
+        },
+        {
+          "id": "c",
+          "text": "Run kubeadm reset",
+          "correct": false,
+          "explanation": "Nothing is broken."
+        },
+        {
+          "id": "d",
+          "text": "Set allowPrivilegeEscalation to true",
+          "correct": false,
+          "explanation": "That's a workaround for a SELinux/old Docker CrashLoopBackOff case."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-clusters-nodes",
+      "stem": "kubectl says `x509: certificate signed by unknown authority` on a kubeadm control plane node. Which is a documented workaround?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/troubleshooting-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "export KUBECONFIG=/etc/kubernetes/admin.conf",
+          "correct": true,
+          "explanation": "Points kubectl at the default admin kubeconfig."
+        },
+        {
+          "id": "b",
+          "text": "systemctl restart kubelet",
+          "correct": false,
+          "explanation": "The issue is the client kubeconfig."
+        },
+        {
+          "id": "c",
+          "text": "Pass --kubelet-insecure-tls to kubectl",
+          "correct": false,
+          "explanation": "That's a metrics-server flag."
+        },
+        {
+          "id": "d",
+          "text": "kubeadm reset",
+          "correct": false,
+          "explanation": "Destroys the node's setup; far too drastic."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-12",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ts-clusters-nodes",
+      "stem": "According to the failure modes list, what happens when the API server VM shuts down? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/",
+      "options": [
+        {
+          "id": "a",
+          "text": "You can't start, update or stop Pods and Services",
+          "correct": true,
+          "explanation": "Listed result."
+        },
+        {
+          "id": "b",
+          "text": "Running Pods keep working unless they rely on the Kubernetes API",
+          "correct": true,
+          "explanation": "Listed result."
+        },
+        {
+          "id": "c",
+          "text": "All Pods on every node stop at once",
+          "correct": false,
+          "explanation": "That's what happens to one node's Pods when that node shuts down."
+        },
+        {
+          "id": "d",
+          "text": "etcd data is deleted",
+          "correct": false,
+          "explanation": "Not a listed result."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-13",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ts-components",
+      "stem": "Which file holds the scheduler's log on a control plane node per the cluster troubleshooting page?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/",
+      "options": [
+        {
+          "id": "a",
+          "text": "/var/log/kube-scheduler.log",
+          "correct": true,
+          "explanation": "Listed for control plane nodes."
+        },
+        {
+          "id": "b",
+          "text": "/var/log/kubelet.log",
+          "correct": false,
+          "explanation": "kubelet log."
+        },
+        {
+          "id": "c",
+          "text": "/var/log/kube-proxy.log",
+          "correct": false,
+          "explanation": "kube-proxy log."
+        },
+        {
+          "id": "d",
+          "text": "/var/log/kube-apiserver.log",
+          "correct": false,
+          "explanation": "API server log."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-cluster-q-14",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-components",
+      "stem": "After installing a new kubelet package on a kubeadm node, which commands make it take effect?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/",
+      "options": [
+        {
+          "id": "a",
+          "text": "sudo systemctl daemon-reload && sudo systemctl restart kubelet",
+          "correct": true,
+          "explanation": "Reload unit files, then restart the kubelet."
+        },
+        {
+          "id": "b",
+          "text": "kubectl uncordon <node>",
+          "correct": false,
+          "explanation": "Marks the node schedulable; doesn't restart the kubelet."
+        },
+        {
+          "id": "c",
+          "text": "kubeadm upgrade plan",
+          "correct": false,
+          "explanation": "Only shows available upgrades."
+        },
+        {
+          "id": "d",
+          "text": "journalctl -xeu kubelet",
+          "correct": false,
+          "explanation": "Reads logs; doesn't restart anything."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,758 @@
+{
+  "id": "network-policies",
+  "title": "Network Policies",
+  "summary": "Restrict Pod traffic at L3/L4 with podSelector, namespaceSelector and ipBlock rules, default-deny policies and a supporting network plugin.",
+  "order": 6,
+  "domainIds": [
+    "services-networking"
+  ],
+  "competencyIds": [
+    "sn-netpol"
+  ],
+  "prerequisites": [
+    "services"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "network-policies-what",
+      "heading": "What NetworkPolicies do",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "sourceTitle": "Network Policies",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A NetworkPolicy controls traffic at the **IP address or port level (OSI layer 3 or 4)** for TCP, UDP and SCTP. It applies to connections that have a selected Pod on one or both ends."
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "The **network plugin** enforces policies. Without a networking solution that supports NetworkPolicy, creating the object **has no effect**."
+        },
+        {
+          "type": "p",
+          "text": "Allowed peers are identified by three things:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Pods** (a Pod can never block access to itself).",
+            "**Namespaces**.",
+            "**IP blocks** (CIDR ranges). Traffic to and from the Pod's own node is always allowed."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network-policies-isolation",
+      "heading": "Isolation: default allow until selected",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "sourceTitle": "Network Policies",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "By default a Pod is **non-isolated** for both ingress and egress: all connections are allowed.",
+            "A Pod becomes **isolated for ingress** once any NetworkPolicy selects it and has `Ingress` in `policyTypes`. Egress works the same way with `Egress`.",
+            "An isolated Pod only allows what some applicable policy's rules allow (plus, for ingress, connections from its own node). **Reply traffic** for allowed connections is allowed implicitly.",
+            "Policies are **additive** and never conflict: the result is the union of all applicable policies, so evaluation order doesn't matter.",
+            "Pod A to Pod B works only if **A's egress and B's ingress** both allow it."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "There are no deny rules. The model is deny by default once isolated, then you add allow rules."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-resource",
+      "heading": "The NetworkPolicy resource",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "sourceTitle": "Network Policies",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: <policy-name>\n  namespace: <namespace>\nspec:\n  podSelector:\n    matchLabels:\n      <key>: <value>       # Pods this policy applies to\n  policyTypes:\n  - Ingress\n  - Egress\n  ingress:\n  - from:\n    - ipBlock:\n        cidr: <cidr>\n        except:\n        - <cidr>\n    - namespaceSelector:\n        matchLabels:\n          <key>: <value>\n    - podSelector:\n        matchLabels:\n          <key>: <value>\n    ports:\n    - protocol: TCP\n      port: <port>\n  egress:\n  - to:\n    - ipBlock:\n        cidr: <cidr>\n    ports:\n    - protocol: TCP\n      port: <port>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`spec.podSelector` picks the Pods the policy applies to. An **empty** `podSelector: {}` selects **all Pods in the namespace**.",
+            "`policyTypes` can hold `Ingress`, `Egress` or both. If omitted, `Ingress` is always set, and `Egress` is set only if the policy has egress rules.",
+            "Each ingress rule allows traffic matching **both** its `from` and `ports`; each egress rule matches both `to` and `ports`.",
+            "A port range is possible with `endPort` (≥ `port`, needs `port`, both numeric). If the plugin doesn't support `endPort`, only `port` is applied."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network-policies-selectors",
+      "heading": "from/to selectors: the AND vs OR trap",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "sourceTitle": "Network Policies",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Peer",
+            "Selects"
+          ],
+          "rows": [
+            [
+              "podSelector",
+              "Pods in the policy's own namespace"
+            ],
+            [
+              "namespaceSelector",
+              "All Pods in matching namespaces"
+            ],
+            [
+              "namespaceSelector + podSelector in one entry",
+              "Matching Pods inside matching namespaces"
+            ],
+            [
+              "ipBlock",
+              "CIDR ranges (use for cluster-external IPs; Pod IPs are ephemeral)"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "# ONE entry = AND: role=client Pods in namespaces labelled user=alice\n- from:\n  - namespaceSelector:\n      matchLabels:\n        user: alice\n    podSelector:\n      matchLabels:\n        role: client\n\n# TWO entries = OR: role=client Pods in this namespace, OR any Pod in user=alice namespaces\n- from:\n  - namespaceSelector:\n      matchLabels:\n        user: alice\n  - podSelector:\n      matchLabels:\n        role: client"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Namespaces can't be named directly; select them by label. The control plane sets the immutable label `kubernetes.io/metadata.name` (value = namespace name) on every namespace.",
+            "When unsure how a policy was read, run `kubectl describe` on it.",
+            "Whether IP rewriting (e.g. by a LoadBalancer or Service) happens before or after policy processing is undefined, so ipBlock results can vary by plugin."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network-policies-defaults",
+      "heading": "Default-deny and allow-all policies",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "sourceTitle": "Network Policies",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "With no policies in a namespace, all ingress and egress is allowed. These namespace-wide policies all use `podSelector: {}`:"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Goal",
+            "spec"
+          ],
+          "rows": [
+            [
+              "Deny all ingress",
+              "`policyTypes: [Ingress]`, no ingress rules"
+            ],
+            [
+              "Deny all egress",
+              "`policyTypes: [Egress]`, no egress rules"
+            ],
+            [
+              "Deny both",
+              "`policyTypes: [Ingress, Egress]`, no rules"
+            ],
+            [
+              "Allow all ingress",
+              "`ingress: [{}]`, `policyTypes: [Ingress]`"
+            ],
+            [
+              "Allow all egress",
+              "`egress: [{}]`, `policyTypes: [Egress]`"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-all\nspec:\n  podSelector: {}\n  policyTypes:\n  - Ingress\n  - Egress"
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "A default-deny **egress** policy also blocks **DNS**. If workloads need name resolution, create an additional policy that permits egress to the cluster DNS service."
+        },
+        {
+          "type": "p",
+          "text": "An allow-all policy means no other policy can deny that direction for those Pods. Each of these leaves the other direction's isolation unchanged."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-walkthrough",
+      "heading": "Hands-on: restrict access to a Service",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/",
+      "sourceTitle": "Declare Network Policy",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Plugins with NetworkPolicy support include Antrea, Calico, Cilium and Kube-router."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl create deployment nginx --image=nginx\nkubectl expose deployment nginx --port=80\nkubectl run busybox --rm -ti --image=busybox -- /bin/sh\n# inside the Pod:\nwget --spider --timeout=1 nginx      # works before any policy"
+        },
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: access-nginx\nspec:\n  podSelector:\n    matchLabels:\n      app: nginx\n  ingress:\n  - from:\n    - podSelector:\n        matchLabels:\n          access: \"true\""
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The `app=nginx` label was added to the Pods automatically by `kubectl create deployment`.",
+            "After applying, `wget` from an unlabelled Pod **times out**.",
+            "A Pod started with `--labels=\"access=true\"` gets through."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Fast test loop: `kubectl run busybox --rm -ti --labels=\"access=true\" --image=busybox -- /bin/sh`, then `wget --spider --timeout=1 <service>`. Run it with and without the label to prove the policy works."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-limits",
+      "heading": "Limits and edge cases",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "sourceTitle": "Network Policies",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Deny-all is only guaranteed for TCP, UDP and SCTP. ICMP, ARP and other protocols are undefined. SCTP needs a CNI plugin that supports it.",
+            "Policies apply at Pod level, so they cover init, sidecar and regular containers alike.",
+            "A Pod created before the plugin handles a new policy may start unprotected. Allow rules may land after isolation rules.",
+            "Policy changes may or may not affect **existing connections**; it's implementation defined.",
+            "hostNetwork Pods: behaviour is undefined. Most plugins treat their traffic as node traffic.",
+            "Not possible with the API: explicit deny rules, TLS, targeting Services by name, node identities, cluster-wide default policies, logging, or blocking localhost and node traffic."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "network-policies-fc-01",
+      "front": "What enforces NetworkPolicy, and what happens without it?",
+      "back": "The network plugin. Without a plugin that supports NetworkPolicy, the objects have no effect.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-02",
+      "front": "Default isolation state of a Pod with no policies selecting it?",
+      "back": "Non-isolated for both ingress and egress: all traffic allowed.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-03",
+      "front": "What does `podSelector: {}` select?",
+      "back": "All Pods in the policy's namespace.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-04",
+      "front": "policyTypes is omitted. What gets set?",
+      "back": "Ingress always; Egress only if the policy has egress rules.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-05",
+      "front": "Two policies select the same Pod with different allow rules. Result?",
+      "back": "The union of both. Policies are additive and never conflict.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-06",
+      "front": "namespaceSelector and podSelector in ONE from entry vs TWO entries?",
+      "back": "One entry = AND (those Pods in those namespaces). Two entries = OR.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-07",
+      "front": "Spec for a default deny-all-ingress policy?",
+      "back": "podSelector: {} and policyTypes: [Ingress], with no ingress rules.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-08",
+      "front": "Side effect of a default deny-all egress policy?",
+      "back": "It blocks DNS too. Add a policy allowing egress to the cluster DNS service.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-09",
+      "front": "How do you target one namespace by its name?",
+      "back": "Select the immutable label kubernetes.io/metadata.name=<namespace> in a namespaceSelector.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-10",
+      "front": "Rules for endPort?",
+      "back": "endPort ≥ port, port must also be set, both numeric. Unsupported plugins apply only port.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-11",
+      "front": "Which traffic can a Pod never block with NetworkPolicy?",
+      "back": "Traffic to itself, and traffic to/from its own node.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+    },
+    {
+      "id": "network-policies-fc-12",
+      "front": "Quick command to test a policy from a labelled Pod?",
+      "back": "kubectl run busybox --rm -ti --labels=\"access=true\" --image=busybox -- /bin/sh, then wget --spider --timeout=1 <service>",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "network-policies-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-netpol",
+      "stem": "You apply a valid NetworkPolicy, but traffic is unaffected. What's the most likely reason?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The cluster's network plugin doesn't support NetworkPolicy",
+          "correct": true,
+          "explanation": "Policies are implemented by the network plugin; without support they do nothing."
+        },
+        {
+          "id": "b",
+          "text": "NetworkPolicies only take effect after the namespace is recreated",
+          "correct": false,
+          "explanation": "No such step exists; the plugin applies policies as it handles them."
+        },
+        {
+          "id": "c",
+          "text": "NetworkPolicies only affect egress traffic",
+          "correct": false,
+          "explanation": "They can cover ingress, egress or both."
+        },
+        {
+          "id": "d",
+          "text": "The policy needs an ipBlock to be valid",
+          "correct": false,
+          "explanation": "ipBlock is one of several optional peer types; it isn't required."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-02",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "sn-netpol",
+      "stem": "In a namespace with no NetworkPolicies, all ingress and egress traffic to and from its Pods is allowed.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": true,
+          "explanation": "Pods are non-isolated by default in both directions."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": false,
+          "explanation": "Isolation only starts once a policy selects the Pod."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-netpol",
+      "stem": "A policy has a podSelector and an `egress` section but no `policyTypes`. Which types apply?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Ingress and Egress",
+          "correct": true,
+          "explanation": "Ingress is always set; Egress is added because egress rules exist."
+        },
+        {
+          "id": "b",
+          "text": "Egress only",
+          "correct": false,
+          "explanation": "Ingress is always set when policyTypes is omitted."
+        },
+        {
+          "id": "c",
+          "text": "Ingress only",
+          "correct": false,
+          "explanation": "Egress is also set when the policy has egress rules."
+        },
+        {
+          "id": "d",
+          "text": "Neither; the policy is invalid",
+          "correct": false,
+          "explanation": "policyTypes is optional and has defaults."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-04",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-netpol",
+      "stem": "An ingress `from` list has two entries: one with `namespaceSelector: {matchLabels: {user: alice}}` and a separate one with `podSelector: {matchLabels: {role: client}}`. What is allowed?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "role=client Pods in the local namespace, OR any Pod in namespaces labelled user=alice",
+          "correct": true,
+          "explanation": "Two separate entries are ORed."
+        },
+        {
+          "id": "b",
+          "text": "Only role=client Pods inside namespaces labelled user=alice",
+          "correct": false,
+          "explanation": "That AND meaning needs both selectors in a single entry."
+        },
+        {
+          "id": "c",
+          "text": "role=client Pods in any namespace",
+          "correct": false,
+          "explanation": "A podSelector alone selects Pods in the policy's own namespace."
+        },
+        {
+          "id": "d",
+          "text": "Nothing, because mixing selectors is invalid",
+          "correct": false,
+          "explanation": "Mixing is valid; the YAML structure decides AND vs OR."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-05",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-netpol",
+      "stem": "Which spec creates a default deny for all ingress in a namespace, leaving egress alone?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "podSelector: {} with policyTypes: [Ingress] and no ingress rules",
+          "correct": true,
+          "explanation": "Selects every Pod and allows no ingress."
+        },
+        {
+          "id": "b",
+          "text": "podSelector: {} with ingress: [{}] and policyTypes: [Ingress]",
+          "correct": false,
+          "explanation": "An empty rule {} allows all ingress."
+        },
+        {
+          "id": "c",
+          "text": "podSelector: {} with policyTypes: [Ingress, Egress]",
+          "correct": false,
+          "explanation": "That denies egress as well."
+        },
+        {
+          "id": "d",
+          "text": "podSelector: {} with policyTypes: [Egress]",
+          "correct": false,
+          "explanation": "That denies egress, not ingress."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-netpol",
+      "stem": "After adding a default deny-all egress policy, Pods can't resolve Service names. What fixes it while keeping the deny?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Add a separate NetworkPolicy allowing egress to the cluster's DNS service",
+          "correct": true,
+          "explanation": "The docs warn deny-all egress blocks DNS and say to allow DNS egress separately."
+        },
+        {
+          "id": "b",
+          "text": "Add an allow-all ingress policy",
+          "correct": false,
+          "explanation": "DNS lookups are outbound from the Pod; ingress rules don't help."
+        },
+        {
+          "id": "c",
+          "text": "Add an ingress rule with an explicit deny for DNS",
+          "correct": false,
+          "explanation": "NetworkPolicy has no deny rules, and the problem is egress."
+        },
+        {
+          "id": "d",
+          "text": "Nothing; DNS is always exempt from NetworkPolicy",
+          "correct": false,
+          "explanation": "It isn't: deny-all egress also blocks DNS."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-07",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "sn-netpol",
+      "stem": "Which statements about combining NetworkPolicies are correct? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Allowed connections are the union of all policies that apply to the Pod",
+          "correct": true,
+          "explanation": "Policies are additive."
+        },
+        {
+          "id": "b",
+          "text": "For Pod A to reach Pod B, A's egress and B's ingress must both allow it",
+          "correct": true,
+          "explanation": "If either side doesn't allow it, the connection doesn't happen."
+        },
+        {
+          "id": "c",
+          "text": "A later policy can deny what an earlier one allowed",
+          "correct": false,
+          "explanation": "There are no deny rules and order doesn't matter."
+        },
+        {
+          "id": "d",
+          "text": "Reply traffic must be allowed by an explicit rule",
+          "correct": false,
+          "explanation": "Replies to allowed connections are allowed implicitly."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-netpol",
+      "stem": "You need to allow traffic from a namespace called `monitoring`, which has no custom labels. What should you select?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A namespaceSelector matching kubernetes.io/metadata.name: monitoring",
+          "correct": true,
+          "explanation": "The control plane sets this immutable label to the namespace name on every namespace."
+        },
+        {
+          "id": "b",
+          "text": "A namespace: monitoring field inside the from entry",
+          "correct": false,
+          "explanation": "Namespaces can't be named directly; a label selector is required."
+        },
+        {
+          "id": "c",
+          "text": "An ipBlock with the namespace's CIDR",
+          "correct": false,
+          "explanation": "Namespaces have no CIDR; ipBlock is meant for cluster-external IPs."
+        },
+        {
+          "id": "d",
+          "text": "A podSelector matching kubernetes.io/metadata.name: monitoring",
+          "correct": false,
+          "explanation": "That label is on namespaces, and podSelector alone only looks in the policy's namespace."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-09",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "sn-netpol",
+      "stem": "With an ingress policy applied, a Pod can block connections from the node it runs on.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "Traffic from the Pod's node is always allowed."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: blocking node or localhost traffic isn't possible with the API."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-netpol",
+      "stem": "An egress rule uses `port: 32000` and `endPort: 32768` with protocol TCP. What does it allow?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "TCP to any port from 32000 to 32768 at the matching destinations",
+          "correct": true,
+          "explanation": "endPort turns port into the start of a range."
+        },
+        {
+          "id": "b",
+          "text": "Only ports 32000 and 32768",
+          "correct": false,
+          "explanation": "It is a range, not two ports."
+        },
+        {
+          "id": "c",
+          "text": "All ports except 32000 to 32768",
+          "correct": false,
+          "explanation": "Rules only allow; there's no exclusion for ports."
+        },
+        {
+          "id": "d",
+          "text": "It's invalid because endPort needs a named port",
+          "correct": false,
+          "explanation": "Both port and endPort must be numeric."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-11",
+      "type": "multi",
+      "difficulty": 3,
+      "competencyId": "sn-netpol",
+      "stem": "Which can NOT be done with the NetworkPolicy API? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Target a Service by its name",
+          "correct": true,
+          "explanation": "Listed as unsupported; target Pods or namespaces by label instead."
+        },
+        {
+          "id": "b",
+          "text": "Write an explicit deny rule",
+          "correct": true,
+          "explanation": "The API only has allow rules."
+        },
+        {
+          "id": "c",
+          "text": "Log blocked or accepted connections",
+          "correct": true,
+          "explanation": "Logging security events is listed as unsupported."
+        },
+        {
+          "id": "d",
+          "text": "Allow ingress only from a CIDR range",
+          "correct": false,
+          "explanation": "ipBlock does exactly this."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "sn-netpol",
+      "stem": "Policy `access-nginx` selects `app: nginx` and allows ingress only from Pods labelled `access: \"true\"`. Which test Pod reaches the nginx Service?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl run busybox --rm -ti --labels=\"access=true\" --image=busybox -- /bin/sh",
+          "correct": true,
+          "explanation": "The labelled Pod matches the from podSelector, so wget succeeds."
+        },
+        {
+          "id": "b",
+          "text": "kubectl run busybox --rm -ti --image=busybox -- /bin/sh",
+          "correct": false,
+          "explanation": "Without the label, the walkthrough shows wget timing out."
+        },
+        {
+          "id": "c",
+          "text": "kubectl expose deployment nginx --port=80",
+          "correct": false,
+          "explanation": "This creates the Service; it doesn't start a client Pod."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-13",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "sn-netpol",
+      "stem": "Which of these is listed as a network provider with NetworkPolicy support?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Calico",
+          "correct": true,
+          "explanation": "Calico is listed with Antrea, Cilium and Kube-router."
+        },
+        {
+          "id": "b",
+          "text": "busybox",
+          "correct": false,
+          "explanation": "busybox is the test client image in the walkthrough."
+        },
+        {
+          "id": "c",
+          "text": "nginx",
+          "correct": false,
+          "explanation": "nginx is the sample workload being protected."
+        }
+      ]
+    },
+    {
+      "id": "network-policies-q-14",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "sn-netpol",
+      "stem": "A deny-all policy is in place. What is guaranteed about ICMP (ping) traffic?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Nothing; behaviour for ICMP is undefined and varies by plugin",
+          "correct": true,
+          "explanation": "Deny is only guaranteed for TCP, UDP and SCTP."
+        },
+        {
+          "id": "b",
+          "text": "ICMP is always blocked",
+          "correct": false,
+          "explanation": "Some plugins may allow it."
+        },
+        {
+          "id": "c",
+          "text": "ICMP is always allowed",
+          "correct": false,
+          "explanation": "Some plugins may deny it."
+        }
+      ]
+    }
+  ]
+}

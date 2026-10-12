@@ -1,0 +1,676 @@
+{
+  "id": "resource-monitoring",
+  "title": "Monitoring Resource Usage",
+  "summary": "metrics-server, the Metrics API and kubectl top, and how they differ from a full metrics pipeline.",
+  "order": 2,
+  "domainIds": [
+    "troubleshooting"
+  ],
+  "competencyIds": [
+    "ts-monitor"
+  ],
+  "prerequisites": [
+    "pods"
+  ],
+  "estMinutes": 12,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "resource-monitoring-pipelines",
+      "heading": "Two kinds of metrics pipeline",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/",
+      "sourceTitle": "Tools for Monitoring Resources",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Kubernetes doesn't depend on one monitoring tool. On a new cluster you pick a **resource metrics pipeline**, a **full metrics pipeline**, or both."
+        },
+        {
+          "type": "table",
+          "header": [
+            "",
+            "Resource metrics pipeline",
+            "Full metrics pipeline"
+          ],
+          "rows": [
+            [
+              "What",
+              "A small set of CPU and memory metrics",
+              "Richer metrics from a monitoring system of your choice"
+            ],
+            [
+              "Collected by",
+              "**metrics-server**: lightweight, short-term, in-memory",
+              "Your tool, which scrapes the kubelet and others"
+            ],
+            [
+              "Exposed as",
+              "`metrics.k8s.io` API",
+              "An adapter serving `custom.metrics.k8s.io` or `external.metrics.k8s.io`"
+            ],
+            [
+              "Used by",
+              "Horizontal Pod Autoscaler, `kubectl top`",
+              "Autoscaling, for example the Horizontal Pod Autoscaler"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "metrics-server finds every node and asks each **kubelet** for CPU and memory usage.",
+            "The kubelet gets per-container stats from the runtime over CRI, or reads them itself using cAdvisor code when the runtime doesn't publish them.",
+            "The kubelet serves the aggregated Pod usage at `/metrics/resource`.",
+            "Full pipelines should speak **OpenMetrics**, which extends the Prometheus exposition format. Kubernetes doesn't recommend any particular one."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-arch",
+      "heading": "How the resource metrics pipeline fits together",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
+      "sourceTitle": "Resource metrics pipeline",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Data flows from the node up to the API server, and from there to its consumers:"
+        },
+        {
+          "type": "code",
+          "lang": "text",
+          "text": "container runtime -> cAdvisor -> kubelet -> metrics-server -> API server (Metrics API) -> HPA / VPA / kubectl top"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**cAdvisor**: built into the kubelet; collects and exposes container metrics. It reads cgroups.",
+            "**kubelet**: exposes resource metrics on its `/metrics/resource` and `/stats` endpoints.",
+            "**metrics-server**: a cluster add-on that pulls from every kubelet and aggregates. It is the reference implementation of the Metrics API.",
+            "**Metrics API**: CPU and memory for nodes and Pods, served through the API server for autoscaling."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "The Metrics API is not there by default. You must deploy metrics-server (or another adapter that serves it), enable the API aggregation layer and register an APIService for `metrics.k8s.io`."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "metrics-server v0.6.0+ scrapes the kubelet's `/metrics/resource`; older versions used `/stats/summary`.",
+            "Runtimes that isolate with something other than cgroups (for example, virtualization) must support CRI Container Metrics."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-api",
+      "heading": "Query the Metrics API directly",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
+      "sourceTitle": "Resource metrics pipeline",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get --raw \"/apis/metrics.k8s.io/v1/nodes/<node-name>\"\nkubectl get --raw \"/apis/metrics.k8s.io/v1/namespaces/<namespace>/pods/<pod-name>\""
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A node returns kind `NodeMetrics`; a Pod returns `PodMetrics`, with usage per container.",
+            "The `window` field (`30s` in the sample) is the time span used to calculate CPU."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Metric",
+            "How it's measured"
+          ],
+          "rows": [
+            [
+              "CPU",
+              "Average core usage in **cpu units**, a rate over the kernel's cumulative CPU counter. One cpu = 1 vCPU/core on cloud providers, or 1 hyper-thread on bare-metal Intel"
+            ],
+            [
+              "Memory",
+              "**Working set** in bytes at the moment of collection. An estimate of memory that can't be freed under pressure; it often includes some cache"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "The Metrics API only offers the minimum CPU and memory needed for HPA/VPA. For anything more, add a second pipeline that uses the Custom Metrics API."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-top",
+      "heading": "kubectl top",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "sourceTitle": "kubectl Quick Reference",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Quick commands for current node and Pod CPU/memory usage:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl top node                          # all nodes\nkubectl top node <node-name>\nkubectl top pod                           # Pods in the current namespace\nkubectl top pod <pod-name> --containers   # per container\nkubectl top pod <pod-name> --sort-by=cpu  # or memory"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "For 'which Pod uses the most CPU' tasks, use `kubectl top pod` with `--sort-by=cpu` (or `memory`). Add `-n <namespace>` when the task names a namespace, and write the answer exactly where asked."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-kubeadm",
+      "heading": "metrics-server on a kubeadm cluster",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/troubleshooting-kubeadm/",
+      "sourceTitle": "Troubleshooting kubeadm",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "kubeadm gives each kubelet a **self-signed** serving certificate, so metrics-server may log `x509: certificate signed by unknown authority`.",
+            "Passing `--kubelet-insecure-tls` to metrics-server works around it, but the page says not to do this in production.",
+            "The secure fix is to enable signed kubelet serving certificates."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "resource-monitoring-fc-01",
+      "front": "Which component collects data for the resource metrics pipeline?",
+      "back": "metrics-server: lightweight, short-term, in-memory.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/"
+    },
+    {
+      "id": "resource-monitoring-fc-02",
+      "front": "Which API group serves resource metrics?",
+      "back": "`metrics.k8s.io`",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/"
+    },
+    {
+      "id": "resource-monitoring-fc-03",
+      "front": "Which API groups do full metrics pipeline adapters implement?",
+      "back": "`custom.metrics.k8s.io` or `external.metrics.k8s.io`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/"
+    },
+    {
+      "id": "resource-monitoring-fc-04",
+      "front": "Where does the kubelet serve aggregated resource usage?",
+      "back": "`/metrics/resource` on its authenticated and read-only ports.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/"
+    },
+    {
+      "id": "resource-monitoring-fc-05",
+      "front": "Which exposition standard should a full pipeline support?",
+      "back": "OpenMetrics, which extends the Prometheus exposition format.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/"
+    },
+    {
+      "id": "resource-monitoring-fc-06",
+      "front": "Name three consumers of the Metrics API.",
+      "back": "HPA, VPA and `kubectl top`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "id": "resource-monitoring-fc-07",
+      "front": "Besides deploying metrics-server, what else does the Metrics API need?",
+      "back": "The API aggregation layer enabled and an APIService registered for `metrics.k8s.io`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "id": "resource-monitoring-fc-08",
+      "front": "Which kubelet endpoint does metrics-server v0.6.0+ use?",
+      "back": "`/metrics/resource` (older versions: `/stats/summary`).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "id": "resource-monitoring-fc-09",
+      "front": "How is memory reported in the Metrics API?",
+      "back": "As the working set in bytes, at the moment of collection.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "id": "resource-monitoring-fc-10",
+      "front": "How is CPU reported in the Metrics API?",
+      "back": "As average core usage in cpu units, a rate over a cumulative counter across the `window`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "id": "resource-monitoring-fc-11",
+      "front": "Read a node's metrics straight from the API?",
+      "back": "`kubectl get --raw \"/apis/metrics.k8s.io/v1/nodes/<node-name>\"`",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/"
+    },
+    {
+      "id": "resource-monitoring-fc-12",
+      "front": "Show per-container usage for one Pod?",
+      "back": "`kubectl top pod <pod-name> --containers`",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/"
+    },
+    {
+      "id": "resource-monitoring-fc-13",
+      "front": "metrics-server on kubeadm logs x509 unknown-authority errors. Why?",
+      "back": "kubeadm's kubelets use self-signed serving certificates.",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/troubleshooting-kubeadm/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "resource-monitoring-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ts-monitor",
+      "stem": "`kubectl top node` returns an error that the metrics API isn't available. What's the most likely cause?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
+      "options": [
+        {
+          "id": "a",
+          "text": "metrics-server (or another Metrics API adapter) isn't deployed",
+          "correct": true,
+          "explanation": "The Metrics API only exists once something serves it."
+        },
+        {
+          "id": "b",
+          "text": "The kubelet's cAdvisor is disabled by default",
+          "correct": false,
+          "explanation": "cAdvisor is built into the kubelet."
+        },
+        {
+          "id": "c",
+          "text": "The VPA isn't installed",
+          "correct": false,
+          "explanation": "VPA consumes the Metrics API; it doesn't provide it."
+        },
+        {
+          "id": "d",
+          "text": "The HPA controller is missing",
+          "correct": false,
+          "explanation": "HPA consumes metrics; it doesn't provide them."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-02",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "Which consume data from the resource Metrics API? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
+      "options": [
+        {
+          "id": "a",
+          "text": "HorizontalPodAutoscaler",
+          "correct": true,
+          "explanation": "Uses it to adjust replicas."
+        },
+        {
+          "id": "b",
+          "text": "VerticalPodAutoscaler",
+          "correct": true,
+          "explanation": "Uses it to adjust resources."
+        },
+        {
+          "id": "c",
+          "text": "kubectl top",
+          "correct": true,
+          "explanation": "Reads node and Pod usage from it."
+        },
+        {
+          "id": "d",
+          "text": "cAdvisor",
+          "correct": false,
+          "explanation": "cAdvisor is a source of data inside the kubelet, not a consumer."
+        },
+        {
+          "id": "e",
+          "text": "The container runtime",
+          "correct": false,
+          "explanation": "The runtime is where stats originate."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "Which is the correct order of the resource metrics pipeline?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
+      "options": [
+        {
+          "id": "a",
+          "text": "cAdvisor/kubelet -> metrics-server -> API server -> kubectl top",
+          "correct": true,
+          "explanation": "Matches the architecture figure."
+        },
+        {
+          "id": "b",
+          "text": "kubectl top -> metrics-server -> kubelet -> API server",
+          "correct": false,
+          "explanation": "kubectl top is the consumer at the end."
+        },
+        {
+          "id": "c",
+          "text": "metrics-server -> cAdvisor -> API server -> kubelet",
+          "correct": false,
+          "explanation": "metrics-server pulls from kubelets, not the reverse."
+        },
+        {
+          "id": "d",
+          "text": "API server -> kubelet -> metrics-server -> HPA",
+          "correct": false,
+          "explanation": "The API server serves metrics-server's data; it doesn't feed the kubelet."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-04",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ts-monitor",
+      "stem": "True or false: metrics-server keeps long-term historical metrics on disk.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "It's described as lightweight, short-term and in-memory."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. For history and richer data you need a full metrics pipeline."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "You need the HPA to scale on a metric from your Prometheus-based monitoring. What does the docs' full-pipeline model require?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/",
+      "options": [
+        {
+          "id": "a",
+          "text": "An adapter that implements custom.metrics.k8s.io or external.metrics.k8s.io",
+          "correct": true,
+          "explanation": "That is how a full pipeline exposes metrics back to Kubernetes."
+        },
+        {
+          "id": "b",
+          "text": "Adding the metric to metrics.k8s.io via metrics-server flags",
+          "correct": false,
+          "explanation": "metrics.k8s.io only offers basic CPU and memory."
+        },
+        {
+          "id": "c",
+          "text": "Writing the metric into the kubelet's /metrics/resource",
+          "correct": false,
+          "explanation": "That's the kubelet's resource metrics endpoint; full pipelines expose metrics through a custom or external metrics adapter."
+        },
+        {
+          "id": "d",
+          "text": "Nothing; HPA reads Prometheus directly",
+          "correct": false,
+          "explanation": "Kubernetes reaches full-pipeline metrics through an adapter."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "Which command shows CPU usage of each container inside one Pod?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl top pod <pod-name> --containers",
+          "correct": true,
+          "explanation": "`--containers` breaks usage down by container."
+        },
+        {
+          "id": "b",
+          "text": "kubectl top node <pod-name>",
+          "correct": false,
+          "explanation": "`top node` takes a node name."
+        },
+        {
+          "id": "c",
+          "text": "kubectl describe pod <pod-name>",
+          "correct": false,
+          "explanation": "Describe shows requests/limits, not live usage."
+        },
+        {
+          "id": "d",
+          "text": "kubectl logs <pod-name> --all-containers",
+          "correct": false,
+          "explanation": "Shows logs, not usage."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-07",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ts-monitor",
+      "stem": "In a Metrics API response, what does the `window` field tell you?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The time span used to compute the CPU rate",
+          "correct": true,
+          "explanation": "CPU is a rate over a cumulative counter across that window."
+        },
+        {
+          "id": "b",
+          "text": "How long metrics-server keeps the sample",
+          "correct": false,
+          "explanation": "Not what the field means."
+        },
+        {
+          "id": "c",
+          "text": "The memory sampling interval",
+          "correct": false,
+          "explanation": "Memory is an instant working-set value."
+        },
+        {
+          "id": "d",
+          "text": "The kubelet scrape timeout",
+          "correct": false,
+          "explanation": "Not described as a timeout."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "Which are needed before `kubectl get --raw \"/apis/metrics.k8s.io/v1/nodes/<node>\"` works? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A deployed metrics-server or alternative adapter",
+          "correct": true,
+          "explanation": "Something must serve the Metrics API."
+        },
+        {
+          "id": "b",
+          "text": "The API aggregation layer enabled, with an APIService registered for metrics.k8s.io",
+          "correct": true,
+          "explanation": "Stated requirement."
+        },
+        {
+          "id": "c",
+          "text": "A Custom Metrics API adapter",
+          "correct": false,
+          "explanation": "That's for richer metrics, not the basic Metrics API."
+        },
+        {
+          "id": "d",
+          "text": "A VerticalPodAutoscaler",
+          "correct": false,
+          "explanation": "VPA consumes the Metrics API; it isn't needed to serve it."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-09",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "True or false: Memory in the Metrics API is the working set, which can include some file-backed cache.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct. The host OS can't always reclaim cache pages, so some ends up in the working set."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "The page says the working set typically includes some cached memory."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-10",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "Which kubelet endpoint does a current metrics-server (v0.6.0+) scrape?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/",
+      "options": [
+        {
+          "id": "a",
+          "text": "/metrics/resource",
+          "correct": true,
+          "explanation": "Newer versions use the resource metrics endpoint."
+        },
+        {
+          "id": "b",
+          "text": "/stats/summary",
+          "correct": false,
+          "explanation": "That's the Summary API used by older versions."
+        },
+        {
+          "id": "c",
+          "text": "/apis/metrics.k8s.io/v1/nodes",
+          "correct": false,
+          "explanation": "That's the Metrics API on the API server, which metrics-server serves."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "On a kubeadm lab cluster, metrics-server logs `x509: certificate signed by unknown authority`. What explains it?",
+      "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/troubleshooting-kubeadm/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubeadm deploys self-signed kubelet serving certificates",
+          "correct": true,
+          "explanation": "metrics-server can't verify them."
+        },
+        {
+          "id": "b",
+          "text": "The API server certificate has expired",
+          "correct": false,
+          "explanation": "The error is between metrics-server and the kubelet."
+        },
+        {
+          "id": "c",
+          "text": "CoreDNS is Pending",
+          "correct": false,
+          "explanation": "Unrelated to metrics TLS."
+        },
+        {
+          "id": "d",
+          "text": "ebtables is missing",
+          "correct": false,
+          "explanation": "That's a kubeadm preflight warning."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-12",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ts-monitor",
+      "stem": "True or false: The Kubernetes docs recommend one specific full metrics pipeline for all clusters.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Kubernetes doesn't recommend a specific pipeline; pick what fits your needs."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. The choice is left to you."
+        }
+      ]
+    },
+    {
+      "id": "resource-monitoring-q-13",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ts-monitor",
+      "stem": "Which command lists nodes with their CPU and memory usage?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl top node",
+          "correct": true,
+          "explanation": "Shows metrics for all nodes."
+        },
+        {
+          "id": "b",
+          "text": "kubectl describe nodes <node>",
+          "correct": false,
+          "explanation": "Shows capacity and requests, not live usage."
+        },
+        {
+          "id": "c",
+          "text": "kubectl cluster-info",
+          "correct": false,
+          "explanation": "Shows control plane and service addresses."
+        },
+        {
+          "id": "d",
+          "text": "kubectl get nodes -o wide",
+          "correct": false,
+          "explanation": "Shows node details, not usage."
+        }
+      ]
+    }
+  ]
+}

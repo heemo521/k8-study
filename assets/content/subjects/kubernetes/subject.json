@@ -1,0 +1,292 @@
+{
+  "id": "kubernetes",
+  "title": "Kubernetes",
+  "tagline": "Core concepts and CKA exam prep",
+  "description": "Concise notes, flashcards, quizzes and practice tests mapped to the Certified Kubernetes Administrator (CKA) exam domains.",
+  "contentVersion": 2,
+  "reviewedAt": "2026-10-11",
+  "curriculum": {
+    "name": "CKA",
+    "title": "Certified Kubernetes Administrator",
+    "source": "https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/",
+    "examVersion": "Kubernetes v1.35",
+    "checkedAt": "2026-10-11",
+    "note": "The real CKA is a hands-on, performance-based exam. These multiple-choice tests check your knowledge of the concepts; they are not a simulation of the exam."
+  },
+  "domains": [
+    {
+      "id": "foundations",
+      "title": "Foundations",
+      "weightPercent": null,
+      "isExamDomain": false,
+      "competencies": []
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "weightPercent": 30,
+      "isExamDomain": true,
+      "competencies": [
+        {
+          "id": "ts-clusters-nodes",
+          "text": "Troubleshoot clusters and nodes"
+        },
+        {
+          "id": "ts-components",
+          "text": "Troubleshoot cluster components"
+        },
+        {
+          "id": "ts-monitor",
+          "text": "Monitor cluster and application resource usage"
+        },
+        {
+          "id": "ts-output-streams",
+          "text": "Manage and evaluate container output streams"
+        },
+        {
+          "id": "ts-networking",
+          "text": "Troubleshoot services and networking"
+        }
+      ]
+    },
+    {
+      "id": "cluster-arch",
+      "title": "Cluster Architecture, Installation & Configuration",
+      "weightPercent": 25,
+      "isExamDomain": true,
+      "competencies": [
+        {
+          "id": "ca-rbac",
+          "text": "Manage role based access control (RBAC)"
+        },
+        {
+          "id": "ca-infra-prep",
+          "text": "Prepare underlying infrastructure for installing a Kubernetes cluster"
+        },
+        {
+          "id": "ca-kubeadm",
+          "text": "Create and manage Kubernetes clusters using kubeadm"
+        },
+        {
+          "id": "ca-lifecycle",
+          "text": "Manage the lifecycle of Kubernetes clusters"
+        },
+        {
+          "id": "ca-ha",
+          "text": "Implement and configure a highly-available control plane"
+        },
+        {
+          "id": "ca-helm-kustomize",
+          "text": "Use Helm and Kustomize to install cluster components"
+        },
+        {
+          "id": "ca-extension",
+          "text": "Understand extension interfaces (CNI, CSI, CRI, etc.)"
+        },
+        {
+          "id": "ca-crds",
+          "text": "Understand CRDs, install and configure operators"
+        }
+      ]
+    },
+    {
+      "id": "services-networking",
+      "title": "Services & Networking",
+      "weightPercent": 20,
+      "isExamDomain": true,
+      "competencies": [
+        {
+          "id": "sn-pod-connectivity",
+          "text": "Understand connectivity between Pods"
+        },
+        {
+          "id": "sn-netpol",
+          "text": "Define and enforce Network Policies"
+        },
+        {
+          "id": "sn-service-types",
+          "text": "Use ClusterIP, NodePort, LoadBalancer service types and endpoints"
+        },
+        {
+          "id": "sn-gateway",
+          "text": "Use the Gateway API to manage Ingress traffic"
+        },
+        {
+          "id": "sn-ingress",
+          "text": "Know how to use Ingress controllers and Ingress resources"
+        },
+        {
+          "id": "sn-coredns",
+          "text": "Understand and use CoreDNS"
+        }
+      ]
+    },
+    {
+      "id": "workloads-scheduling",
+      "title": "Workloads & Scheduling",
+      "weightPercent": 15,
+      "isExamDomain": true,
+      "competencies": [
+        {
+          "id": "ws-rollouts",
+          "text": "Understand application deployments and how to perform rolling update and rollbacks"
+        },
+        {
+          "id": "ws-config",
+          "text": "Use ConfigMaps and Secrets to configure applications"
+        },
+        {
+          "id": "ws-autoscaling",
+          "text": "Configure workload autoscaling"
+        },
+        {
+          "id": "ws-self-healing",
+          "text": "Understand the primitives used to create robust, self-healing, application deployments"
+        },
+        {
+          "id": "ws-admission-scheduling",
+          "text": "Configure Pod admission and scheduling (limits, node affinity, etc.)"
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "title": "Storage",
+      "weightPercent": 10,
+      "isExamDomain": true,
+      "competencies": [
+        {
+          "id": "st-storage-classes",
+          "text": "Implement storage classes and dynamic volume provisioning"
+        },
+        {
+          "id": "st-volume-types",
+          "text": "Configure volume types, access modes and reclaim policies"
+        },
+        {
+          "id": "st-pv-pvc",
+          "text": "Manage persistent volumes and persistent volume claims"
+        }
+      ]
+    }
+  ],
+  "topics": [
+    "what-is-k8s",
+    "architecture",
+    "kubectl-basics",
+    "minikube",
+    "namespaces",
+    "pods",
+    "deployments",
+    "workload-controllers",
+    "configmaps-secrets",
+    "scheduling",
+    "autoscaling",
+    "cluster-networking",
+    "services",
+    "coredns",
+    "ingress",
+    "gateway-api",
+    "network-policies",
+    "volumes",
+    "persistent-volumes",
+    "storage-classes",
+    "rbac",
+    "managed-k8s",
+    "kubeadm",
+    "ha-control-plane",
+    "cluster-upgrade",
+    "etcd-backup",
+    "helm-kustomize",
+    "extension-interfaces",
+    "crds-operators",
+    "troubleshoot-apps",
+    "resource-monitoring",
+    "troubleshoot-cluster",
+    "troubleshoot-networking"
+  ],
+  "sourceAllowlist": [
+    {
+      "prefix": "https://kubernetes.io/docs/"
+    },
+    {
+      "prefix": "https://minikube.sigs.k8s.io/docs/"
+    },
+    {
+      "prefix": "https://docs.aws.amazon.com/eks/",
+      "topics": [
+        "managed-k8s"
+      ]
+    },
+    {
+      "prefix": "https://cloud.google.com/kubernetes-engine/docs/",
+      "topics": [
+        "managed-k8s"
+      ]
+    },
+    {
+      "prefix": "https://learn.microsoft.com/en-us/azure/aks/",
+      "topics": [
+        "managed-k8s"
+      ]
+    },
+    {
+      "prefix": "https://helm.sh/docs/",
+      "topics": [
+        "helm-kustomize"
+      ]
+    }
+  ],
+  "attributions": [
+    {
+      "text": "Study notes are original summaries adapted from the Kubernetes Documentation, © The Kubernetes Authors, licensed under CC BY 4.0. Changes: content has been summarized, reorganized, and rewritten. Each note links to its source page.",
+      "links": [
+        {
+          "label": "Kubernetes Documentation",
+          "url": "https://kubernetes.io/docs/"
+        },
+        {
+          "label": "CC BY 4.0 license",
+          "url": "https://creativecommons.org/licenses/by/4.0/"
+        }
+      ]
+    },
+    {
+      "text": "Some notes on minikube are adapted from the minikube documentation, © The Kubernetes Authors.",
+      "links": [
+        {
+          "label": "minikube documentation",
+          "url": "https://minikube.sigs.k8s.io/docs/"
+        }
+      ]
+    },
+    {
+      "text": "Helm notes are adapted from the Helm documentation, © Helm Authors, licensed under CC BY 4.0. Changes: summarized and rewritten.",
+      "links": [
+        {
+          "label": "Helm documentation",
+          "url": "https://helm.sh/docs/"
+        }
+      ]
+    },
+    {
+      "text": "The Managed Kubernetes topic states basic facts about Amazon EKS, Google GKE and Azure AKS and links to each vendor’s own documentation. Product names belong to their owners.",
+      "links": []
+    }
+  ],
+  "trademarks": [
+    {
+      "text": "Kubernetes® is a registered trademark of The Linux Foundation.",
+      "links": [
+        {
+          "label": "Linux Foundation trademark usage",
+          "url": "https://www.linuxfoundation.org/legal/trademark-usage"
+        },
+        {
+          "label": "LF Projects policies",
+          "url": "https://lfprojects.org/policies/"
+        }
+      ]
+    }
+  ]
+}

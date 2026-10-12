@@ -1,0 +1,800 @@
+{
+  "id": "persistent-volumes",
+  "title": "PersistentVolumes & Claims",
+  "summary": "PVs are cluster storage, PVCs are requests for it: provisioning, binding, access modes, reclaim policies and phases.",
+  "order": 2,
+  "domainIds": [
+    "storage"
+  ],
+  "competencyIds": [
+    "st-pv-pvc",
+    "st-volume-types"
+  ],
+  "prerequisites": [
+    "volumes"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "persistent-volumes-model",
+      "heading": "PV and PVC: the two objects",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "sourceTitle": "Persistent Volumes",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The PersistentVolume subsystem separates **how storage is provided** from **how it is consumed**."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Object",
+            "What it is",
+            "Analogy"
+          ],
+          "rows": [
+            [
+              "PersistentVolume (PV)",
+              "A piece of storage, created by an admin or dynamically via a StorageClass. Its lifecycle is independent of any Pod.",
+              "Like a node: a cluster resource"
+            ],
+            [
+              "PersistentVolumeClaim (PVC)",
+              "A user's request for storage: a size and access modes.",
+              "Like a Pod: it consumes PV resources"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A PV is a **cluster** resource; PVCs are **namespaced** objects, and a Pod can only use claims from its **own namespace**.",
+            "A PV records the storage implementation details (NFS, iSCSI, a cloud provider's disk...). Users only deal with the claim.",
+            "StorageClasses let admins offer storage that differs in more than size and access mode (performance, for example)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-lifecycle",
+      "heading": "Lifecycle: provision, bind, use, reclaim",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "sourceTitle": "Persistent Volumes",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "**Static provisioning**: an admin pre-creates PVs that describe real storage.",
+            "**Dynamic provisioning**: if no static PV matches, the cluster may provision one based on the PVC's StorageClass. A claim requesting class `\"\"` opts out of dynamic provisioning.",
+            "**Binding**: a control-plane loop matches a new PVC to a PV. Binding is **one-to-one** and exclusive, recorded with a `claimRef`. You always get at least what you asked for, possibly more.",
+            "A claim with no matching PV stays **unbound indefinitely**, and binds when a suitable PV appears (100Gi requested, only 50Gi PVs: it waits).",
+            "**Using**: a Pod lists the claim under `volumes`; the bound PV is the user's for as long as they need it.",
+            "**Reclaiming**: when the PVC is deleted, the PV's reclaim policy decides what happens next."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "**Storage Object in Use Protection**: deleting a PVC that a Pod uses, or a PV bound to a PVC, is postponed. The object shows `Terminating` with the `kubernetes.io/pvc-protection` or `kubernetes.io/pv-protection` finalizer."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-access",
+      "heading": "Access modes",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "sourceTitle": "Persistent Volumes",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Mode (CLI)",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "ReadWriteOnce (RWO)",
+              "Read-write by a **single node**. Several Pods on that node can still use it."
+            ],
+            [
+              "ReadOnlyMany (ROX)",
+              "Read-only by many nodes"
+            ],
+            [
+              "ReadWriteMany (RWX)",
+              "Read-write by many nodes"
+            ],
+            [
+              "ReadWriteOncePod (RWOP)",
+              "Read-write by a **single Pod** in the whole cluster. CSI volumes only."
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Each PV lists the modes its backend supports. For example, `HostPath` supports RWO only, while `NFS` supports RWO, ROX and RWX.",
+            "A volume is mounted with **one access mode at a time**, even if it supports several.",
+            "Access modes are used to **match** PVCs to PVs. Apart from RWOP, they don't enforce write protection once mounted.",
+            "Because PVCs are namespaced, sharing a claim with ROX/RWX only works **within one namespace**."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-reclaim",
+      "heading": "Reclaim policies",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "sourceTitle": "Persistent Volumes",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Policy",
+            "After the PVC is deleted"
+          ],
+          "rows": [
+            [
+              "Retain",
+              "PV stays and becomes **Released**. Not reusable until an admin cleans it up."
+            ],
+            [
+              "Delete",
+              "PV object **and** the backing storage asset are removed"
+            ],
+            [
+              "Recycle (deprecated)",
+              "Basic scrub (`rm -rf /thevolume/*`), then available again. Only `nfs` and `hostPath` support it."
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Manual reclaim of a Retained volume: delete the PV (the storage asset remains), clean up the data, then delete the asset or create a new PV for it."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Dynamically provisioned PVs **inherit** their StorageClass's reclaim policy, which defaults to **Delete**.",
+            "For Recycle, the docs recommend **dynamic provisioning** instead."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-pvspec",
+      "heading": "PersistentVolume spec and phases",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "sourceTitle": "Persistent Volumes",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: v1\nkind: PersistentVolume\nmetadata:\n  name: <pv-name>\nspec:\n  capacity:\n    storage: <size>\n  volumeMode: Filesystem      # or Block\n  accessModes:\n  - ReadWriteOnce\n  persistentVolumeReclaimPolicy: Retain\n  storageClassName: <class>\n  mountOptions: [<option>]\n  nfs:\n    path: <export-path>\n    server: <server>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`capacity.storage` is currently the **only** resource you can set or request.",
+            "`volumeMode`: `Filesystem` (the default) mounts a directory; `Block` gives the Pod a **raw block device**, used via `volumeDevices`/`devicePath` instead of a mount path.",
+            "`storageClassName`: a PV with a class only binds to PVCs requesting that class; a PV with no class only binds to PVCs requesting no class.",
+            "`mountOptions` aren't validated; a bad option makes the mount fail. `nodeAffinity` is required for `local` volumes."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Phase",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "Available",
+              "Free, not yet bound"
+            ],
+            [
+              "Bound",
+              "Bound to a claim"
+            ],
+            [
+              "Released",
+              "Claim deleted; resource not yet reclaimed"
+            ],
+            [
+              "Failed",
+              "Automatic reclamation failed"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-pvc",
+      "heading": "Writing a claim and using it",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "sourceTitle": "Persistent Volumes",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "yaml",
+          "text": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: <pvc-name>\nspec:\n  accessModes:\n  - ReadWriteOnce\n  volumeMode: Filesystem\n  resources:\n    requests:\n      storage: <size>\n  storageClassName: <class>\n---\n# in the Pod spec\nvolumes:\n- name: <volume-name>\n  persistentVolumeClaim:\n    claimName: <pvc-name>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`selector` (`matchLabels` / `matchExpressions`) narrows which PVs can bind. A PVC with a non-empty selector **can't** be dynamically provisioned.",
+            "`volumeName` pre-binds the claim to a specific PV. If that PV is bound to another PVC, the claim stays **pending**.",
+            "`storageClassName: \"\"` means \"PVs with no class\". Leaving the field **unset** lets the default StorageClass apply.",
+            "For Filesystem volumes the request is the outer size, so usable space can be slightly smaller."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-walkthrough",
+      "heading": "Walkthrough: hostPath PV to Pod",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/",
+      "sourceTitle": "Configure a Pod to Use a PersistentVolume for Storage",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The official tutorial (single-node cluster) shows the full static flow. hostPath PVs are for development and testing only."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl apply -f https://k8s.io/examples/pods/storage/pv-volume.yaml   # 10Gi, RWO, class manual\nkubectl get pv task-pv-volume       # STATUS Available\nkubectl apply -f https://k8s.io/examples/pods/storage/pv-claim.yaml    # requests 3Gi, class manual\nkubectl get pv task-pv-volume       # STATUS Bound, CLAIM default/task-pv-claim\nkubectl get pvc task-pv-claim       # CAPACITY 10Gi\nkubectl apply -f https://k8s.io/examples/pods/storage/pv-pod.yaml"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The claim asked for 3Gi but shows **10Gi**: it bound to the whole PV.",
+            "Matching used the same `storageClassName` (`manual`) plus size and access mode.",
+            "The Pod names only the **claim**, never the PV.",
+            "Clean up in order: `kubectl delete pod <pod>`, then `kubectl delete pvc <pvc>`, then `kubectl delete pv <pv>`."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Verify binding with `kubectl get pv <pv>` and `kubectl get pvc <pvc>`: the PV goes from `Available` to `Bound` and its CLAIM column shows `<namespace>/<pvc>`. The claim only binds to a PV with the same `storageClassName` that satisfies its size and access mode."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "persistent-volumes-fc-01",
+      "front": "PV vs PVC in one line each?",
+      "back": "PV: a piece of cluster storage (cluster resource, like a node). PVC: a user's request for storage (like a Pod consuming resources).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-02",
+      "front": "What does a claim with `storageClassName: \"\"` do?",
+      "back": "Requests a PV with no class, so it opts out of dynamic provisioning.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-03",
+      "front": "What happens to a PVC when no PV matches?",
+      "back": "It stays unbound indefinitely and binds once a matching PV appears.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-04",
+      "front": "RWO vs RWOP?",
+      "back": "RWO: read-write by a single node (several Pods on that node OK). RWOP: read-write by a single Pod cluster-wide; CSI only.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-05",
+      "front": "CLI abbreviations of the four access modes?",
+      "back": "RWO = ReadWriteOnce, ROX = ReadOnlyMany, RWX = ReadWriteMany, RWOP = ReadWriteOncePod.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-06",
+      "front": "Retain: what state is the PV in after its PVC is deleted?",
+      "back": "Released. Data stays and the PV can't be claimed again until an admin reclaims it.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-07",
+      "front": "Which reclaim policy is deprecated, and which volume types still support it?",
+      "back": "Recycle; only nfs and hostPath.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-08",
+      "front": "Default reclaim policy of a dynamically provisioned PV?",
+      "back": "Whatever its StorageClass sets; a StorageClass defaults to Delete.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-09",
+      "front": "The four PV phases?",
+      "back": "Available, Bound, Released, Failed.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-10",
+      "front": "Default `volumeMode` and the alternative?",
+      "back": "Filesystem (default); Block exposes a raw block device.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-11",
+      "front": "Which finalizer shows a PVC is protected from deletion while in use?",
+      "back": "`kubernetes.io/pvc-protection` (PVs: `kubernetes.io/pv-protection`).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-12",
+      "front": "Can a Pod use a PVC from another namespace?",
+      "back": "No. Claims must be in the same namespace as the Pod.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+    },
+    {
+      "id": "persistent-volumes-fc-13",
+      "front": "Tutorial: a 3Gi PVC binds to a 10Gi PV. What capacity does the PVC show?",
+      "back": "10Gi — the claim gets the whole PV (at least what it asked for).",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "persistent-volumes-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "st-pv-pvc",
+      "stem": "Which statement about PVs and PVCs is correct?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "A PV is a cluster resource; a PVC is a namespaced request for storage",
+          "correct": true,
+          "explanation": "PVs are like nodes, PVCs like Pods consuming resources."
+        },
+        {
+          "id": "b",
+          "text": "A PVC is created by the admin; a PV is created by the user",
+          "correct": false,
+          "explanation": "It's typically the other way round (or the PV is dynamically provisioned)."
+        },
+        {
+          "id": "c",
+          "text": "A PV is deleted automatically when its Pod is deleted",
+          "correct": false,
+          "explanation": "A PV's lifecycle is independent of any Pod."
+        },
+        {
+          "id": "d",
+          "text": "A Pod references a PV directly by name in its volumes",
+          "correct": false,
+          "explanation": "Pods reference the claim (`claimName`), not the PV."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-pv-pvc",
+      "stem": "A PVC requests 100Gi, but the cluster only has 50Gi PVs and no dynamic provisioning. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The PVC stays unbound until a matching PV (100Gi or more) is added",
+          "correct": true,
+          "explanation": "Claims remain unbound indefinitely until a match exists."
+        },
+        {
+          "id": "b",
+          "text": "It binds to two 50Gi PVs",
+          "correct": false,
+          "explanation": "Binding is one-to-one."
+        },
+        {
+          "id": "c",
+          "text": "It binds to a 50Gi PV and grows it",
+          "correct": false,
+          "explanation": "A claim always gets at least what it asked for."
+        },
+        {
+          "id": "d",
+          "text": "The PVC is rejected by the API server",
+          "correct": false,
+          "explanation": "It's created and stays Pending."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-03",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "Which access modes allow read-write from more than one Pod? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ReadWriteMany",
+          "correct": true,
+          "explanation": "Read-write by many nodes."
+        },
+        {
+          "id": "b",
+          "text": "ReadWriteOnce, when the Pods are on the same node",
+          "correct": true,
+          "explanation": "RWO is per node, so several Pods on that node can use it."
+        },
+        {
+          "id": "c",
+          "text": "ReadWriteOncePod",
+          "correct": false,
+          "explanation": "Only a single Pod in the whole cluster."
+        },
+        {
+          "id": "d",
+          "text": "ReadOnlyMany",
+          "correct": false,
+          "explanation": "Many nodes, but read-only."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "You must guarantee only one Pod in the whole cluster can write to a CSI-backed PVC. Which access mode?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ReadWriteOncePod",
+          "correct": true,
+          "explanation": "RWOP restricts the volume to a single Pod; CSI only."
+        },
+        {
+          "id": "b",
+          "text": "ReadWriteOnce",
+          "correct": false,
+          "explanation": "RWO restricts to a single node, not a single Pod."
+        },
+        {
+          "id": "c",
+          "text": "ReadOnlyMany",
+          "correct": false,
+          "explanation": "Read-only."
+        },
+        {
+          "id": "d",
+          "text": "ReadWriteMany",
+          "correct": false,
+          "explanation": "Allows many nodes."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-05",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "True or false: A PV created as ReadOnlyMany is guaranteed to be read-only once mounted.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Access modes are for matching; apart from RWOP they don't enforce write protection after mounting."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct — the docs say ROX gives no such guarantee."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "A PV with `persistentVolumeReclaimPolicy: Retain` has its PVC deleted. What is its state?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Released; the data remains and an admin must reclaim it manually",
+          "correct": true,
+          "explanation": "Retain keeps the PV and the data."
+        },
+        {
+          "id": "b",
+          "text": "Available, ready for the next claim",
+          "correct": false,
+          "explanation": "The previous claimant's data is still there, so it isn't reusable yet."
+        },
+        {
+          "id": "c",
+          "text": "Deleted together with the backing storage",
+          "correct": false,
+          "explanation": "That's the Delete policy."
+        },
+        {
+          "id": "d",
+          "text": "Failed",
+          "correct": false,
+          "explanation": "Failed means automatic reclamation failed."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "What is the default reclaim policy of a PV that was dynamically provisioned from a StorageClass that doesn't set reclaimPolicy?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Delete",
+          "correct": true,
+          "explanation": "Dynamically provisioned PVs inherit the class's policy, which defaults to Delete."
+        },
+        {
+          "id": "b",
+          "text": "Retain",
+          "correct": false,
+          "explanation": "Only if the class sets it."
+        },
+        {
+          "id": "c",
+          "text": "Recycle",
+          "correct": false,
+          "explanation": "Recycle is deprecated and not a default."
+        },
+        {
+          "id": "d",
+          "text": "None; it must be set",
+          "correct": false,
+          "explanation": "There is a default."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-08",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "Which statements about the Recycle reclaim policy are true? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It is deprecated in favour of dynamic provisioning",
+          "correct": true,
+          "explanation": "Stated in the warning."
+        },
+        {
+          "id": "b",
+          "text": "Only nfs and hostPath volume types support it",
+          "correct": true,
+          "explanation": "Stated for current Kubernetes."
+        },
+        {
+          "id": "c",
+          "text": "It deletes the backing storage asset",
+          "correct": false,
+          "explanation": "That's Delete; Recycle scrubs files and reuses the volume."
+        },
+        {
+          "id": "d",
+          "text": "It's the default for StorageClasses",
+          "correct": false,
+          "explanation": "The default is Delete."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-09",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "st-pv-pvc",
+      "stem": "Which PV phase means the claim was deleted but the storage hasn't been reclaimed yet?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Released",
+          "correct": true,
+          "explanation": "Exactly that definition."
+        },
+        {
+          "id": "b",
+          "text": "Available",
+          "correct": false,
+          "explanation": "Free and not yet bound."
+        },
+        {
+          "id": "c",
+          "text": "Bound",
+          "correct": false,
+          "explanation": "Still bound to a claim."
+        },
+        {
+          "id": "d",
+          "text": "Failed",
+          "correct": false,
+          "explanation": "Automatic reclamation failed."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-10",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "st-pv-pvc",
+      "stem": "A PVC sets `selector.matchLabels` and names a StorageClass with a working provisioner, but no existing PV matches. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "It stays unbound: a PVC with a non-empty selector can't be dynamically provisioned",
+          "correct": true,
+          "explanation": "The docs note this limitation."
+        },
+        {
+          "id": "b",
+          "text": "A new PV is provisioned with those labels",
+          "correct": false,
+          "explanation": "Selectors block dynamic provisioning."
+        },
+        {
+          "id": "c",
+          "text": "The selector is ignored and a PV is provisioned",
+          "correct": false,
+          "explanation": "It isn't ignored."
+        },
+        {
+          "id": "d",
+          "text": "It binds to any PV in the class",
+          "correct": false,
+          "explanation": "Selector and class requirements are ANDed."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-pv-pvc",
+      "stem": "You delete a PVC that a running Pod still uses. What do you see?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The PVC shows Terminating with the kubernetes.io/pvc-protection finalizer until no Pod uses it",
+          "correct": true,
+          "explanation": "Storage Object in Use Protection postpones removal."
+        },
+        {
+          "id": "b",
+          "text": "The PVC is removed and the Pod crashes",
+          "correct": false,
+          "explanation": "Removal is postponed to avoid data loss."
+        },
+        {
+          "id": "c",
+          "text": "The deletion is rejected with an error",
+          "correct": false,
+          "explanation": "It's accepted but postponed."
+        },
+        {
+          "id": "d",
+          "text": "The PV is deleted immediately",
+          "correct": false,
+          "explanation": "The PV stays bound while the PVC exists."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-12",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "st-pv-pvc",
+      "stem": "True or false: A Pod can mount a PVC that lives in a different namespace if it gives the full name.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Claims must be in the same namespace as the Pod."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-volume-types",
+      "stem": "A PV uses `volumeMode: Block`. How does a container access it?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Through `volumeDevices` with a `devicePath`",
+          "correct": true,
+          "explanation": "Raw block devices use a device path, not a mount path."
+        },
+        {
+          "id": "b",
+          "text": "Through `volumeMounts` with a `mountPath`",
+          "correct": false,
+          "explanation": "That's for Filesystem mode."
+        },
+        {
+          "id": "c",
+          "text": "Through `mountOptions` on the PV",
+          "correct": false,
+          "explanation": "Mount options tune how the volume is mounted; they don't expose a raw device."
+        },
+        {
+          "id": "d",
+          "text": "It can't be used by Pods",
+          "correct": false,
+          "explanation": "Block mode is for applications that handle raw devices."
+        }
+      ]
+    },
+    {
+      "id": "persistent-volumes-q-14",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "st-pv-pvc",
+      "stem": "In the official tutorial, which field makes the PVC `task-pv-claim` bind to `task-pv-volume`?",
+      "sourceUrl": "https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Both use `storageClassName: manual`, and the size and access mode fit",
+          "correct": true,
+          "explanation": "The control plane looks for a PV with the same StorageClass that satisfies the claim."
+        },
+        {
+          "id": "b",
+          "text": "The PVC requests exactly 10Gi",
+          "correct": false,
+          "explanation": "It requests 3Gi; a bigger PV still satisfies it."
+        },
+        {
+          "id": "c",
+          "text": "The Pod names the PV",
+          "correct": false,
+          "explanation": "The Pod names only the claim."
+        },
+        {
+          "id": "d",
+          "text": "A selector on the PVC matches the PV's `type: local` label",
+          "correct": false,
+          "explanation": "The tutorial's PVC has no selector; the label is just metadata here."
+        }
+      ]
+    }
+  ]
+}

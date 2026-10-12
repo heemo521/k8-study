@@ -1,0 +1,801 @@
+{
+  "id": "troubleshoot-networking",
+  "title": "Troubleshooting Services & Networking",
+  "summary": "Step through a broken Service: existence, DNS, spec, endpoints, Pods, kube-proxy, then debug CoreDNS itself.",
+  "order": 4,
+  "domainIds": [
+    "troubleshooting"
+  ],
+  "competencyIds": [
+    "ts-networking"
+  ],
+  "prerequisites": [
+    "services",
+    "coredns"
+  ],
+  "estMinutes": 18,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "troubleshoot-networking-flow",
+      "heading": "The Service debugging checklist",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "sourceTitle": "Debug Services",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A Service gives no response. Work through these in order; each step rules out a layer."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Check",
+            "Command",
+            "Look for"
+          ],
+          "rows": [
+            [
+              "1. Pods serve directly",
+              "`wget -qO- <pod-ip>:<container-port>` from a Pod",
+              "Each Pod answers on the port you expect"
+            ],
+            [
+              "2. Service exists",
+              "`kubectl get svc <service-name>`",
+              "Not `NotFound`. Forgetting to create it is common"
+            ],
+            [
+              "3. Network Policy",
+              "Review ingress rules on the target Pods",
+              "Nothing blocking incoming traffic"
+            ],
+            [
+              "4. DNS name resolves",
+              "`nslookup <service-name>` from a Pod",
+              "The Service's ClusterIP"
+            ],
+            [
+              "5. Works by IP",
+              "`wget -qO- <cluster-ip>:<port>` from a Pod",
+              "Responses from the backends"
+            ],
+            [
+              "6. Spec is right",
+              "`kubectl get service <service-name> -o json`",
+              "Ports, targetPort, protocol"
+            ],
+            [
+              "7. Has endpoints",
+              "`kubectl get endpointslices -l kubernetes.io/service-name=<service-name>`",
+              "Pod IPs, not `<none>`"
+            ],
+            [
+              "8. kube-proxy works",
+              "on the node: `ps auxw | grep kube-proxy`, its logs, iptables/IPVS rules",
+              "Rules for your Service"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "To see what a Pod sees, start a throwaway shell, or exec into an existing Pod:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl run -it --rm --restart=Never busybox --image=registry.k8s.io/busybox:1.27.2 sh\nkubectl exec <pod-name> -c <container-name> -- <command>"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "`kubectl expose deployment <deployment-name> --port=<port> --target-port=<container-port>` creates a Service for a Deployment. `--port` is the Service port and `--target-port` is where the Pods listen."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-dnsname",
+      "heading": "Service DNS names and resolv.conf",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "sourceTitle": "Debug Services",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "If the short name fails, try wider names. The suffix is `<namespace>.svc.<cluster-domain>`, usually `cluster.local`."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "nslookup <service-name>                               # same namespace only\nnslookup <service-name>.<namespace>\nnslookup <service-name>.<namespace>.svc.cluster.local\nnslookup kubernetes.default                           # should always work\ncat /etc/resolv.conf"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Short name fails but the namespace-qualified name works: the client is in another namespace. Use the cross-namespace name.",
+            "FQDN works but relative names don't: check the Pod's `/etc/resolv.conf`.",
+            "`nameserver` must be the cluster DNS Service IP (given to the kubelet by `--cluster-dns`).",
+            "`search` must include `<namespace>.svc.cluster.local`, `svc.cluster.local` and `cluster.local` (the domain comes from `--cluster-domain`).",
+            "`options ndots:5` is the Kubernetes default, so search paths are used for its names.",
+            "If even `kubernetes.default` fails, debug the DNS Service itself, or kube-proxy."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-spec",
+      "heading": "Spec and endpoint checks",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "sourceTitle": "Debug Services",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "Is the port you call listed in `spec.ports[]`?",
+            "Does `targetPort` match the port the Pods actually listen on?",
+            "Numeric port written as a number (`9376`), not a string (`\"9376\"`)?",
+            "Named `targetPort`? The Pods must expose a port with that same name.",
+            "Is the protocol right?"
+          ]
+        },
+        {
+          "type": "p",
+          "text": "An EndpointSlice with `ENDPOINTS <none>` means the Service's `spec.selector` doesn't match the Pods' `metadata.labels`. A typo, or a different label key such as `app` vs `run`, is the classic cause. Compare with:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl get pods -l <key>=<value>"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Ready Pods with a high **RESTARTS** count can cause intermittent failures.",
+            "When testing Pods directly, use the **Pod** port (`targetPort`), not the Service port."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-proxy",
+      "heading": "Is kube-proxy doing its job?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "sourceTitle": "Debug Services",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "If the Service exists, has endpoints and the Pods answer, suspect the proxy layer. These apply only if your cluster uses kube-proxy."
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "ps auxw | grep kube-proxy                 # running on the node?\niptables-save | grep <service-name>      # iptables mode\nipvsadm -ln                              # IPVS mode\ncurl <cluster-ip>:<port>                 # from the node"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Logs: a file such as `/var/log/kube-proxy.log`, or `journalctl`, depending on the node OS. Errors contacting the control plane suggest a node config problem.",
+            "The log line `Using iptables Proxier` shows the mode. The other common mode is `ipvs`.",
+            "iptables mode: one `KUBE-SERVICES` rule per Service port, a `KUBE-SVC-<hash>` chain, and a `KUBE-SEP-<hash>` chain per endpoint.",
+            "IPVS mode: a virtual server per Service port, with a real server per Pod endpoint.",
+            "Look for `Setting endpoints for <namespace>/<service-name>` in the logs. If it's missing, restart kube-proxy with `-v` set to 4."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "A Pod that can't reach **itself** through its own Service IP points to hairpin mode. The kubelet's `--hairpin-mode` must be `hairpin-veth` or `promiscuous-bridge`."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-dns",
+      "heading": "Debugging cluster DNS",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "sourceTitle": "Debugging DNS Resolution",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Create the `dnsutils` test Pod from the docs example, then:"
+        },
+        {
+          "type": "code",
+          "lang": "shell",
+          "text": "kubectl exec -i -t dnsutils -- nslookup kubernetes.default\nkubectl exec -ti dnsutils -- cat /etc/resolv.conf\nkubectl get pods --namespace=kube-system -l k8s-app=kube-dns\nkubectl logs --namespace=kube-system -l k8s-app=kube-dns\nkubectl get svc --namespace=kube-system\nkubectl get endpointslice -l kubernetes.io/service-name=kube-dns --namespace=kube-system"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Step",
+            "What it tells you"
+          ],
+          "rows": [
+            [
+              "nslookup fails",
+              "Problem with CoreDNS or its Services. Keep going"
+            ],
+            [
+              "No CoreDNS Pods running",
+              "The DNS add-on may not be deployed; deploy it"
+            ],
+            [
+              "Errors in CoreDNS logs",
+              "Suspicious messages point at config or upstream problems"
+            ],
+            [
+              "`kube-dns` Service missing",
+              "Follow the Service debugging steps"
+            ],
+            [
+              "No endpoints",
+              "See the endpoints section of Debug Services"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "CoreDNS keeps the label `k8s-app=kube-dns` and the Service name `kube-dns` for backward compatibility.",
+            "To see each query, add the `log` plugin to the Corefile: `kubectl -n kube-system edit configmap coredns`. Changes can take a minute or two to reach the Pods.",
+            "`SERVFAIL` for Service names? Check `kubectl describe clusterrole system:coredns -n kube-system`. CoreDNS needs list/watch on services and endpointslices.",
+            "A query without a namespace only searches the Pod's own namespace. Use `<service-name>.<namespace>`."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-known",
+      "heading": "Known DNS issues",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "sourceTitle": "Debugging DNS Resolution",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "**systemd-resolved** (for example, Ubuntu) replaces `/etc/resolv.conf` with a stub that can cause a forwarding loop. Point the kubelet's `--resolv-conf` at `/run/systemd/resolve/resolv.conf`. kubeadm detects this and sets it for you.",
+            "glibc allows only **3** nameserver records, and Kubernetes needs 1 of them. Extra entries get dropped. dnsmasq or `--resolv-conf` can help.",
+            "Alpine **3.17 or earlier** may fail DNS answers over 512 bytes (no TCP fallback). Use 3.18 or later."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "troubleshoot-networking-fc-01",
+      "front": "Quick throwaway Pod for network tests?",
+      "back": "`kubectl run -it --rm --restart=Never busybox --image=registry.k8s.io/busybox:1.27.2 sh`",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-02",
+      "front": "First thing to check when a Service doesn't respond?",
+      "back": "That it exists: `kubectl get svc <service-name>`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-03",
+      "front": "List the endpoints behind a Service?",
+      "back": "`kubectl get endpointslices -l kubernetes.io/service-name=<service-name>`",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-04",
+      "front": "EndpointSlice shows `<none>`. Most likely cause?",
+      "back": "The Service selector doesn't match the Pods' labels.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-05",
+      "front": "Fully qualified DNS name of a Service?",
+      "back": "`<service>.<namespace>.svc.cluster.local` (cluster domain may differ).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-06",
+      "front": "Which kubelet flags feed the Pod's resolv.conf nameserver and domain?",
+      "back": "`--cluster-dns` and `--cluster-domain`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-07",
+      "front": "Kubernetes default `ndots` value?",
+      "back": "5",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-08",
+      "front": "How do you tell kube-proxy's mode from its logs?",
+      "back": "`Using iptables Proxier` means iptables mode; the other common mode is ipvs.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-09",
+      "front": "Inspect Service rules in IPVS mode?",
+      "back": "`ipvsadm -ln` on the node.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-10",
+      "front": "Valid kubelet hairpin-mode values for Pods to reach themselves via their Service?",
+      "back": "`hairpin-veth` or `promiscuous-bridge`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-11",
+      "front": "Label that selects CoreDNS Pods?",
+      "back": "`k8s-app=kube-dns`",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-12",
+      "front": "What's the CoreDNS Service called?",
+      "back": "`kube-dns`, kept for backward compatibility.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-13",
+      "front": "How do you make CoreDNS log every query?",
+      "back": "Add `log` to the Corefile in ConfigMap `coredns` (kube-system).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+    },
+    {
+      "id": "troubleshoot-networking-fc-14",
+      "front": "systemd-resolved node causes a DNS loop. Fix?",
+      "back": "Kubelet `--resolv-conf=/run/systemd/resolve/resolv.conf` (kubeadm does this automatically).",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "troubleshoot-networking-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ts-networking",
+      "stem": "`wget -O- hostnames` from a Pod fails with 'unable to resolve host address'. What does the guide tell you to check first?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Whether the Service exists: kubectl get svc hostnames",
+          "correct": true,
+          "explanation": "A missing Service is the first thing to rule out."
+        },
+        {
+          "id": "b",
+          "text": "ipvsadm -ln on every node",
+          "correct": false,
+          "explanation": "Proxy rules come much later in the flow."
+        },
+        {
+          "id": "c",
+          "text": "The kubelet's --hairpin-mode",
+          "correct": false,
+          "explanation": "Only for a Pod reaching itself through its Service."
+        },
+        {
+          "id": "d",
+          "text": "iptables-save | grep hostnames",
+          "correct": false,
+          "explanation": "Pointless if the Service doesn't exist."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-networking",
+      "stem": "`kubectl get endpointslices -l kubernetes.io/service-name=web` shows ENDPOINTS `<none>`, but the Pods are Running. What's the most likely fault?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The Service selector doesn't match the Pod labels",
+          "correct": true,
+          "explanation": "The EndpointSlice controller selects Pods by the Service's spec.selector."
+        },
+        {
+          "id": "b",
+          "text": "kube-proxy is not running",
+          "correct": false,
+          "explanation": "kube-proxy doesn't build EndpointSlices."
+        },
+        {
+          "id": "c",
+          "text": "Cluster DNS is down",
+          "correct": false,
+          "explanation": "DNS doesn't decide endpoints."
+        },
+        {
+          "id": "d",
+          "text": "ndots is set too low",
+          "correct": false,
+          "explanation": "That affects name lookups, not endpoint selection."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-networking",
+      "stem": "`nslookup web` fails from a Pod, but `nslookup web.prod` works. What's going on?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The client Pod is in a different namespace than the Service",
+          "correct": true,
+          "explanation": "Short names only search the Pod's own namespace."
+        },
+        {
+          "id": "b",
+          "text": "The cluster DNS Service is down",
+          "correct": false,
+          "explanation": "The qualified lookup worked, so DNS is up."
+        },
+        {
+          "id": "c",
+          "text": "The Service has no endpoints",
+          "correct": false,
+          "explanation": "The namespace-qualified name resolved, so the guide points to a namespace mismatch, not endpoints."
+        },
+        {
+          "id": "d",
+          "text": "kube-proxy is in IPVS mode",
+          "correct": false,
+          "explanation": "The proxy mode doesn't affect DNS search paths."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ts-networking",
+      "stem": "Your Service resolves and has endpoints, but connections fail. Which checks of the Service spec does the guide list? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "targetPort matches the port the Pods listen on",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "b",
+          "text": "A named targetPort matches a port name exposed by the Pods",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "c",
+          "text": "The port protocol is correct",
+          "correct": true,
+          "explanation": "Listed."
+        },
+        {
+          "id": "d",
+          "text": "The Service type is not ClusterIP",
+          "correct": false,
+          "explanation": "The walkthrough's working Service is a ClusterIP Service."
+        },
+        {
+          "id": "e",
+          "text": "sessionAffinity is set",
+          "correct": false,
+          "explanation": "Not on the guide's checklist; the example uses None."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-05",
+      "type": "truefalse",
+      "difficulty": 1,
+      "competencyId": "ts-networking",
+      "stem": "True or false: When you test Pods directly (bypassing the Service), you should use the Service port rather than the Pod's port.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": false,
+          "explanation": "Direct tests use the Pod port (targetPort, 9376 in the example)."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. The Service port only applies when going through the Service IP."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-networking",
+      "stem": "Which line in a Pod's /etc/resolv.conf must point at the cluster DNS Service?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "nameserver",
+          "correct": true,
+          "explanation": "It is set from the kubelet's --cluster-dns."
+        },
+        {
+          "id": "b",
+          "text": "search",
+          "correct": false,
+          "explanation": "search lists domain suffixes."
+        },
+        {
+          "id": "c",
+          "text": "options ndots:5",
+          "correct": false,
+          "explanation": "Controls when search paths are tried."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-07",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ts-networking",
+      "stem": "In iptables mode, which chain should exist once per Pod endpoint of a Service?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "KUBE-SEP-<hash>",
+          "correct": true,
+          "explanation": "One SEP chain per endpoint."
+        },
+        {
+          "id": "b",
+          "text": "KUBE-SERVICES",
+          "correct": false,
+          "explanation": "Holds one rule per Service port, shared by all Services."
+        },
+        {
+          "id": "c",
+          "text": "KUBE-SVC-<hash>",
+          "correct": false,
+          "explanation": "One per Service port; it jumps to the SEP chains."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-08",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-networking",
+      "stem": "Which command lists the CoreDNS Pods?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl get pods --namespace=kube-system -l k8s-app=kube-dns",
+          "correct": true,
+          "explanation": "CoreDNS keeps the kube-dns label for compatibility."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get pods --namespace=kube-system -l k8s-app=coredns",
+          "correct": false,
+          "explanation": "The label value is kube-dns."
+        },
+        {
+          "id": "c",
+          "text": "kubectl get svc --namespace=kube-system",
+          "correct": false,
+          "explanation": "Lists Services, not Pods."
+        },
+        {
+          "id": "d",
+          "text": "kubectl get pods -l app=coredns",
+          "correct": false,
+          "explanation": "Wrong label and wrong namespace."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-09",
+      "type": "multi",
+      "difficulty": 2,
+      "competencyId": "ts-networking",
+      "stem": "`nslookup kubernetes.default` fails from the dnsutils Pod. Which are documented next steps? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Check /etc/resolv.conf inside the Pod",
+          "correct": true,
+          "explanation": "Look at nameserver and search."
+        },
+        {
+          "id": "b",
+          "text": "Check that CoreDNS Pods are Running",
+          "correct": true,
+          "explanation": "No Pods means DNS isn't deployed."
+        },
+        {
+          "id": "c",
+          "text": "Check that the kube-dns Service has endpoints",
+          "correct": true,
+          "explanation": "Use kubectl get endpointslice for kube-dns."
+        },
+        {
+          "id": "d",
+          "text": "Restart the API server",
+          "correct": false,
+          "explanation": "Not a step on the DNS debugging page."
+        },
+        {
+          "id": "e",
+          "text": "Lower ndots to 1",
+          "correct": false,
+          "explanation": "Not a documented step."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-10",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ts-networking",
+      "stem": "CoreDNS logs `SERVFAIL` for internal Service names. Which documented check fits?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Check that ClusterRole system:coredns allows list/watch on services and endpointslices",
+          "correct": true,
+          "explanation": "CoreDNS needs those permissions to resolve Service names."
+        },
+        {
+          "id": "b",
+          "text": "Check the Service's IP address",
+          "correct": false,
+          "explanation": "SERVFAIL here points at CoreDNS permissions, not the Service IP."
+        },
+        {
+          "id": "c",
+          "text": "Increase the cache plugin TTL",
+          "correct": false,
+          "explanation": "Not a documented fix."
+        },
+        {
+          "id": "d",
+          "text": "Disable the loop plugin",
+          "correct": false,
+          "explanation": "Not a documented fix."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "competencyId": "ts-networking",
+      "stem": "Where is the CoreDNS Corefile stored, and how do you edit it?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "options": [
+        {
+          "id": "a",
+          "text": "ConfigMap coredns in kube-system: kubectl -n kube-system edit configmap coredns",
+          "correct": true,
+          "explanation": "Shown when adding the log plugin."
+        },
+        {
+          "id": "b",
+          "text": "/etc/resolv.conf on each node",
+          "correct": false,
+          "explanation": "That's the host resolver config."
+        },
+        {
+          "id": "c",
+          "text": "Secret kube-dns in kube-system",
+          "correct": false,
+          "explanation": "The Corefile lives in a ConfigMap."
+        },
+        {
+          "id": "d",
+          "text": "ClusterRole system:coredns",
+          "correct": false,
+          "explanation": "That holds permissions, not configuration."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-12",
+      "type": "truefalse",
+      "difficulty": 2,
+      "competencyId": "ts-networking",
+      "stem": "True or false: On nodes using systemd-resolved, kubeadm automatically adjusts the kubelet to use the correct resolv.conf.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
+      "options": [
+        {
+          "id": "t",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct. It points the kubelet at /run/systemd/resolve/resolv.conf."
+        },
+        {
+          "id": "f",
+          "text": "False",
+          "correct": false,
+          "explanation": "The page says kubeadm detects systemd-resolved and adjusts the kubelet flags."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-13",
+      "type": "single",
+      "difficulty": 3,
+      "competencyId": "ts-networking",
+      "stem": "A Pod can reach a Service from other Pods but not through its own Service IP. In iptables mode with a bridge network, what should you check?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The kubelet's effective hairpin mode (hairpin-veth or promiscuous-bridge)",
+          "correct": true,
+          "explanation": "Hairpin traffic needs one of these."
+        },
+        {
+          "id": "b",
+          "text": "The Service selector",
+          "correct": false,
+          "explanation": "Other Pods reach it, so endpoints are fine."
+        },
+        {
+          "id": "c",
+          "text": "DNS lookups",
+          "correct": false,
+          "explanation": "This is an IP-level problem."
+        },
+        {
+          "id": "d",
+          "text": "ndots",
+          "correct": false,
+          "explanation": "Unrelated to Service IP traffic."
+        }
+      ]
+    },
+    {
+      "id": "troubleshoot-networking-q-14",
+      "type": "single",
+      "difficulty": 1,
+      "competencyId": "ts-networking",
+      "stem": "Which kubectl command creates the Service in the guide's walkthrough?",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl expose deployment hostnames --port=80 --target-port=9376",
+          "correct": true,
+          "explanation": "Service port 80 forwards to Pod port 9376."
+        },
+        {
+          "id": "b",
+          "text": "kubectl expose deployment hostnames --port=9376 --target-port=80",
+          "correct": false,
+          "explanation": "Ports reversed: the Pods listen on 9376."
+        },
+        {
+          "id": "c",
+          "text": "kubectl create deployment hostnames --image=registry.k8s.io/serve_hostname",
+          "correct": false,
+          "explanation": "Creates the Deployment, not the Service."
+        },
+        {
+          "id": "d",
+          "text": "kubectl scale deployment hostnames --replicas=3",
+          "correct": false,
+          "explanation": "Scales the Deployment."
+        }
+      ]
+    }
+  ]
+}

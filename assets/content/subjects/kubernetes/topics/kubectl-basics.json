@@ -1,0 +1,819 @@
+{
+  "id": "kubectl-basics",
+  "title": "kubectl Essentials",
+  "summary": "Command syntax, output formats, imperative vs declarative management, generating manifests and switching contexts.",
+  "order": 4,
+  "domainIds": [
+    "foundations"
+  ],
+  "competencyIds": [],
+  "prerequisites": [
+    "what-is-k8s"
+  ],
+  "estMinutes": 15,
+  "reviewedAt": "2026-10-11",
+  "sections": [
+    {
+      "id": "kubectl-basics-syntax",
+      "heading": "Command syntax",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/",
+      "sourceTitle": "Command line tool (kubectl)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "kubectl talks to the control plane through the Kubernetes API. Every command follows one shape:"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "text": "kubectl [command] [TYPE] [NAME] [flags]"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**command**: the operation, such as `create`, `get`, `describe` or `delete`.",
+            "**TYPE**: the resource type. It is case-insensitive and accepts singular, plural or short forms, so `kubectl get pod <name>`, `kubectl get pods <name>` and `kubectl get po <name>` are equivalent.",
+            "**NAME**: case-sensitive. Leave it out to act on every resource of that type (`kubectl get pods`).",
+            "**flags**: optional. A flag on the command line beats default values and matching environment variables.",
+            "Several objects at once: `TYPE1 name1 name2` (same type), `TYPE1/name1 TYPE1/name2 TYPE2/name3` (mixed types) or `-f <file>` (repeatable).",
+            "By default kubectl reads `config` in `$HOME/.kube`. Point it elsewhere with the `KUBECONFIG` variable or `--kubeconfig`."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Resource",
+            "Short name"
+          ],
+          "rows": [
+            [
+              "pods",
+              "po"
+            ],
+            [
+              "services",
+              "svc"
+            ],
+            [
+              "deployments",
+              "deploy"
+            ],
+            [
+              "namespaces",
+              "ns"
+            ],
+            [
+              "nodes",
+              "no"
+            ],
+            [
+              "configmaps",
+              "cm"
+            ],
+            [
+              "persistentvolumeclaims",
+              "pvc"
+            ],
+            [
+              "daemonsets",
+              "ds"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "`kubectl api-resources` prints every resource type with its short names, API version, kind and whether it is namespaced."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-output",
+      "heading": "Output formats, sorting and watching",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/",
+      "sourceTitle": "Command line tool (kubectl)",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Plain human-readable text is the default. Add `-o` (or `--output`) to change it."
+        },
+        {
+          "type": "table",
+          "header": [
+            "Flag",
+            "Prints"
+          ],
+          "rows": [
+            [
+              "`-o wide`",
+              "Plain text plus extra columns; for Pods that includes the node name"
+            ],
+            [
+              "`-o yaml` / `-o json`",
+              "The full API object"
+            ],
+            [
+              "`-o jsonpath=<template>`",
+              "Only the fields selected by a JSONPath expression"
+            ],
+            [
+              "`-o custom-columns=<spec>`",
+              "A table of columns you define, e.g. `NAME:.metadata.name`"
+            ],
+            [
+              "`-o name`",
+              "Just the resource name"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Sort a list with `--sort-by=<jsonpath_exp>`, e.g. `kubectl get pods --sort-by=.metadata.name`.",
+            "`-w` / `--watch` on `get` keeps streaming updates to the object.",
+            "`get` lists objects of one type; `describe` builds a richer view (for a node it adds its Pods and events) and may make several API calls.",
+            "Filter by field: `kubectl get pods --field-selector=spec.nodeName=<node-name>`."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-mgmt",
+      "heading": "Imperative vs declarative",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/",
+      "sourceTitle": "Kubernetes Object Management",
+      "blocks": [
+        {
+          "type": "table",
+          "header": [
+            "Technique",
+            "Example",
+            "Works on"
+          ],
+          "rows": [
+            [
+              "Imperative commands",
+              "`kubectl create deployment nginx --image nginx`",
+              "Live objects"
+            ],
+            [
+              "Imperative object configuration",
+              "`kubectl create -f nginx.yaml`, `kubectl replace -f nginx.yaml`",
+              "Individual files"
+            ],
+            [
+              "Declarative object configuration",
+              "`kubectl apply -f configs/`",
+              "Directories of files"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Imperative commands are the quickest way to start or do a one-off task, but they leave no record of earlier configuration and no template for the next object.",
+            "`replace` swaps in the whole spec from the file. Anything changed on the live object but missing from the file is lost.",
+            "`apply` works out per object whether to create, patch or delete. It writes only the differences, so changes from other writers survive.",
+            "Preview first with `kubectl diff -f configs/`, then `kubectl apply -f configs/`. Add `-R` to recurse into subdirectories."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Pick one technique per object. Mixing techniques on the same object gives undefined behavior."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-generate",
+      "heading": "Generate manifests fast",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "sourceTitle": "kubectl Quick Reference",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Rather than typing YAML from memory, let kubectl write a starting manifest, edit it, then apply it."
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "text": "kubectl run <pod-name> --image=<image> --dry-run=client -o yaml > pod.yaml\nkubectl create deployment <name> --image=<image>\nkubectl create job <name> --image=<image> -- <command>\nkubectl expose rc <name> --port=<port> --target-port=<target-port>\nkubectl explain pods   # field docs for Pod manifests"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Time is tight in the CKA. Generate a skeleton with `--dry-run=client -o yaml > <file>.yaml`, fix the fields you need, then `kubectl apply -f <file>.yaml`. Use `kubectl explain` instead of guessing field names."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "Manifests may be YAML or JSON with `.yaml`, `.yml` or `.json` extensions.",
+            "`kubectl apply -f -` reads a manifest from stdin, handy with a heredoc.",
+            "The quick reference calls `apply` the recommended way to manage applications in production."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-kubeconfig",
+      "heading": "kubeconfig files and contexts",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/",
+      "sourceTitle": "Organizing Cluster Access Using kubeconfig Files",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "A **kubeconfig** file holds clusters, users, namespaces and authentication details. The name is generic: no file actually has to be called kubeconfig."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A **context** names a combination of **cluster**, **namespace** and **user**. kubectl uses the current context unless told otherwise.",
+            "`KUBECONFIG` lists files to merge: colon-separated on Linux and Mac, semicolon-separated on Windows. If it is unset, kubectl uses `$HOME/.kube/config`.",
+            "`--kubeconfig` uses only that one file and skips merging.",
+            "When merging, the first file to set a value or map key wins, and later files never change it.",
+            "Context choice: the `--context` flag first, otherwise `current-context` from the merged config.",
+            "Paths inside a kubeconfig are relative to that file; paths on the command line are relative to the working directory."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "warn",
+          "text": "Only use kubeconfig files you trust. A crafted file can run malicious code or expose files."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-contexts",
+      "heading": "Switching clusters and namespaces",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "sourceTitle": "kubectl Quick Reference",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "bash",
+          "text": "kubectl config view                      # merged settings\nkubectl config get-contexts              # list contexts\nkubectl config current-context           # show current one\nkubectl config use-context <context>     # switch\nkubectl config set-context --current --namespace=<namespace>"
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "When a task names a context, run `kubectl config use-context <context>` before anything else and confirm with `kubectl config current-context`. Working in the wrong cluster costs the whole task."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`--all-namespaces` has the shorthand `-A`, e.g. `kubectl get pods -A`.",
+            "`kubectl config view --raw` also shows certificate data and secrets."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-cheats",
+      "heading": "Everyday cheat sheet",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "sourceTitle": "kubectl Quick Reference",
+      "blocks": [
+        {
+          "type": "code",
+          "lang": "bash",
+          "text": "alias k=kubectl\nsource <(kubectl completion bash)\nkubectl logs -f <pod>                     # stream logs\nkubectl logs <pod> -c <container> --previous\nkubectl exec --stdin --tty <pod> -- /bin/sh\nkubectl port-forward <pod> <local-port>:<pod-port>\nkubectl label pods <pod> <key>=<value>\nkubectl scale --replicas=<n> deployment/<name>\nkubectl rollout undo deployment/<name>\nkubectl delete pod <pod> --now           # no grace period\nkubectl get pods --show-labels\nkubectl top pod"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`--previous` shows logs from the earlier instance of a restarted container.",
+            "`kubectl get pods --field-selector=status.phase=Running` lists only running Pods.",
+            "`kubectl events --types=Warning` lists warning events.",
+            "Verbosity: `-v` / `--v` from 0 upward; `--v=6` shows requested resources and `--v=8` shows HTTP request contents."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "kubectl-basics-fc-01",
+      "front": "General syntax of a kubectl command?",
+      "back": "kubectl [command] [TYPE] [NAME] [flags]",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/"
+    },
+    {
+      "id": "kubectl-basics-fc-02",
+      "front": "Is the resource TYPE case-sensitive? The NAME?",
+      "back": "TYPE is case-insensitive (singular, plural or short form). NAME is case-sensitive.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/"
+    },
+    {
+      "id": "kubectl-basics-fc-03",
+      "front": "Which output flag adds the node name to `kubectl get pods`?",
+      "back": "`-o wide`",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/"
+    },
+    {
+      "id": "kubectl-basics-fc-04",
+      "front": "How do you sort `kubectl get` output?",
+      "back": "`--sort-by=<jsonpath_exp>`, e.g. `--sort-by=.metadata.name`.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/"
+    },
+    {
+      "id": "kubectl-basics-fc-05",
+      "front": "Three object management techniques?",
+      "back": "Imperative commands, imperative object configuration (create/replace -f), declarative object configuration (apply -f).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/"
+    },
+    {
+      "id": "kubectl-basics-fc-06",
+      "front": "Why can `kubectl replace -f` lose changes?",
+      "back": "It replaces the whole spec, dropping anything not in the file.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/"
+    },
+    {
+      "id": "kubectl-basics-fc-07",
+      "front": "Command to preview what `apply` would change?",
+      "back": "`kubectl diff -f <file-or-dir>`",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/"
+    },
+    {
+      "id": "kubectl-basics-fc-08",
+      "front": "Generate a Pod manifest without creating it?",
+      "back": "`kubectl run <name> --image=<image> --dry-run=client -o yaml > pod.yaml`",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/"
+    },
+    {
+      "id": "kubectl-basics-fc-09",
+      "front": "What three things does a kubeconfig context group?",
+      "back": "Cluster, namespace and user.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+    },
+    {
+      "id": "kubectl-basics-fc-10",
+      "front": "Default kubeconfig location?",
+      "back": "`$HOME/.kube/config`",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+    },
+    {
+      "id": "kubectl-basics-fc-11",
+      "front": "Separator between files in KUBECONFIG on Linux?",
+      "back": "A colon (Windows uses a semicolon).",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/"
+    },
+    {
+      "id": "kubectl-basics-fc-12",
+      "front": "Set the default namespace for the current context?",
+      "back": "`kubectl config set-context --current --namespace=<namespace>`",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/"
+    },
+    {
+      "id": "kubectl-basics-fc-13",
+      "front": "Shorthand for `--all-namespaces`?",
+      "back": "`-A`",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/"
+    },
+    {
+      "id": "kubectl-basics-fc-14",
+      "front": "Logs from the previous instance of a crashed container?",
+      "back": "`kubectl logs <pod> --previous` (add `-c <container>` if multi-container).",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "kubectl-basics-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Which three commands produce the same result?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl get pod <name>, kubectl get pods <name>, kubectl get po <name>",
+          "correct": true,
+          "explanation": "TYPE accepts singular, plural and short forms."
+        },
+        {
+          "id": "b",
+          "text": "kubectl get pod <name>, kubectl describe pod <name>, kubectl logs <name>",
+          "correct": false,
+          "explanation": "These are different operations with different output."
+        },
+        {
+          "id": "c",
+          "text": "kubectl get pods, kubectl get pods -A, kubectl get pods -o wide",
+          "correct": false,
+          "explanation": "-A widens the scope to all namespaces and -o wide adds columns."
+        },
+        {
+          "id": "d",
+          "text": "kubectl get svc, kubectl get sa, kubectl get sts",
+          "correct": false,
+          "explanation": "These are services, service accounts and StatefulSets: different types."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-02",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "You need to see which node each Pod runs on, in the usual table layout. Which flag?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/",
+      "options": [
+        {
+          "id": "a",
+          "text": "-o wide",
+          "correct": true,
+          "explanation": "Wide output adds columns; for Pods it includes the node name."
+        },
+        {
+          "id": "b",
+          "text": "-o name",
+          "correct": false,
+          "explanation": "Prints only resource names."
+        },
+        {
+          "id": "c",
+          "text": "--watch",
+          "correct": false,
+          "explanation": "Streams updates; it doesn't add the node column."
+        },
+        {
+          "id": "d",
+          "text": "--server-print=false",
+          "correct": false,
+          "explanation": "This turns off server-side columns, giving less detail."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-03",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which are valid kubectl output formats? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/",
+      "options": [
+        {
+          "id": "a",
+          "text": "-o jsonpath=<template>",
+          "correct": true,
+          "explanation": "Prints the fields picked by a JSONPath expression."
+        },
+        {
+          "id": "b",
+          "text": "-o custom-columns=<spec>",
+          "correct": true,
+          "explanation": "Prints a table of columns you define."
+        },
+        {
+          "id": "c",
+          "text": "-o yaml",
+          "correct": true,
+          "explanation": "Prints the full object as YAML."
+        },
+        {
+          "id": "d",
+          "text": "--sort-by=<jsonpath_exp>",
+          "correct": false,
+          "explanation": "A real flag, but it sorts lists; it is not an output format."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-04",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "A teammate changed a live object by hand. You then run kubectl replace -f with an older file that lacks that change. What happens?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The change is lost because replace overwrites the spec with the file",
+          "correct": true,
+          "explanation": "replace drops anything missing from the configuration file."
+        },
+        {
+          "id": "b",
+          "text": "The change is kept because replace only patches differences",
+          "correct": false,
+          "explanation": "That describes apply, which uses patch."
+        },
+        {
+          "id": "c",
+          "text": "kubectl refuses to run until the file is updated",
+          "correct": false,
+          "explanation": "There is no such check."
+        },
+        {
+          "id": "d",
+          "text": "The object is deleted and must be created again",
+          "correct": false,
+          "explanation": "replace updates the object; it doesn't leave it deleted."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "Which technique detects create, patch and delete operations per object and works well on directories?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/",
+      "options": [
+        {
+          "id": "a",
+          "text": "Declarative object configuration with kubectl apply",
+          "correct": true,
+          "explanation": "apply works out the operation per object."
+        },
+        {
+          "id": "b",
+          "text": "Imperative commands such as kubectl create deployment",
+          "correct": false,
+          "explanation": "These act on live objects and you choose the operation."
+        },
+        {
+          "id": "c",
+          "text": "Imperative object configuration with kubectl create -f",
+          "correct": false,
+          "explanation": "You name the operation and it works best on single files."
+        },
+        {
+          "id": "d",
+          "text": "kubectl diff -f configs/",
+          "correct": false,
+          "explanation": "diff only previews changes; it doesn't create, patch or delete anything."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-06",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "It is safe to manage the same object with kubectl create, kubectl replace and kubectl apply interchangeably.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "Mixing techniques on one object is explicitly undefined behavior."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. Stick to one management technique per object."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-07",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Which command writes a Pod manifest to a file without creating the Pod?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl run nginx --image=nginx --dry-run=client -o yaml > pod.yaml",
+          "correct": true,
+          "explanation": "Client dry-run prints the object instead of sending it."
+        },
+        {
+          "id": "b",
+          "text": "kubectl run nginx --image=nginx -o yaml > pod.yaml",
+          "correct": false,
+          "explanation": "Without --dry-run the Pod is actually created."
+        },
+        {
+          "id": "c",
+          "text": "kubectl get pod nginx -o yaml > pod.yaml",
+          "correct": false,
+          "explanation": "This exports an existing Pod; it doesn't generate a new one."
+        },
+        {
+          "id": "d",
+          "text": "kubectl explain pods > pod.yaml",
+          "correct": false,
+          "explanation": "explain prints field documentation, not a manifest."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-08",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "You can't remember the fields allowed in a Pod spec. Which command shows them?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl explain pods",
+          "correct": true,
+          "explanation": "explain prints documentation for a resource's manifest fields."
+        },
+        {
+          "id": "b",
+          "text": "kubectl describe pods",
+          "correct": false,
+          "explanation": "describe shows the state of existing Pods."
+        },
+        {
+          "id": "c",
+          "text": "kubectl api-resources",
+          "correct": false,
+          "explanation": "Lists resource types, not their fields."
+        },
+        {
+          "id": "d",
+          "text": "kubectl diff -f pod.yaml",
+          "correct": false,
+          "explanation": "Compares a file with the live object."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "KUBECONFIG lists two files and both define current-context. Which value does kubectl use?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/",
+      "options": [
+        {
+          "id": "a",
+          "text": "The value from the first file in the list",
+          "correct": true,
+          "explanation": "The first file to set a value wins; later files never change it."
+        },
+        {
+          "id": "b",
+          "text": "The value from the last file in the list",
+          "correct": false,
+          "explanation": "Later files don't override earlier ones."
+        },
+        {
+          "id": "c",
+          "text": "kubectl fails with a conflict error",
+          "correct": false,
+          "explanation": "Conflicting authentication techniques fail, but duplicate keys follow first-wins."
+        },
+        {
+          "id": "d",
+          "text": "Neither; it falls back to $HOME/.kube/config",
+          "correct": false,
+          "explanation": "The default file is used only when KUBECONFIG is unset."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-10",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which three parameters make up a kubeconfig context? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/",
+      "options": [
+        {
+          "id": "a",
+          "text": "cluster",
+          "correct": true,
+          "explanation": "Part of every context."
+        },
+        {
+          "id": "b",
+          "text": "user",
+          "correct": true,
+          "explanation": "Part of every context."
+        },
+        {
+          "id": "c",
+          "text": "namespace",
+          "correct": true,
+          "explanation": "Part of every context."
+        },
+        {
+          "id": "d",
+          "text": "proxy-url",
+          "correct": false,
+          "explanation": "proxy-url is set on a cluster entry, not as a context parameter."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-11",
+      "type": "truefalse",
+      "difficulty": 2,
+      "stem": "When --kubeconfig is set, kubectl still merges in the files listed in KUBECONFIG.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "With --kubeconfig, only that file is used and nothing is merged."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct. The flag means one file, no merging."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-12",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "A task asks you to work in namespace <namespace> for all following commands in your current context. Which command?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl config set-context --current --namespace=<namespace>",
+          "correct": true,
+          "explanation": "Saves the namespace into the current context."
+        },
+        {
+          "id": "b",
+          "text": "kubectl config use-context <namespace>",
+          "correct": false,
+          "explanation": "use-context switches contexts, not namespaces."
+        },
+        {
+          "id": "c",
+          "text": "kubectl create namespace <namespace>",
+          "correct": false,
+          "explanation": "Creates a namespace but doesn't make it the default."
+        },
+        {
+          "id": "d",
+          "text": "kubectl config set-cluster <namespace>",
+          "correct": false,
+          "explanation": "Sets a cluster entry in the kubeconfig."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-13",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "A container keeps restarting. Which command shows the logs of the instance that crashed?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl logs <pod> --previous",
+          "correct": true,
+          "explanation": "--previous shows the earlier instance of the container."
+        },
+        {
+          "id": "b",
+          "text": "kubectl logs -f <pod>",
+          "correct": false,
+          "explanation": "Streams the current instance's logs."
+        },
+        {
+          "id": "c",
+          "text": "kubectl attach <pod> -i",
+          "correct": false,
+          "explanation": "Attaches to the running container."
+        },
+        {
+          "id": "d",
+          "text": "kubectl top pod <pod>",
+          "correct": false,
+          "explanation": "Shows CPU and memory usage."
+        }
+      ]
+    },
+    {
+      "id": "kubectl-basics-q-14",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which commands are imperative (they act directly on live objects without a manifest file)? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "options": [
+        {
+          "id": "a",
+          "text": "kubectl create deployment nginx --image=nginx",
+          "correct": true,
+          "explanation": "Creates the object straight from flags."
+        },
+        {
+          "id": "b",
+          "text": "kubectl scale --replicas=3 deployment/<name>",
+          "correct": true,
+          "explanation": "Changes the live object from flags."
+        },
+        {
+          "id": "c",
+          "text": "kubectl apply -f ./my-manifest.yaml",
+          "correct": false,
+          "explanation": "apply is driven by a manifest file."
+        },
+        {
+          "id": "d",
+          "text": "kubectl diff -f ./my-manifest.yaml",
+          "correct": false,
+          "explanation": "diff compares a file to the cluster and changes nothing."
+        }
+      ]
+    }
+  ]
+}

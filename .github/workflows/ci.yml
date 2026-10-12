@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.47.7
+
+jobs:
+  build:
+    name: Analyze, test, build web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build web --release --no-web-resources-cdn
+      - run: dart run tool/gen_precache.dart
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+          retention-days: 7
+      # Onboarding a subject stays data-only: scaffold one, validate it and
+      # check the app renders it (after the upload, so the build is unaffected).
+      - name: Onboarding smoke test
+        run: |
+          python3 tool/new_subject.py ci-sample "CI Sample" --source https://example.com/docs/
+          python3 tool/validate_content.py ci-sample
+          ONBOARDING_SUBJECT=ci-sample flutter test test/widget/onboarding_test.dart
+
+  pwa-check:
+    name: PWA check (headless Chromium, 390px)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright Chromium
+        working-directory: tool/pwa_check
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Serve build and run checks
+        run: |
+          python3 -m http.server 8080 --directory build/web &
+          sleep 2
+          (cd tool/pwa_check && SHOT_DIR=../../pwa-screenshots npm run check)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pwa-screenshots
+          path: pwa-screenshots
+          retention-days: 7
