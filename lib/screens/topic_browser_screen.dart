@@ -75,6 +75,7 @@ class TopicBrowserScreen extends StatelessWidget {
           const SizedBox(height: 16),
           for (final domain in content.domainsInDisplayOrder)
             _DomainSection(
+              key: ValueKey('${content.subject.id}/${domain.id}'),
               content: content,
               domain: domain,
               topics: content.topicsForDomain(domain.id),
@@ -185,6 +186,7 @@ class _ContinueCard extends StatelessWidget {
 /// start collapsed so the list stays focused on what's left.
 class _DomainSection extends StatefulWidget {
   const _DomainSection({
+    super.key,
     required this.content,
     required this.domain,
     required this.topics,

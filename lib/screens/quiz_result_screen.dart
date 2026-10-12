@@ -58,7 +58,11 @@ class QuizResultScreen extends StatelessWidget {
 
     switch (spec!) {
       case TopicQuizSpec(:final topicId, :final retryMissed):
-        final topic = content.topic(topicId)!;
+        final topic = content.topic(topicId);
+        // e.g. results for a topic of a subject that's no longer selected.
+        if (topic == null) {
+          return const NotFoundView(message: 'No recent quiz result to show.');
+        }
         final stats = progress.quizStats(topicId);
         final mastered = (stats?.bestPct ?? 0) >= masteryPercent;
         children.addAll([
@@ -105,7 +109,10 @@ class QuizResultScreen extends StatelessWidget {
           ),
           OutlinedButton(
             key: const ValueKey('retry-missed'),
-            onPressed: (stats?.missed ?? const []).isNotEmpty
+            onPressed:
+                (stats?.missed ?? const []).any(
+                  (id) => topic.questions.any((q) => q.id == id),
+                )
                 ? () => context.go('/topic/$topicId/quiz?mode=missed')
                 : null,
             child: const Text('Retry missed'),

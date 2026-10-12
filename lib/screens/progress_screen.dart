@@ -105,7 +105,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     title: Text(
                       '$due ${due == 1 ? 'flashcard' : 'flashcards'} due',
                     ),
-                    subtitle: const Text('Spaced repetition across all topics'),
+                    subtitle: const Text('Across all topics, 20 at a time'),
                     trailing: const Icon(Icons.chevron_right),
                     enabled: due > 0,
                     onTap: () => context.go('/progress/cards'),

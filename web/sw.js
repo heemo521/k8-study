@@ -15,7 +15,10 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
       .then((cache) => cache.addAll(PRECACHE.map((p) => new Request(p, { cache: 'reload' }))))
-      .then(() => self.skipWaiting())
+      // First install: take over right away (no older app is running).
+      // Updates wait until the old version's tabs close, so one page never
+      // mixes files from two builds.
+      .then(() => { if (!self.registration.active) return self.skipWaiting(); })
   );
 });
 

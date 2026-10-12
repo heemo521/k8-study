@@ -54,4 +54,19 @@ void main() {
     await tapKey(tester, 'subject-kubernetes');
     expect(find.text('0 of $k8sCount topics complete'), findsOneWidget);
   });
+
+  testWidgets('quiz result for another subject\'s topic shows a message, '
+      'not a crash', (tester) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester);
+    h.progress.subjectId = 'docker';
+    await tester.pumpAndSettle();
+    await pumpApp(
+      tester,
+      initialLocation: '/topic/pods/quiz/result',
+      prefs: {'k8s.settings': '{"subjectId":"docker"}'},
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.text('No recent quiz result to show.'), findsOneWidget);
+  });
 }

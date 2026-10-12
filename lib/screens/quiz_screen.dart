@@ -48,7 +48,12 @@ class _QuizScreenState extends State<QuizScreen> {
         final topic = content.topic(topicId);
         if (topic == null) return;
         progress.markTopicVisited(content.subject.id, topicId);
-        final missed = {...?progress.quizStats(topicId)?.missed};
+        // Only ids that still exist (content updates can remove questions).
+        final missed = {
+          for (final id
+              in progress.quizStats(topicId)?.missed ?? const <String>[])
+            if (topic.questions.any((q) => q.id == id)) id,
+        };
         final retry = retryMissed && missed.isNotEmpty;
         _spec = TopicQuizSpec(topicId, retryMissed: retry);
         _title = retry ? 'Retry missed' : '${topic.title} · Quiz';

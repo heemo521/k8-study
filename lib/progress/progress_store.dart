@@ -163,70 +163,71 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     }
   }
 
+  // Parsers for each stored key. Shared by loading and backup validation;
+  // they throw on any malformed value.
+  static Map<String, Set<String>> _parseNotes(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries)
+      e.key: {for (final s in e.value as List) s as String},
+  };
+  static Map<String, CardState> _parseCards(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries)
+      e.key: CardState.fromJson(e.value as Map<String, dynamic>),
+  };
+  static Map<String, QuizStats> _parseQuiz(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries)
+      e.key: QuizStats.fromJson(e.value as Map<String, dynamic>),
+  };
+  static List<PracticeRecord> _parsePractice(dynamic j) => [
+    for (final r in j as List)
+      PracticeRecord.fromJson(r as Map<String, dynamic>),
+  ];
+  static AdCapState _parseAds(dynamic j) =>
+      AdCapState.fromJson(j as Map<String, dynamic>);
+  static Map<String, dynamic> _parseSettings(dynamic j) {
+    final m = j as Map<String, dynamic>;
+    m['practiceTimerOn'] as bool?;
+    m['subjectId'] as String?;
+    return m;
+  }
+
+  static Map<String, AnswerStats> _parseAnswers(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries)
+      e.key: AnswerStats.fromJson(e.value as Map<String, dynamic>),
+  };
+  static Map<String, String> _parseRecent(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries)
+      e.key: e.value as String,
+  };
+
+  static final Map<String, Object Function(dynamic)> _parsers = {
+    StorageKeys.notes: _parseNotes,
+    StorageKeys.cards: _parseCards,
+    StorageKeys.quiz: _parseQuiz,
+    StorageKeys.practice: _parsePractice,
+    StorageKeys.ads: _parseAds,
+    StorageKeys.settings: _parseSettings,
+    StorageKeys.answers: _parseAnswers,
+    StorageKeys.recent: _parseRecent,
+  };
+
   void _load() {
     final stored = _prefs.getInt(StorageKeys.schema);
     if (stored != schemaVersion) _migrate(stored);
 
-    _notes = _read(
-      StorageKeys.notes,
-      {},
-      (j) => {
-        for (final e in (j as Map<String, dynamic>).entries)
-          e.key: {for (final s in e.value as List) s as String},
-      },
-    );
-    _cards = _read(
-      StorageKeys.cards,
-      {},
-      (j) => {
-        for (final e in (j as Map<String, dynamic>).entries)
-          e.key: CardState.fromJson(e.value as Map<String, dynamic>),
-      },
-    );
-    _quiz = _read(
-      StorageKeys.quiz,
-      {},
-      (j) => {
-        for (final e in (j as Map<String, dynamic>).entries)
-          e.key: QuizStats.fromJson(e.value as Map<String, dynamic>),
-      },
-    );
-    _practice = _read(
-      StorageKeys.practice,
-      [],
-      (j) => [
-        for (final r in j as List)
-          PracticeRecord.fromJson(r as Map<String, dynamic>),
-      ],
-    );
-    _ads = _read(
-      StorageKeys.ads,
-      AdCapState.initial,
-      (j) => AdCapState.fromJson(j as Map<String, dynamic>),
-    );
+    _notes = _read(StorageKeys.notes, {}, _parseNotes);
+    _cards = _read(StorageKeys.cards, {}, _parseCards);
+    _quiz = _read(StorageKeys.quiz, {}, _parseQuiz);
+    _practice = _read(StorageKeys.practice, [], _parsePractice);
+    _ads = _read(StorageKeys.ads, AdCapState.initial, _parseAds);
     final settings = _read<Map<String, dynamic>>(
       StorageKeys.settings,
       const {},
-      (j) => j as Map<String, dynamic>,
+      _parseSettings,
     );
     _practiceTimerOn = settings['practiceTimerOn'] as bool? ?? true;
     _subjectId = settings['subjectId'] as String?;
-    _answers = _read(
-      StorageKeys.answers,
-      {},
-      (j) => {
-        for (final e in (j as Map<String, dynamic>).entries)
-          e.key: AnswerStats.fromJson(e.value as Map<String, dynamic>),
-      },
-    );
-    _recent = _read(
-      StorageKeys.recent,
-      {},
-      (j) => {
-        for (final e in (j as Map<String, dynamic>).entries)
-          e.key: e.value as String,
-      },
-    );
+    _answers = _read(StorageKeys.answers, {}, _parseAnswers);
+    _recent = _read(StorageKeys.recent, {}, _parseRecent);
   }
 
   /// Schema migrations. v1 is the first schema, so an unknown or missing
@@ -479,10 +480,25 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
         doc['data'] is! Map<String, dynamic>) {
       throw const FormatException('This is not a K8 Study backup.');
     }
-    if ((doc['schema'] as int? ?? 0) > schemaVersion) {
+    final schema = doc['schema'];
+    if (schema is! int?) {
+      throw const FormatException('This is not a K8 Study backup.');
+    }
+    if ((schema ?? 0) > schemaVersion) {
       throw const FormatException('Backup is from a newer app version.');
     }
     final data = doc['data'] as Map<String, dynamic>;
+    // Validate everything before touching stored progress.
+    for (final k in _backupKeys) {
+      if (data[k] == null) continue;
+      try {
+        _parsers[k]!(data[k]);
+      } catch (_) {
+        throw const FormatException(
+          'The backup is damaged; nothing was changed.',
+        );
+      }
+    }
     for (final k in _backupKeys) {
       await _prefs.remove(k);
       if (data[k] != null) await _prefs.setString(k, jsonEncode(data[k]));

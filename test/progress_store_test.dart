@@ -145,6 +145,18 @@ void main() {
       throwsFormatException,
     );
     await expectLater(b.importJson('not json'), throwsFormatException);
+    // Valid wrapper, damaged payload: rejected before anything is written.
+    await expectLater(
+      b.importJson(
+        '{"app":"k8-study","schema":1,"data":{"k8s.quiz":{"t":{"attempts":"x"}}}}',
+      ),
+      throwsFormatException,
+    );
+    await expectLater(
+      b.importJson('{"app":"k8-study","schema":"1","data":{}}'),
+      throwsFormatException,
+    );
+    expect(b.quizStats('t')!.bestPct, 85);
     expect(b.readSections('t'), {'x'}, reason: 'failed import changes nothing');
   });
 }
