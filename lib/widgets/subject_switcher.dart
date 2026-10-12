@@ -54,6 +54,9 @@ Future<void> showSubjectPicker(BuildContext context) {
   final current = context.read<ContentBundle>().subject.id;
   return showModalBottomSheet<void>(
     context: context,
+    // Size the sheet to its subjects instead of the default 9/16 cap, so a
+    // longer catalog doesn't leave the last subjects hidden below the fold.
+    isScrollControlled: true,
     showDragHandle: true,
     builder: (sheet) => SafeArea(
       child: ListView(
