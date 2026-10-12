@@ -114,12 +114,51 @@ class _ContinueCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              '$complete of $total topics complete',
-              style: textTheme.labelLarge?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$complete of $total topics complete',
+                    style: textTheme.labelLarge?.copyWith(
+                      color: scheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+                if (progress.streak > 0)
+                  Semantics(
+                    label: '${progress.streak} day study streak',
+                    excludeSemantics: true,
+                    child: Row(
+                      key: const ValueKey('streak'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.local_fire_department,
+                          size: 18,
+                          color: scheme.onPrimaryContainer,
+                        ),
+                        Text(
+                          '${progress.streak}',
+                          style: textTheme.labelLarge?.copyWith(
+                            color: scheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
+            if (_todaySummary(progress.today) case final today?)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  today,
+                  key: const ValueKey('today-summary'),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
             const SizedBox(height: 6),
             LinearProgressIndicator(
               value: total == 0 ? 0 : complete / total,
@@ -422,4 +461,19 @@ class _IntroCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "Today: 3 sections, 12 cards, 1 quiz", or null when nothing yet.
+String? _todaySummary(Map<String, int> today) {
+  String part(String key, String one, String many) {
+    final n = today[key] ?? 0;
+    return n == 0 ? '' : '$n ${n == 1 ? one : many}';
+  }
+
+  final parts = [
+    part('sections', 'section', 'sections'),
+    part('cards', 'card', 'cards'),
+    part('quizzes', 'quiz', 'quizzes'),
+  ].where((p) => p.isNotEmpty);
+  return parts.isEmpty ? null : 'Today: ${parts.join(', ')}';
 }

@@ -270,4 +270,17 @@ void main() {
     expect(find.byKey(const ValueKey('intro-card')), findsNothing);
     expect(h.progress.introDismissed, isTrue);
   });
+
+  testWidgets('continue card shows streak and today after studying', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester);
+    expect(find.byKey(const ValueKey('streak')), findsNothing);
+    final t = h.content.topics.first;
+    h.progress.markSectionRead(t.id, t.sections.first.id);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('streak')), findsOneWidget);
+    expect(find.text('Today: 1 section'), findsOneWidget);
+  });
 }

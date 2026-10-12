@@ -159,4 +159,25 @@ void main() {
     expect(b.quizStats('t')!.bestPct, 85);
     expect(b.readSections('t'), {'x'}, reason: 'failed import changes nothing');
   });
+
+  test('daily activity and streak', () async {
+    SharedPreferences.setMockInitialValues({});
+    final clock = FixedClock(DateTime(2026, 10, 10, 9));
+    final s = ProgressStore(
+      await SharedPreferences.getInstance(),
+      clock: clock,
+    );
+    expect(s.streak, 0);
+    s.markSectionRead('t', 'a');
+    s.setCardState('c', CardState(box: 2, dueAt: DateTime(2026, 10, 11)));
+    expect(s.today, {'sections': 1, 'cards': 1});
+    expect(s.streak, 1);
+    clock.t = DateTime(2026, 10, 11, 9);
+    expect(s.streak, 1, reason: 'yesterday counts until today has activity');
+    expect(s.today, isEmpty);
+    s.markSectionRead('t', 'b');
+    expect(s.streak, 2);
+    clock.t = DateTime(2026, 10, 13, 9);
+    expect(s.streak, 0, reason: 'a missed day breaks the streak');
+  });
 }

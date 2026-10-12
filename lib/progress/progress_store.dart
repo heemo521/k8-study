@@ -28,6 +28,7 @@ abstract final class StorageKeys {
   static const settings = 'k8s.settings';
   static const answers = 'k8s.answers';
   static const recent = 'k8s.recent';
+  static const activity = 'k8s.activity';
 }
 
 /// Answer history for one question across quizzes, reviews and tests.
@@ -150,6 +151,9 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   Map<String, AnswerStats> _answers = {};
   Map<String, String> _recent = {};
 
+  /// Per-day counts: {'yyyy-mm-dd': {'sections': n, 'cards': n, 'quizzes': n}}.
+  Map<String, Map<String, int>> _activity = {};
+
   // ---- loading -------------------------------------------------------------
 
   T _read<T>(String key, T fallback, T Function(dynamic json) parse) {
@@ -200,7 +204,16 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       e.key: e.value as String,
   };
 
+  static Map<String, Map<String, int>> _parseActivity(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries)
+      e.key: {
+        for (final c in (e.value as Map<String, dynamic>).entries)
+          c.key: c.value as int,
+      },
+  };
+
   static final Map<String, Object Function(dynamic)> _parsers = {
+    StorageKeys.activity: _parseActivity,
     StorageKeys.notes: _parseNotes,
     StorageKeys.cards: _parseCards,
     StorageKeys.quiz: _parseQuiz,
@@ -230,6 +243,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _introDismissed = settings['introDismissed'] as bool? ?? false;
     _answers = _read(StorageKeys.answers, {}, _parseAnswers);
     _recent = _read(StorageKeys.recent, {}, _parseRecent);
+    _activity = _read(StorageKeys.activity, {}, _parseActivity);
   }
 
   /// Schema migrations. v1 is the first schema, so an unknown or missing
@@ -248,6 +262,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   void markSectionRead(String topicId, String sectionId) {
     final set = _notes.putIfAbsent(topicId, () => {});
     if (!set.add(sectionId)) return;
+    _bump('sections');
     _write(StorageKeys.notes, {
       for (final e in _notes.entries) e.key: e.value.toList(),
     });
@@ -269,6 +284,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   CardState? cardState(String cardId) => _cards[cardId];
 
   void setCardState(String cardId, CardState state) {
+    _bump('cards');
     _cards[cardId] = state;
     _write(StorageKeys.cards, {
       for (final e in _cards.entries) e.key: e.value.toJson(),
@@ -389,6 +405,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
 
   /// Records every question in a finished attempt (unanswered = wrong).
   void recordAnswers(QuizAttempt attempt) {
+    _bump('quizzes');
     final now = clock.now();
     for (final p in attempt.questions) {
       final id = p.question.id;
@@ -455,6 +472,43 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     notifyListeners();
   }
 
+  // ---- daily activity ------------------------------------------------------
+
+  static const _activityDays = 60;
+
+  void _bump(String kind) {
+    final today = formatDate(clock.now());
+    final day = _activity.putIfAbsent(today, () => {});
+    day[kind] = (day[kind] ?? 0) + 1;
+    if (_activity.length > _activityDays) {
+      final keys = _activity.keys.toList()..sort();
+      for (final k in keys.take(_activity.length - _activityDays)) {
+        _activity.remove(k);
+      }
+    }
+    _write(StorageKeys.activity, _activity);
+  }
+
+  /// Counts for today (sections, cards, quizzes).
+  Map<String, int> get today => Map.unmodifiable(
+    _activity[formatDate(clock.now())] ?? const <String, int>{},
+  );
+
+  /// Consecutive days with any study activity, ending today — or yesterday,
+  /// so the streak isn't shown as broken before today's first session.
+  int get streak {
+    var day = dateOnly(clock.now());
+    if (!_activity.containsKey(formatDate(day))) {
+      day = day.subtract(const Duration(days: 1));
+    }
+    var n = 0;
+    while (_activity.containsKey(formatDate(day))) {
+      n++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return n;
+  }
+
   // ---- backup ----------------------------------------------------------------
 
   static const _backupKeys = [
@@ -464,6 +518,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     StorageKeys.practice,
     StorageKeys.answers,
     StorageKeys.recent,
+    StorageKeys.activity,
     StorageKeys.settings,
   ];
 
@@ -531,11 +586,13 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       StorageKeys.ads,
       StorageKeys.answers,
       StorageKeys.recent,
+      StorageKeys.activity,
     ]) {
       await _prefs.remove(key);
     }
     _answers = {};
     _recent = {};
+    _activity = {};
     _notes = {};
     _cards = {};
     _quiz = {};
