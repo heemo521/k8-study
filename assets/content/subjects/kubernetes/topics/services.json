@@ -22,6 +22,11 @@
       "sourceTitle": "Service",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Bays come and go, and their phone numbers change. So each job gets a **fixed port phone number** (a Service) that forwards to whichever bays currently do it. It finds them by coloured tag (the selector), and the switchboard's list of bays (EndpointSlices) stays current automatically. Callers dial the Service's `port`, which rings the bay's own line (`targetPort`), even by line name, so bays can renumber without breaking callers. Unless you say otherwise, it's an internal extension (ClusterIP)."
+        },
+        {
           "type": "p",
           "text": "Pods are ephemeral and their IPs change. A **Service** puts one stable address in front of a group of Pods. Its **selector** picks the Pods by label, and a controller keeps the Service's **EndpointSlices** in sync with the matching Pods."
         },
@@ -166,6 +171,11 @@
       "sourceTitle": "Service",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Port numbers come in four kinds. An **internal extension** (ClusterIP) works only inside the port. A **numbered gate on every ship** (NodePort, 30000-32767 by default) adds outside access through the same gate number everywhere. A **public entrance the city builds** (LoadBalancer) adds an outside balancer that the liaison to the city points at those gates. A **forwarding note** (ExternalName) just tells callers another hostname, with no switchboard involved."
+        },
+        {
           "type": "table",
           "header": [
             "Type",
@@ -209,6 +219,11 @@
       "sourceTitle": "Service",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Three numbers, three places. The **port** is the extension callers dial on the Service itself. The **targetPort** is the line inside the bay where the call finally rings, given as a number or a named line. The **nodePort** is the gate number opened on every ship for NodePort and LoadBalancer Services. Mixing them up is like giving a visitor standing at the ship's gate the bay's internal line instead of the gate number."
+        },
+        {
           "type": "table",
           "header": [
             "Field",
@@ -243,6 +258,11 @@
       "sourceTitle": "Service",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Sometimes callers want the bays themselves, not a switchboard. A **headless** number (`clusterIP: None`) has no extension of its own, so the switchboard ignores it and the directory hands back each bay's own number. A number with **no selector** gets no automatic bay list; you write the list yourself and tag it `kubernetes.io/service-name`, handy for an outside database. Those hand-written entries can't be loopback numbers or another Service's extension."
+        },
+        {
           "type": "p",
           "text": "**Headless:** set `.spec.clusterIP: None`. No cluster IP is allocated, kube-proxy ignores the Service and nothing is load-balanced. DNS returns the **Pod IPs** directly (A/AAAA records). `None` is not the same as leaving the field empty."
         },
@@ -263,6 +283,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/",
       "sourceTitle": "EndpointSlices",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Behind each port number, the switchboard keeps **cards** listing the current bays (EndpointSlices). Supervisors write them automatically for numbers with a selector, at most 100 bays per card by default, with IPv4 and IPv6 on separate cards. Each entry notes the bay's ship and zone, and whether it is ready, serving or terminating. The switchboard operator (`kube-proxy`) trusts these cards as the source of truth. They replace the older single-sheet Endpoints list."
+        },
         {
           "type": "bullets",
           "items": [
@@ -285,6 +310,11 @@
       "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/",
       "sourceTitle": "kubectl expose",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The quickest way to get a port number is to point at an existing contract or bay and say \"give that a number\" (`kubectl expose`). The clerk copies its coloured-tag selector, picks an internal extension unless you ask for another `--type`, and can copy the port too. `--cluster-ip=None` makes it headless. Add `--dry-run=client -o yaml` to get the paperwork as a draft you can edit, for example to fix the gate number."
+        },
         {
           "type": "p",
           "text": "Creates a Service by copying the **selector** of an existing pod, service, replicationcontroller, deployment or replicaset."
@@ -316,6 +346,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/service/",
       "sourceTitle": "Service",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "How does a bay learn a port number? When a bay opens, the cargo officer pins a **printed list** of active numbers inside (environment variables like `{SVCNAME}_SERVICE_HOST`), but numbers created later never make that list. The **port phone directory** (cluster DNS such as CoreDNS) has no such gap: ask for `<service>` in your own yard, or `<service>.<ns>` from anywhere. Forwarding notes (ExternalName) can only be found through the directory."
+        },
         {
           "type": "bullets",
           "items": [

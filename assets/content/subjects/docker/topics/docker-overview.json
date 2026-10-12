@@ -16,6 +16,11 @@
       "sourceTitle": "What is Docker?",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Before the big port, there is **your own dock**. Here you pack an app and everything it needs into a **shipping container** (container), so it never depends on tools lying around the dock. Teams pass the same containers along, send them to testing, and ship a fix by sending an updated template (image). The same container sails from a laptop dock to a data center or the cloud, and many fit where one heavy hypervisor VM would."
+        },
+        {
           "type": "p",
           "text": "Docker is an open platform to **develop, ship and run** applications. It packages an app into a **container**: a loosely isolated environment holding everything the app needs, so it doesn't depend on what the host has installed."
         },
@@ -35,6 +40,11 @@
       "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
       "sourceTitle": "What is Docker?",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "On your dock, the **crane operator** (`dockerd`) does all the heavy lifting: building, running and shipping containers, plus managing templates, networks and lockers. You hold a **control handset** (`docker` client) that sends requests over a REST API, by UNIX socket or network, even to a crane on another dock. Pressing `docker run` on the handset does nothing by itself; the operator carries it out. A **group order form** (Docker Compose) is another handset for multi-container apps."
+        },
         {
           "type": "p",
           "text": "Docker uses a **client-server architecture**. The client sends requests; the daemon does the heavy lifting of building, running and distributing containers. They talk over a **REST API**, using UNIX sockets or a network interface, and may run on the same machine or the client can target a remote daemon."
@@ -63,6 +73,11 @@
       "sourceTitle": "What is Docker?",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The crane works with two main things. A **sealed packing template** (image) is read-only, often built on another template plus tweaks, from step-by-step packing instructions (Dockerfile) where each step adds a layer and only changed layers are redone. A **shipping container** (container) is a runnable copy stamped from it, which you can start, stop, move or delete. Throw a container away and anything not kept in a locker (persistent storage) goes with it."
+        },
+        {
           "type": "table",
           "header": ["Object", "What it is"],
           "rows": [
@@ -86,6 +101,11 @@
       "sourceUrl": "https://docs.docker.com/get-started/docker-overview/",
       "sourceTitle": "What is Docker?",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "You radio the operator: `docker run -i -t ubuntu /bin/bash`. If the `ubuntu` template isn't on the dock, the operator fetches it from the depot (registry). A container is stamped out, topped with a fresh **writable layer**, given a network connection and an IP, then started with a shell on your terminal. Type `exit` and it stops but stays on the dock. Inside, **partition walls** (namespaces) keep each aspect of the container in its own space."
+        },
         {
           "type": "code",
           "lang": "shell",
@@ -114,6 +134,11 @@
       "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/",
       "sourceTitle": "What is a container?",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Each container on your dock is a sealed, self-contained unit: frontend in one, API in another, database in a third. Scrap one; the others don't notice. Unlike a full VM, which brings its own engine room (kernel), containers all draw from the **dock's shared engine** (host kernel), so more fit in less space. Your dock roster (`docker ps`) lists only running containers; add `-a` for parked ones; a few ID characters are enough to name one."
+        },
         {
           "type": "p",
           "text": "A container is an **isolated process** with all the files it needs. Each app component (frontend, API, database) can run in its own container. Containers are:"
@@ -150,6 +175,11 @@
       "sourceTitle": "What is an image?",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A **sealed packing template** (image) holds every file, library and setting a container needs. Once sealed it never changes; to alter it, you make a new template or stack changes on top. It is built from **stacked packing layers**, each a set of file additions, removals or edits. The default catalog is Docker Hub, where the **Official Images** shelf (like Redis) is a trusted starting point. `docker image history` shows how each layer was packed."
+        },
+        {
           "type": "p",
           "text": "A container image is a standardized package of all the files, binaries, libraries and configuration a container needs. Two principles:"
         },
@@ -177,6 +207,11 @@
       "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-registry/",
       "sourceTitle": "What is a registry?",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Templates live in the **container depot** (registry), public or private. Docker Hub is the default public depot; ECR, ACR, GCR or a self-hosted Harbor are others. Inside a depot, a **repository** is one aisle of related templates, like `project-a:v1.0` and `project-a:v2.0`. You build a template (`docker build -t ... .`), stick a version label on it (`docker tag`), and send it to the depot (`docker push`). Don't forget that trailing `.`: it says where the packing instructions are."
+        },
         {
           "type": "p",
           "text": "An **image registry** is a central place to store and share images, public or private. **Docker Hub** is public and is the **default** registry. Alternatives include Amazon ECR, Azure ACR and Google GCR, or a self-hosted one such as Harbor, JFrog Artifactory or GitLab Container registry."

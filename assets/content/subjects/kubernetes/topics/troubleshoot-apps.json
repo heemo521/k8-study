@@ -22,6 +22,11 @@
       "sourceTitle": "Debug Pods",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The port investigator starts every case in the same spot: `kubectl describe`, which shows state, restarts and recent events. A bay stuck **Pending** never found a ship with room. **Waiting** means it has a ship but the template never arrived, usually an image pull failure. **Terminating** often means a finalizer plus a blocking webhook. Running but odd? A misspelled key may be silently ignored, so reapply with `--validate` and diff."
+        },
+        {
           "type": "p",
           "text": "Start every app investigation with `kubectl describe`. It shows container state, restarts and recent events. Then follow the branch that matches what you see."
         },
@@ -78,6 +83,11 @@
       "sourceTitle": "Debug Running Pods",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The describe output is the investigator's case file. Each container's **State** is Waiting, Running or Terminated; **Ready** shows whether the last readiness check passed; a climbing **Restart Count** hints at a crash loop. **Events** list who reported what and why, such as a `FailedScheduling` note from the load planner (`kube-scheduler`). Events are filed per yard (namespaced), and `-o yaml` shows everything the port holds about the bay."
+        },
+        {
           "type": "bullets",
           "items": [
             "A container's **State** is `Waiting`, `Running` or `Terminated`, with extra detail for each.",
@@ -115,6 +125,11 @@
       "sourceTitle": "Logging Architecture",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Containers that speak out loud (stdout/stderr) get recorded on tape, and `kubectl logs` asks the cargo officer (`kubelet`) to play it. After a crash, `--previous` plays the last instance, since one terminated container's tape is kept. Tapes rotate (default 10Mi, 5 files) and you only hear the latest. The port keeps no long-term archive; that needs a separate backend, often fed by a recorder on every ship (DaemonSet)."
+        },
+        {
           "type": "p",
           "text": "Write to **stdout/stderr** and Kubernetes captures it. `kubectl logs` asks the kubelet, which reads the log file on the node."
         },
@@ -146,6 +161,11 @@
       "sourceTitle": "kubectl Quick Reference",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Seasoned investigators keep a pocket card of radio calls. Follow a tape live with `-f`, gather tapes from every bay with a given coloured tag using `-l`, or ask a whole contract with `deploy/<name>`. Line the clues up in time with `--sort-by=.metadata.creationTimestamp`, hear only the alarms with `kubectl events --types=Warning`, and rank bays by restart count to spot the troublemaker."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "kubectl logs -f <pod-name>                        # stream\nkubectl logs -f <pod-name> -c <container-name>\nkubectl logs -l <label>=<value>                   # by label\nkubectl logs -f -l <label>=<value> --all-containers\nkubectl logs deploy/<deployment-name>\nkubectl get events --sort-by=.metadata.creationTimestamp\nkubectl events --types=Warning\nkubectl get pods --sort-by='.status.containerStatuses[0].restartCount'"
@@ -163,6 +183,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/",
       "sourceTitle": "Debug Running Pods",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "If the container has tools inside, step in and use them (`kubectl exec`). No shell, or already crashed? Send a temporary inspector into the bay (an ephemeral container via `kubectl debug`), who can watch a container's processes with `--target`. Or build a replica bay to experiment on (`--copy-to`), swapping images or commands without touching the original. Remove the replica when you're done."
+        },
         {
           "type": "p",
           "text": "If the image has tools, run them in place. `-c` is optional for single-container Pods."
@@ -214,6 +239,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/determine-reason-pod-failure/",
       "sourceTitle": "Determine the Reason for Pod Failure",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "On its way out, a container can leave a short note at the door, in `/dev/termination-log` by default. The port copies that note into the container's status so tools can show it, up to 4096 bytes each and 12KiB per bay. With `FallbackToLogsOnError`, if the note is empty and the container failed, the end of its tape is used instead."
+        },
         {
           "type": "p",
           "text": "A container can write a short final status to a file. Kubernetes copies it into the container's status so tools can show it."

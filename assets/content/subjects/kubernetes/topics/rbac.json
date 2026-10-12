@@ -22,6 +22,11 @@
       "sourceTitle": "Using RBAC Authorization",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "At the Port of Kube, staff carry badges. A **badge card** (Role) lists what its holder may do in one company yard (namespace); a port-wide card (ClusterRole) covers the whole port. Handing a card to someone takes an **issuing slip** (RoleBinding, or ClusterRoleBinding port-wide). Cards only add powers: no card ever says \"forbidden\". The front desk (`kube-apiserver`) checks badges only when RBAC is listed in its `--authorization-mode`."
+        },
+        {
           "type": "p",
           "text": "RBAC lives in the `rbac.authorization.k8s.io` API group. It defines four kinds: two hold permissions (roles) and two hand those permissions to someone (bindings)."
         },
@@ -168,6 +173,11 @@
       "sourceTitle": "Using RBAC Authorization",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Each line on a badge card names three things: which department of forms (API group, `\"\"` for the core one), which items by their filing name (`pods`), and which actions (verbs) are allowed. Sub-items like a bay's logbook (`pods/log`) get a slash. A star (`*`) means everything, even items invented next year, so careful harbormasters write explicit lists instead. A card can also name specific objects with `resourceNames`."
+        },
+        {
           "type": "p",
           "text": "Each rule names the API groups, the resources (by the name used in the API URL, such as `pods`) and the verbs it allows."
         },
@@ -194,6 +204,11 @@
       "sourceTitle": "Using RBAC Authorization",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "An issuing slip (binding) has two parts: the people receiving the badge (subjects: users, groups or robot crew ServiceAccounts) and exactly one card it points to (`roleRef`). Point a yard slip at a port-wide card and it only works in that yard, so common cards are written once and reused. Once printed, the card reference can't change; tear up the slip and issue a new one. Names starting `system:` are reserved for the port itself."
+        },
+        {
           "type": "p",
           "text": "A binding has a list of **subjects** and one **roleRef**. Subjects are users, groups or ServiceAccounts."
         },
@@ -219,6 +234,11 @@
       "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
       "sourceTitle": "Using RBAC Authorization",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The front desk keeps four ready-made port-wide cards for people, and restocks any missing permissions every time it opens (auto-reconciliation). **cluster-admin** opens every door. **admin** runs a yard, badges included. **edit** moves cargo but can't touch badges. **view** only looks, and never inside sealed envelopes (Secrets). The last three are meant to be issued yard by yard. You can't print a card granting more than you hold, unless you have the `escalate` verb."
+        },
         {
           "type": "p",
           "text": "The API server creates default ClusterRoles and bindings and re-adds missing permissions to them at every start-up (auto-reconciliation). Four are meant for people:"
@@ -265,6 +285,11 @@
       "sourceTitle": "Using RBAC Authorization",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Rather than drafting cards by hand, radio the front desk (`kubectl`) and have them printed on the spot: `kubectl create role` for a yard card, `kubectl create rolebinding` to issue a card in one yard, `kubectl create clusterrolebinding` to issue one port-wide. A favourite shortcut: issue the ready-made **view** card to one robot crew member with `--serviceaccount=<namespace>:<name>`, and you never have to write a new card at all."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods\nkubectl create role foo --verb=get,list,watch --resource=replicasets.apps\nkubectl create role pod-reader --verb=get --resource=pods --resource-name=<pod>\nkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods\n\nkubectl create rolebinding bob-admin-binding --clusterrole=admin --user=bob --namespace=acme\nkubectl create rolebinding myapp-view-binding --clusterrole=view \\\n  --serviceaccount=acme:myapp --namespace=acme\nkubectl create clusterrolebinding root-cluster-admin-binding \\\n  --clusterrole=cluster-admin --user=root"
@@ -291,6 +316,11 @@
       "sourceTitle": "Service Accounts",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Robot crew members wear badges too (ServiceAccounts), and each belongs to one yard. Every yard comes with a robot badge named `default`; throw it away and the office prints a new one. Out of the box it opens almost nothing beyond the directory of forms (API discovery). A bay that names no badge gets `default`; set `spec.serviceAccountName` to pick another. Its pass code is short-lived and refreshed automatically. To work in another yard, issue the card in that target yard."
+        },
+        {
           "type": "bullets",
           "items": [
             "A ServiceAccount is a **namespaced**, non-human identity for workloads and automation. User accounts, by contrast, are not API objects.",
@@ -309,6 +339,11 @@
       "sourceUrl": "https://kubernetes.io/docs/reference/access-authn-authz/authorization/",
       "sourceTitle": "Authorization",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The front desk starts from \"no\": some checkpoint must say yes. Several checkpoints (authorization modes) are asked in order, and the first clear yes or no wins; a refusal comes back as **403**. Before trying a job, ask the desk yourself with `kubectl auth can-i`, even on someone else's behalf with `--as`. Careful: a card that lets you list sealed envelopes (Secrets) lets you read what's inside, because `get`, `list` and `watch` return everything."
+        },
         {
           "type": "p",
           "text": "Authorization is **deny by default**: some authorizer must allow the request. With several modes (e.g. `--authorization-mode=Node,RBAC,Webhook`) they are checked in order; the first allow or deny wins. A denied request gets HTTP **403**."

@@ -19,6 +19,11 @@
       "sourceTitle": "Production environment",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A one-ship training harbor is charming until its only office floods: then everything stops. A real port plans ahead. It keeps the harbor office (control plane) apart from the fleet, runs copies of each office desk with callers spread across the front desks, and keeps enough ships ready. It plans for busy and quiet seasons, and in a shared port it issues badges (RBAC) and cargo limits so no tenant hogs the docks."
+        },
+        {
           "type": "p",
           "text": "A single-machine learning cluster has a single point of failure. A production cluster has to plan for:"
         },
@@ -38,6 +43,11 @@
       "sourceUrl": "https://kubernetes.io/docs/setup/production-environment/",
       "sourceTitle": "Production environment",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Before building an office yourself, consider letting the city (a cloud provider) run parts of the port. It can carry cargo with no port for you to manage, billing by the cargo you declare (serverless). It can staff and patch the harbor office (managed control plane), keep your chosen fleets seaworthy (managed worker nodes), or connect the port to warehouses, depots and ID offices. Even if the city runs the office, you still decide how your ships are managed."
+        },
         {
           "type": "p",
           "text": "Before building production yourself, the docs suggest considering **Turnkey Cloud Solutions** providers or other Kubernetes partners. The options are:"
@@ -81,6 +91,11 @@
       "sourceTitle": "Production environment",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Building the port yourself means a long checklist. Hire a construction crew such as `kubeadm`, kops or kubespray. Manage the seals (certificates) on office mail. Put a traffic marshal (load balancer) in front of the front desks. Keep the master ledger (`etcd`) separate if needed and photocopy it into the safe regularly. Run several office systems, each service on at least three machines if systemd runs it, and consider spreading across districts (zones)."
+        },
+        {
           "type": "bullets",
           "items": [
             "Choose deployment tools, such as **kubeadm**, kops or kubespray.",
@@ -105,6 +120,11 @@
       "sourceTitle": "What is Amazon EKS? (AWS docs)",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "In the Amazon district, the city's port service is EKS. On the standard plan, AWS staffs the harbor office (control plane) while you crew your own ships. On Auto Mode, the city runs the ships too (the data plane). Badges there work two ways at once: Kubernetes' own badge system combined with the city's ID office, AWS IAM. It is a handy example of the city running the office for you."
+        },
+        {
           "type": "bullets",
           "items": [
             "Amazon Elastic Kubernetes Service (EKS) is AWS's managed Kubernetes service.",
@@ -122,6 +142,11 @@
       "sourceTitle": "GKE overview (Google Cloud docs)",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "In the Google district the service is GKE, and every ship is a Compute Engine VM. In **Autopilot** mode the city runs both the harbor office and the ships, and you pay only for the cargo weight your running bays declare (Pod requests). In **Standard** mode you pay for whole ships, full or half empty, regardless of what your bays declare."
+        },
+        {
           "type": "bullets",
           "items": [
             "Google Kubernetes Engine (GKE) is Google Cloud's managed implementation of Kubernetes. Nodes are Compute Engine VMs.",
@@ -137,6 +162,11 @@
       "sourceUrl": "https://learn.microsoft.com/en-us/azure/aks/what-is-aks",
       "sourceTitle": "What is Azure Kubernetes Service? (Microsoft docs)",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "In the Azure district the service is AKS. Azure builds and configures your harbor office (control plane) at no cost; you pay for the ships carrying your cargo. With **AKS Automatic**, Azure also looks after the ships, scaling, security, monitoring and upgrades. With **AKS Standard**, you configure the port and manage your fleets (node pools) yourself. City prices and perks change often, so check the vendor page before relying on any detail."
+        },
         {
           "type": "bullets",
           "items": [

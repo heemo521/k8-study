@@ -22,6 +22,11 @@
       "sourceTitle": "Resource Management for Pods and Containers",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Each bay declares its cargo weight (a **request**) and the most it may load (a **limit**). The load planner (`kube-scheduler`) only adds up declarations: a ship takes a bay only if the declared totals fit. On deck, the ship enforces limits. Too much CPU and the bay is slowed down (throttled); too much memory and a process may be thrown overboard (OOM-killed)."
+        },
+        {
           "type": "table",
           "header": [
             "",
@@ -75,6 +80,11 @@
       "sourceTitle": "Pod Quality of Service Classes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "When a ship runs short of room, the cargo officer (kubelet) unloads bays by **boarding class**. Bays that declared nothing (BestEffort) go first, then partly declared bays (Burstable), and last the bays where every container declared CPU and memory with limit equal to request (Guaranteed). The class is stamped on the bay's ticket at creation and never changes. The load planner ignores this ticket when it bumps bays to make room."
+        },
+        {
           "type": "table",
           "header": [
             "Class",
@@ -113,6 +123,11 @@
       "sourceTitle": "Limit Ranges",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Each company yard can post a **bay rulebook** (a `LimitRange`) at its entrance. A gatekeeper fills in default weights for containers that left them blank, then checks each one against the minimum, maximum and request-to-limit ratio. Break a rule and you're turned away with `403 Forbidden`. Bays already inside are left alone. Careful: defaults aren't checked against each other, so a big request with a small default limit gets rejected. Declare both to stay safe."
+        },
+        {
           "type": "p",
           "text": "A LimitRange is a namespaced policy for **individual** Pods, containers or PersistentVolumeClaims. Its admission controller first fills in default requests/limits for containers that set none, then checks min, max and the request-to-limit ratio."
         },
@@ -138,6 +153,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/policy/resource-quotas/",
       "sourceTitle": "Resource Quotas",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "While the rulebook judges one bay at a time, the yard's **budget board** (a `ResourceQuota`) caps the totals: summed CPU and memory, plus counts of bays, Services, envelopes and more. Once a budget exists, new bays must declare their weights, so pair it with a rulebook that fills defaults. Go over budget and you get `403 Forbidden`; a contract (Deployment) may be signed while some of its bays never appear."
+        },
         {
           "type": "p",
           "text": "A ResourceQuota caps the **aggregate** use in a namespace: total requests/limits and object counts. It is enforced by the `ResourceQuota` admission plugin (listed in the API server's `--enable-admission-plugins`) once a quota exists in the namespace."
@@ -165,6 +185,11 @@
       "sourceTitle": "Assign Pods to Nodes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Want your bay on a ship with fast holds? First give the ship a coloured tag (`kubectl label nodes <node> disktype=ssd`), then write that tag on the bay's order as a requirement (`nodeSelector`). The load planner will only consider matching ships. You can also name one exact ship (`nodeName`) and skip the planner entirely. Check where the bay landed in the NODE column of `kubectl get pods --output=wide`."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "kubectl get nodes --show-labels\nkubectl label nodes <your-node-name> disktype=ssd\nkubectl get pods --output=wide    # NODE column shows placement"
@@ -187,6 +212,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/",
       "sourceTitle": "Assigning Pods to Nodes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Node affinity is a richer wish list. **Required** rules are must-haves: no matching ship, no loading. **Preferred** rules earn points by weight, but the bay still loads if nothing matches. Once aboard, a bay stays even if the ship's tags change. Pod affinity instead checks which bays already sit on a ship or in a zone, costly in a big port. Naming a ship (`nodeName`) skips all this, and fails if that ship is missing or full."
+        },
         {
           "type": "code",
           "lang": "yaml",
@@ -215,6 +245,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
       "sourceTitle": "Taints and Tolerations",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some ships hang a **\"hazmat only\"** sign (a taint). Bays without a matching **hazmat permit** (a toleration) stay off. A permit lets a bay board that ship but never forces it there; use affinity to attract it. Signs come in strengths: `NoSchedule` stops new bays, `PreferNoSchedule` merely discourages them, and `NoExecute` also evicts permitless bays already aboard. Supervisors hang signs like `not-ready` on troubled ships, and bays get a five-minute permit for those by default."
+        },
         {
           "type": "p",
           "text": "Affinity attracts Pods; a **taint** on a node repels them. A **toleration** on a Pod lets it schedule onto a matching taint but doesn't force it there."

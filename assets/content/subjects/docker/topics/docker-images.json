@@ -16,6 +16,11 @@
       "sourceTitle": "Writing a Dockerfile",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every template starts as **step-by-step packing instructions** (Dockerfile), a plain text sheet named `Dockerfile` with no extension. A typical sheet reads: start from an existing template (`FROM`), pick a work area (`WORKDIR`), carry in files from your dock (`COPY`), do some packing work (`RUN`), and write the default job on the door (`CMD`). Order usually follows: base template, install dependencies, copy in your source, then finish the configuration."
+        },
+        {
           "type": "p",
           "text": "A **Dockerfile** is a text file of instructions the builder follows to create an image: commands to run, files to copy, the startup command and more. The file is named `Dockerfile` with **no extension**."
         },
@@ -51,6 +56,11 @@
       "sourceTitle": "Dockerfile reference",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The packing sheet has house rules. It must open with `FROM` (only `ARG` may come earlier), and an untagged `FROM` means `latest`. `RUN` does real packing work now and seals the result; `CMD` only writes the intended job on the door. `EXPOSE` is a note about a port, not an open hatch. `ENV` notes travel with the container, while `ARG` notes stay at the packing bench. Never write secrets as build arguments: anyone reading `docker history` sees them."
+        },
+        {
           "type": "bullets",
           "items": [
             "A Dockerfile must begin with `FROM` (after parser directives, comments and global `ARG`s). `ARG` is the only instruction that may come before `FROM`.",
@@ -80,6 +90,11 @@
       "sourceUrl": "https://docs.docker.com/reference/dockerfile/",
       "sourceTitle": "Dockerfile reference",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Picture the container door with two labels. A permanent **job plate** (`ENTRYPOINT`) says what this container is. A replaceable **default note** (`CMD`) underneath supplies the usual arguments. Extra words on `docker run` replace the note and are appended to an exec-form plate. Only the last of each counts, and you need at least one. A shell-form plate ignores the note and runs under `/bin/sh -c`, so it misses the polite stop signal. Best pattern: exec-form plate plus exec-form note."
+        },
         {
           "type": "bullets",
           "items": [
@@ -113,6 +128,11 @@
       "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/build-tag-and-publish-an-image/",
       "sourceTitle": "Build, tag, and publish an image",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "You hand the crane a **build context**, the pile of files at the path you name (`docker build .`). The finished template gets only an ID unless you give it a **shipping label** (tag) in the form `[HOST[:PORT]/]PATH[:TAG]`. Leave parts off and defaults fill in: depot `docker.io`, shelf `library`, version `latest`, so `nginx` means `docker.io/library/nginx:latest`. If the depot refuses your push, check you signed in (`docker login`) and the label carries your username."
+        },
         {
           "type": "p",
           "text": "`docker build .` builds from the **build context** given as the last argument (a path or URL); the builder finds the Dockerfile and referenced files there. Without a tag the image has no name, only an ID."
@@ -150,6 +170,11 @@
       "sourceTitle": "Understanding the image layers",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A template is a stack of sealed **packing layers**, each recording file changes. Two Python templates can share base layers, saving space. When a container runs, the crane unpacks each layer into its own folder and stacks them into one combined view (union filesystem) as the container's root. On top it adds a private scratch layer for that container's own changes, so many containers share one template untouched. `docker container commit` works, but packing instructions are normal."
+        },
+        {
           "type": "p",
           "text": "Each layer holds filesystem changes (additions, deletions, modifications) and is immutable once created. Layers can be **reused between images**: two Python apps can share the same Python base layers, saving build time, storage and bandwidth."
         },
@@ -178,6 +203,11 @@
       "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/using-the-build-cache/",
       "sourceTitle": "Using the build cache",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The crane remembers every packing step. If a step and everything before it are unchanged, it reuses the stacked layer from the shelf (`CACHED`). Change a `RUN` command or any file a `COPY` brings in, and that layer plus **every layer above it** must be repacked. So copy the parts list (`package.json`) first, install, then `COPY . .`: a source edit only repacks the last step. A `.dockerignore` keeps clutter like `node_modules` out of the pile."
+        },
         {
           "type": "p",
           "text": "Docker runs each instruction in order, creating a layer per instruction, and reuses a cached result when it has already run the same step. The cache is **invalidated** when:"
@@ -208,6 +238,11 @@
       "sourceUrl": "https://docs.docker.com/get-started/docker-concepts/building-images/multi-stage-builds/",
       "sourceTitle": "Multi-stage builds",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Packing in one go leaves compilers and tools inside the container, making it heavy and riskier. Instead, use a **workshop shed** and a **clean shipping crate**: several `FROM ... AS <name>` stages, building in the shed and carrying only the finished parts into a lean crate with `COPY --from`. The crane builds the last stage by default; `--target` picks another. In the guide, swapping a JDK crate for a JRE crate cut 880MB to 428MB."
+        },
         {
           "type": "p",
           "text": "A single-stage build leaves compilers and build tools in the final image, making it bulky and riskier. **Multi-stage builds** use several `FROM ... AS <stage-name>` stages: build in one, then `COPY --from=<stage>` only the artifacts into a smaller runtime image. Recommended for all application types."

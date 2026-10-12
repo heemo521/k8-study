@@ -17,6 +17,11 @@
       "sourceTitle": "Namespaces",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Inside one port, each company gets its own yard (namespace) with its own signs. Two yards can each have a bay called `web`, but one yard can't have two. Yards don't sit inside other yards, and each item belongs to exactly one yard. Port-wide things, like the ships themselves (Nodes), the warehouse units (PersistentVolumes) and the rental catalog (StorageClasses), belong to no yard at all."
+        },
+        {
           "type": "p",
           "text": "A namespace isolates a group of resources within a **single cluster**. Resource names must be unique within a namespace, but the same name can be used in different namespaces."
         },
@@ -38,6 +43,11 @@
       "sourceTitle": "Namespaces",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A small port with a handful of crews doesn't need yards at all. Yards earn their keep when many teams and projects share the port, and each yard can be given its own cargo allowance (resource quota). Don't build a new yard just for a slightly different version of the same cargo; use coloured tags (labels) inside one yard. And for serious work, set up your own yard instead of using the `default` one."
+        },
+        {
           "type": "p",
           "text": "Namespaces are meant for environments with many users across multiple teams or projects. Clusters with a few to tens of users shouldn't need to think about them at all."
         },
@@ -57,6 +67,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
       "sourceTitle": "Namespaces",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A brand-new port opens with four yards. `default` lets you start work without building one. `kube-node-lease` holds each ship's check-in slip (Lease) for heartbeats. `kube-public` is a notice board anyone can read, public only by custom. `kube-system` is the port's own utility yard. Yard names starting with `kube-` are reserved for the port itself, so don't claim one."
+        },
         {
           "type": "table",
           "header": [
@@ -96,6 +111,11 @@
       "sourceTitle": "Share a Cluster with Namespaces",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Over the radio you can list, describe, build and tear down yards. A yard is either open (Active) or being cleared (Terminating), and nothing new moves into a yard being cleared. Tearing down a yard removes **everything** inside it, and clearing takes a while. Describing a yard shows any cargo allowance and limits posted on its gate. Yard names must be valid DNS labels."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "kubectl get namespaces\nkubectl describe namespaces <name>\nkubectl create namespace <name>\nkubectl delete namespaces <name>"
@@ -117,6 +137,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
       "sourceTitle": "Namespaces",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every order to the front desk lands in some yard. For a one-off, name the yard in your call (`-n` or `--namespace`). If you'll work in one yard for a while, set it as the default on your radio's current preset channel (`kubectl config set-context --current --namespace=<name>`), then double-check with `kubectl config view --minify`."
+        },
         {
           "type": "p",
           "text": "Use `--namespace` (or `-n`) for a single request:"
@@ -143,6 +168,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
       "sourceTitle": "Namespaces",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every fixed port phone number (Service) gets a directory entry: `<service-name>.<namespace-name>.svc.cluster.local`. Dial just the short name and you reach the one in your own yard, so the same instructions work in the dev, staging and prod yards. To call another yard, dial the full name. That's why yard names follow DNS rules. A yard named like a public web domain can hijack outside calls, so limit who may build yards."
+        },
         {
           "type": "p",
           "text": "Creating a Service creates a DNS entry of the form:"
@@ -173,6 +203,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
       "sourceTitle": "Namespaces",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some things live inside a yard; others belong to the whole port. Ask the front desk which is which with `kubectl api-resources --namespaced=true` or `false`. The yards themselves belong to no yard. The harbor office paints a permanent name tag (`kubernetes.io/metadata.name`) on every yard, matching its name. On the exam, check which yard a task means before you touch anything."
+        },
         {
           "type": "code",
           "lang": "shell",

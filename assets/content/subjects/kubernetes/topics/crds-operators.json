@@ -22,6 +22,11 @@
       "sourceTitle": "Custom Resources",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The master ledger normally holds familiar forms, like bays. A **custom resource** adds a new kind of form, registered or removed while the port runs, and your radio (`kubectl`) handles it like any other. On its own, the form just sits there. Add a specialist supervisor (custom controller) who acts on it, and you have an operator. Most staff badges (RBAC roles) don't cover new forms, so grant access explicitly."
+        },
+        {
           "type": "p",
           "text": "A **resource** is an API endpoint holding objects of one kind (for example `pods`). A **custom resource** extends the API with a kind that isn't in a default install. It can be registered and removed in a running cluster, and once installed you use it with kubectl like any built-in kind."
         },
@@ -46,6 +51,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/",
       "sourceTitle": "Custom Resources",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Need new paperwork? Adding a form to the ledger (CRD) takes no programming; the front desk files and serves it. Opening your own side desk behind the front desk (API aggregation) takes code but gives more control. If a bay just reads an existing config file, post an instruction sheet (ConfigMap). Don't fill the ledger with customer data: too many forms can overload it."
+        },
         {
           "type": "table",
           "header": [
@@ -85,6 +95,11 @@
       "sourceTitle": "Extend the Kubernetes API with CustomResourceDefinitions",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Designing a new form means filling in a form about forms (the CRD). Its name must read `<plural>.<group>`, like `crontabs.stable.example.com`. You list versions (exactly one is the filed copy, `storage: true`), a strict layout (structural schema) that trims unknown fields, whether filled forms belong to one yard or the whole port (`scope`), and their names. Then wait a few seconds for `Established`."
+        },
+        {
           "type": "code",
           "lang": "yaml",
           "text": "apiVersion: apiextensions.k8s.io/v1\nkind: CustomResourceDefinition\nmetadata:\n  name: crontabs.stable.example.com   # <plural>.<group>\nspec:\n  group: stable.example.com           # REST path /apis/<group>/<version>\n  versions:\n    - name: v1\n      served: true                    # enable/disable this version\n      storage: true                   # exactly one storage version\n      schema:\n        openAPIV3Schema:\n          type: object\n          properties:\n            spec:\n              type: object\n              properties:\n                cronSpec:\n                  type: string\n                replicas:\n                  type: integer\n  scope: Namespaced                   # or Cluster\n  names:\n    plural: crontabs\n    singular: crontab\n    kind: CronTab\n    shortNames:\n    - ct"
@@ -106,6 +121,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
       "sourceTitle": "Extend the Kubernetes API with CustomResourceDefinitions",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Once the new form type exists, radio for it by plural, singular or short name: `kubectl get ct`. Closing a yard (namespace) shreds the custom forms filed in it. Delete the form type itself (the CRD) and the front desk closes that counter and shreds every filled copy; recreate it and the drawer starts empty. The published layout also powers `kubectl explain`."
+        },
         {
           "type": "code",
           "lang": "shell",
@@ -133,6 +153,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/",
       "sourceTitle": "Extend the Kubernetes API with CustomResourceDefinitions",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "You can dress up the new form: extra columns on the `kubectl get` printout, a separate status window (`/status`) so normal edits ignore `.status`, a scale dial (`/scale`) so `kubectl scale` works, and a category so `kubectl get all` lists it. **Finalizers** work like checkout slips: a delete only stamps a deletion time, and the form stays until every supervisor removes their slip."
+        },
         {
           "type": "table",
           "header": [
@@ -175,6 +200,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/extend-kubernetes/operator/",
       "sourceTitle": "Operator pattern",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "An operator is a specialist supervisor hired for one kind of form, like a database expert. They follow the same control loop as every supervisor, doing what a human expert would: deploy, back up and restore, upgrade, pick a leader. You hire one by adding the form type plus its controller, often as a standing contract (Deployment). Then you just create or edit forms like `SampleDB`, and the expert does the rest."
+        },
         {
           "type": "p",
           "text": "**Operators** are API clients that act as controllers for a custom resource. They follow the control loop and automate what a human operator would do for one application."
