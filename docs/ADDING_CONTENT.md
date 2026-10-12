@@ -61,6 +61,19 @@ section cites exactly one page. Block types:
 | `code` | `lang`, `text` | use `<placeholders>` and never realistic-looking invented values |
 | `callout` | `kind` (`key` · `exam` · `warn`), `text` | |
 | `table` | `header` (2–3 columns), `rows` | |
+| `diagram` | `title`, `width`, `height`, `nodes`, `edges?`, `steps?` | animated, see below |
+
+**Diagram:** boxes on a `width` × `height` grid (use width 10; the diagram
+scales to the screen).
+- `nodes`: `{ id, label, x, y, w, h, kind?, group? }`. `kind` picks the colour:
+  `control` · `worker` · `pod` · `service` · `storage` · `external` · `user` ·
+  `generic`. `group: true` draws a labelled container behind the other boxes.
+  Use `\n` in a label to break a long name.
+- `edges`: `{ from, to, label?, flow? }`. `flow: true` animates packets along
+  the arrow. Labels are hidden when the arrow is too short for them.
+- `steps`: `{ text, highlight: [nodeIds] }`, a walkthrough the reader steps
+  or plays through. Step text counts toward the word limit and is what
+  screen readers and search see.
 
 **Flashcard:** `{ id, front, back, sourceUrl }`
 

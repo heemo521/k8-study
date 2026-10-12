@@ -220,6 +220,83 @@
           "text": "Affinity attracts Pods; a **taint** on a node repels them. A **toleration** on a Pod lets it schedule onto a matching taint but doesn't force it there."
         },
         {
+          "type": "diagram",
+          "title": "Taints and tolerations",
+          "width": 10,
+          "height": 3.6,
+          "nodes": [
+            {
+              "id": "node1",
+              "label": "node-1 (tainted)",
+              "x": 0,
+              "y": 0,
+              "w": 4.8,
+              "h": 3.6,
+              "kind": "worker",
+              "group": true
+            },
+            {
+              "id": "node2",
+              "label": "node-2 (no taint)",
+              "x": 5.2,
+              "y": 0,
+              "w": 4.8,
+              "h": 3.6,
+              "kind": "worker",
+              "group": true
+            },
+            {
+              "id": "podA",
+              "label": "Pod with toleration",
+              "x": 0.4,
+              "y": 1.2,
+              "w": 4,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "podB",
+              "label": "Pod without toleration",
+              "x": 5.6,
+              "y": 1.2,
+              "w": 4,
+              "h": 0.9,
+              "kind": "pod"
+            }
+          ],
+          "edges": [],
+          "steps": [
+            {
+              "text": "A **taint** on a node repels Pods. `node-1` has `gpu=true:NoSchedule`.",
+              "highlight": [
+                "node1"
+              ]
+            },
+            {
+              "text": "A Pod with a matching **toleration** can be scheduled onto the tainted node.",
+              "highlight": [
+                "node1",
+                "podA"
+              ]
+            },
+            {
+              "text": "A Pod without the toleration can't be scheduled on `node-1`, so it lands on another node.",
+              "highlight": [
+                "node2",
+                "podB"
+              ]
+            },
+            {
+              "text": "A toleration allows the tainted node but doesn't require it. Use node affinity to attract Pods to a node.",
+              "highlight": [
+                "podA",
+                "node1",
+                "node2"
+              ]
+            }
+          ]
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "kubectl taint nodes <node> <key>=<value>:NoSchedule    # add\nkubectl taint nodes <node> <key>=<value>:NoSchedule-   # remove (trailing -)"

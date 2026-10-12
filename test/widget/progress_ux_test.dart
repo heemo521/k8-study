@@ -10,6 +10,9 @@ import 'package:k8_study/progress/progress_store.dart';
 import 'package:k8_study/widgets/question_view.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'package:k8_study/audio/narration.dart';
+
+import '../audio_test.dart' show FakeSpeechEngine;
 import 'test_app.dart';
 
 Future<void> tapKey(WidgetTester tester, String key) async {
@@ -340,5 +343,107 @@ void main() {
       find.textContaining('last 60% · best 80% (2 attempts)'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('read aloud: plays, highlights, marks heard sections read', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    final engine = FakeSpeechEngine();
+    final h = await pumpApp(
+      tester,
+      initialLocation: '/topic/namespaces/notes',
+      speech: engine,
+    );
+    final topic = h.content.topic('namespaces')!;
+    await tester.tap(find.byKey(const ValueKey('listen')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('listen-bar')), findsOneWidget);
+    expect(engine.spoken.first, startsWith('Section 1. '));
+
+    // Finish every chunk of section 1.
+    final first = narrateTopic(topic).where((i) => i.group == 0).length;
+    for (var i = 0; i < first; i++) {
+      engine.finish();
+    }
+    await tester.pumpAndSettle();
+    expect(
+      h.progress.readSections(topic.id),
+      contains(topic.sections.first.id),
+    );
+    expect(engine.spoken.last, startsWith('Section 2. '));
+
+    await tester.tap(find.byKey(const ValueKey('listen-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Paused'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('listen-stop')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('listen-bar')), findsNothing);
+  });
+
+  testWidgets('read aloud explains when no voice is available', (tester) async {
+    await setPhoneViewport(tester);
+    final engine = FakeSpeechEngine();
+    final h = await pumpApp(
+      tester,
+      initialLocation: '/topic/namespaces/notes',
+      speech: engine,
+    );
+    await tester.tap(find.byKey(const ValueKey('listen')));
+    await tester.pumpAndSettle();
+    engine.finish(ok: false);
+    await tester.pumpAndSettle();
+    expect(find.textContaining("Read-aloud isn't available"), findsOneWidget);
+    expect(find.byKey(const ValueKey('listen-bar')), findsNothing);
+    expect(h.progress.readSections('namespaces'), isEmpty);
+  });
+
+  testWidgets('no read-aloud controls without speech support', (tester) async {
+    await setPhoneViewport(tester);
+    await pumpApp(tester, initialLocation: '/topic/namespaces/notes');
+    expect(find.byKey(const ValueKey('listen')), findsNothing);
+  });
+
+  testWidgets('exam -> gaps -> plan -> re-test, and the plan cards', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    await pumpApp(tester, initialLocation: '/progress');
+    // Before any exam, Progress invites one.
+    expect(find.byKey(const ValueKey('plan-prompt')), findsOneWidget);
+
+    final h = await pumpApp(tester, initialLocation: '/practice/cka-mock/run');
+    await tester.tap(find.text('Finish test'));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'confirm-finish');
+
+    // Unanswered questions count against the exam, so every tested
+    // competency is a gap.
+    expect(find.byKey(const ValueKey('exam-gaps')), findsOneWidget);
+    await tapKey(tester, 'build-plan');
+    final plan = h.progress.gapPlan('kubernetes')!;
+    expect(plan.items, isNotEmpty);
+    expect(find.text('0 of ${plan.items.length} gaps fixed'), findsOneWidget);
+    final first = plan.items.first.competencyId;
+    expect(find.byKey(ValueKey('plan-item-$first')), findsOneWidget);
+
+    await tapKey(tester, 'plan-retest');
+    expect(find.text('Re-test my gaps'), findsOneWidget);
+    await tester.tap(find.byType(CloseButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Leave'));
+    await tester.pumpAndSettle();
+
+    // Home shows the plan card while a plan is open.
+    await tester.tap(find.text('Learn'));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'plan-card');
+    expect(find.byKey(const ValueKey('plan-summary')), findsOneWidget);
+
+    // Discarding removes the plan, not the answers.
+    await tapKey(tester, 'plan-discard');
+    await tapKey(tester, 'confirm-discard');
+    expect(h.progress.gapPlan('kubernetes'), isNull);
+    expect(find.text('No gap plan yet'), findsOneWidget);
   });
 }

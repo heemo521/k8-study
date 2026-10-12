@@ -5,6 +5,7 @@ import 'quiz_spec.dart';
 
 import '../screens/about_screen.dart';
 import '../screens/flashcards_screen.dart';
+import '../screens/gap_plan_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/practice_hub_screen.dart';
 import '../screens/practice_result_screen.dart';
@@ -129,6 +130,10 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                         s.uri.queryParameters['id'],
                       ),
                     ),
+                  ),
+                  GoRoute(
+                    path: 'plan',
+                    builder: (_, _) => const GapPlanScreen(),
                   ),
                   GoRoute(
                     path: 'review/result',

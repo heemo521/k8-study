@@ -76,6 +76,7 @@ class _QuizScreenState extends State<QuizScreen> {
         final pool = reviewPool(content, progress, kind: kind, id: id);
         _title = switch (kind) {
           'missed' => 'Review missed questions',
+          'plan' => 'Re-test my gaps',
           'competency' => 'Review: ${content.competencyText(id ?? '') ?? id}',
           'domain' => 'Review: ${content.domain(id ?? '')?.title ?? id}',
           _ => 'Review',

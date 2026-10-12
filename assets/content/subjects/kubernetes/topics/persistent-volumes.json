@@ -27,6 +27,111 @@
           "text": "The PersistentVolume subsystem separates **how storage is provided** from **how it is consumed**."
         },
         {
+          "type": "diagram",
+          "title": "From Pod to storage",
+          "width": 10,
+          "height": 4,
+          "nodes": [
+            {
+              "id": "pod",
+              "label": "Pod",
+              "x": 0,
+              "y": 1.5,
+              "w": 2,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "pvc",
+              "label": "PVC",
+              "x": 2.7,
+              "y": 1.5,
+              "w": 2.2,
+              "h": 0.9,
+              "kind": "generic"
+            },
+            {
+              "id": "pv",
+              "label": "PV",
+              "x": 5.6,
+              "y": 1.5,
+              "w": 2,
+              "h": 0.9,
+              "kind": "storage"
+            },
+            {
+              "id": "disk",
+              "label": "Storage",
+              "x": 8.2,
+              "y": 1.5,
+              "w": 1.8,
+              "h": 0.9,
+              "kind": "external"
+            },
+            {
+              "id": "sc",
+              "label": "StorageClass",
+              "x": 5.4,
+              "y": 3,
+              "w": 2.4,
+              "h": 0.9,
+              "kind": "control"
+            }
+          ],
+          "edges": [
+            {
+              "from": "pod",
+              "to": "pvc",
+              "label": "uses"
+            },
+            {
+              "from": "pvc",
+              "to": "pv",
+              "label": "bound",
+              "flow": true
+            },
+            {
+              "from": "pv",
+              "to": "disk"
+            },
+            {
+              "from": "sc",
+              "to": "pv",
+              "label": "provisions"
+            }
+          ],
+          "steps": [
+            {
+              "text": "A **PersistentVolume** is a piece of storage in the cluster, provisioned by an administrator or dynamically.",
+              "highlight": [
+                "pv",
+                "disk"
+              ]
+            },
+            {
+              "text": "A **PersistentVolumeClaim** is a user's request for storage. The control plane binds it to a matching PV, one to one.",
+              "highlight": [
+                "pvc",
+                "pv"
+              ]
+            },
+            {
+              "text": "With dynamic provisioning, the claim's **StorageClass** creates a PV for it.",
+              "highlight": [
+                "sc",
+                "pv"
+              ]
+            },
+            {
+              "text": "A Pod mounts the claim as a volume, and the data outlives the Pod.",
+              "highlight": [
+                "pod",
+                "pvc"
+              ]
+            }
+          ]
+        },
+        {
           "type": "table",
           "header": [
             "Object",

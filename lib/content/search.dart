@@ -32,6 +32,7 @@ String blockText(NoteBlock b) => switch (b) {
     header.join(' | '),
     for (final r in rows) r.join(' | '),
   ].join(' · '),
+  DiagramBlock(:final description) => description,
 };
 
 /// ~[width]-char window around the first match of [needle] in [text].

@@ -26,6 +26,121 @@
           "text": "An Ingress is an API object (`networking.k8s.io/v1`) that manages **external access to Services**, typically HTTP. Rules on the Ingress decide which Service gets each request."
         },
         {
+          "type": "diagram",
+          "title": "Traffic through an Ingress",
+          "width": 10,
+          "height": 4,
+          "nodes": [
+            {
+              "id": "client",
+              "label": "Client",
+              "x": 0,
+              "y": 1.5,
+              "w": 1.8,
+              "h": 0.9,
+              "kind": "user"
+            },
+            {
+              "id": "ctrl",
+              "label": "Ingress controller",
+              "x": 2.2,
+              "y": 1.5,
+              "w": 2.6,
+              "h": 0.9,
+              "kind": "external"
+            },
+            {
+              "id": "rules",
+              "label": "Ingress rules",
+              "x": 2.2,
+              "y": 3,
+              "w": 2.6,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "svc",
+              "label": "Service",
+              "x": 5.3,
+              "y": 1.5,
+              "w": 2,
+              "h": 0.9,
+              "kind": "service"
+            },
+            {
+              "id": "p1",
+              "label": "Pod",
+              "x": 7.8,
+              "y": 0.5,
+              "w": 2.2,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "p2",
+              "label": "Pod",
+              "x": 7.8,
+              "y": 2.5,
+              "w": 2.2,
+              "h": 0.9,
+              "kind": "pod"
+            }
+          ],
+          "edges": [
+            {
+              "from": "client",
+              "to": "ctrl",
+              "label": "HTTP(S)",
+              "flow": true
+            },
+            {
+              "from": "ctrl",
+              "to": "svc",
+              "flow": true
+            },
+            {
+              "from": "svc",
+              "to": "p1",
+              "flow": true
+            },
+            {
+              "from": "svc",
+              "to": "p2",
+              "flow": true
+            },
+            {
+              "from": "rules",
+              "to": "ctrl",
+              "label": "configures"
+            }
+          ],
+          "steps": [
+            {
+              "text": "HTTP and HTTPS traffic from outside the cluster reaches an **Ingress controller**. An Ingress has no effect without one.",
+              "highlight": [
+                "client",
+                "ctrl"
+              ]
+            },
+            {
+              "text": "The **Ingress** resource holds the routing rules, hosts and paths, that the controller applies.",
+              "highlight": [
+                "rules",
+                "ctrl"
+              ]
+            },
+            {
+              "text": "A matching request goes to the rule's backend **Service**, which forwards it to its Pods.",
+              "highlight": [
+                "ctrl",
+                "svc",
+                "p1",
+                "p2"
+              ]
+            }
+          ]
+        },
+        {
           "type": "bullets",
           "items": [
             "It can give Services externally reachable URLs, load balance, terminate SSL/TLS and do **name-based virtual hosting**.",

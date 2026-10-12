@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:k8_study/audio/speech.dart';
+import 'package:k8_study/widgets/diagram_view.dart';
 import 'package:k8_study/ads/ads_service.dart';
 import 'package:k8_study/ads/impl/noop_ads_service.dart';
 import 'package:k8_study/app/app.dart';
@@ -50,8 +52,10 @@ Future<TestHarness> pumpApp(
   AdsService Function(ProgressStore)? ads,
   Map<String, Object> prefs = const {},
   String initialLocation = '/',
+  SpeechEngine? speech,
 }) async {
   final cat = catalog ?? await loadCatalog(tester);
+  DiagramView.flowAnimation = false;
   SharedPreferences.setMockInitialValues(prefs);
   final clock = FixedClock(testNow);
   final progress = ProgressStore(
@@ -67,6 +71,7 @@ Future<TestHarness> pumpApp(
       ads: ads?.call(progress) ?? const NoopAdsService(),
       clock: clock,
       random: Random(42),
+      speech: speech,
       initialLocation: initialLocation,
     ),
   );

@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
+import 'gap_plan_screen.dart';
 import '../ads/ads_service.dart';
 import '../content/models.dart';
 import '../engine/clock.dart';
@@ -46,6 +47,10 @@ class TopicBrowserScreen extends StatelessWidget {
             const SizedBox(height: 12),
           ],
           _ContinueCard(content: content, progress: progress),
+          if (progress.gapPlan(content.subject.id) != null) ...[
+            const SizedBox(height: 12),
+            const GapPlanSummaryCard(),
+          ],
           if (due > 0 || missed > 0) ...[
             const SizedBox(height: 8),
             Wrap(
@@ -105,12 +110,34 @@ class _ContinueCard extends StatelessWidget {
     final total = content.topics.length;
     final complete = content.topics.where(progress.topicComplete).length;
     final next = nextAction(content, progress);
+    final fg = scheme.onPrimary;
+    final buttonStyle = FilledButton.styleFrom(
+      backgroundColor: scheme.onPrimary,
+      foregroundColor: scheme.primary,
+    );
 
-    return Card(
+    return DecoratedBox(
       key: const ValueKey('continue-card'),
-      color: scheme.primaryContainer,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.primary,
+            Color.lerp(scheme.primary, scheme.tertiary, 0.4)!,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -119,9 +146,7 @@ class _ContinueCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '$complete of $total topics complete',
-                    style: textTheme.labelLarge?.copyWith(
-                      color: scheme.onPrimaryContainer,
-                    ),
+                    style: textTheme.labelLarge?.copyWith(color: fg),
                   ),
                 ),
                 if (progress.streak > 0)
@@ -132,16 +157,10 @@ class _ContinueCard extends StatelessWidget {
                       key: const ValueKey('streak'),
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.local_fire_department,
-                          size: 18,
-                          color: scheme.onPrimaryContainer,
-                        ),
+                        Icon(Icons.local_fire_department, size: 18, color: fg),
                         Text(
                           '${progress.streak}',
-                          style: textTheme.labelLarge?.copyWith(
-                            color: scheme.onPrimaryContainer,
-                          ),
+                          style: textTheme.labelLarge?.copyWith(color: fg),
                         ),
                       ],
                     ),
@@ -154,42 +173,37 @@ class _ContinueCard extends StatelessWidget {
                 child: Text(
                   today,
                   key: const ValueKey('today-summary'),
-                  style: textTheme.bodySmall?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                  ),
+                  style: textTheme.bodySmall?.copyWith(color: fg),
                 ),
               ),
             const SizedBox(height: 6),
             LinearProgressIndicator(
               value: total == 0 ? 0 : complete / total,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(3),
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+              color: fg,
+              backgroundColor: fg.withValues(alpha: 0.25),
               semanticsLabel: 'Overall progress',
             ),
             const SizedBox(height: 14),
             if (total == 0)
               Text(
                 'No topics yet for this subject.',
-                style: textTheme.titleMedium?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
+                style: textTheme.titleMedium?.copyWith(color: fg),
               )
             else if (next == null) ...[
               Text(
                 'Every topic is complete',
-                style: textTheme.titleLarge?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
+                style: textTheme.titleLarge?.copyWith(color: fg),
               ),
               const SizedBox(height: 4),
               Text(
                 'Keep your flashcards up to date and try a practice test.',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
+                style: textTheme.bodyMedium?.copyWith(color: fg),
               ),
               const SizedBox(height: 12),
               FilledButton(
+                style: buttonStyle,
                 onPressed: () => context.go('/practice'),
                 child: const Text('Practice tests'),
               ),
@@ -197,22 +211,19 @@ class _ContinueCard extends StatelessWidget {
               Text(
                 '${next.resuming ? 'Continue' : (complete == 0 && !progress.topicStarted(next.topic) ? 'Start here' : 'Up next')}'
                 ' · Topic ${next.position} of ${next.total}',
-                style: textTheme.labelMedium?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
+                style: textTheme.labelMedium?.copyWith(color: fg),
               ),
               const SizedBox(height: 2),
               Text(
                 next.topic.title,
-                style: textTheme.titleLarge?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
+                style: textTheme.headlineSmall?.copyWith(color: fg),
               ),
               const SizedBox(height: 8),
               TopicStepRow(topic: next.topic),
               const SizedBox(height: 12),
               FilledButton.icon(
                 key: const ValueKey('continue-button'),
+                style: buttonStyle,
                 onPressed: () => context.go(stepPath(next.topic, next.step)),
                 icon: const Icon(Icons.play_arrow),
                 label: Text(stepLabel(next.step)),

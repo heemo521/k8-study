@@ -2,7 +2,7 @@
   "tests": [
     {
       "id": "cka-mock",
-      "title": "CKA domain-weighted mock",
+      "title": "Mock exam (CKA-weighted)",
       "description": "Questions spread across all five CKA domains by exam weight.",
       "questionCount": 30,
       "timeLimitMinutes": 45,

@@ -35,6 +35,7 @@ dependencies:
   provider: ^6.1.5+1
   shared_preferences: ^2.5.6
   url_launcher: ^6.3.3
+  web: ^1.1.1
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -61,3 +62,16 @@ flutter:
     - assets/content/subjects/docker/topics/
     - assets/content/subjects/kubernetes/
     - assets/content/subjects/kubernetes/topics/
+  # Inter (SIL Open Font License 1.1, assets/fonts/OFL.txt), static Latin
+  # subsets cut from the variable font. Bundled so text renders offline.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700

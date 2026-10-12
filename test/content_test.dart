@@ -189,6 +189,7 @@ void main() {
               ...header,
               ...rows.expand((r) => r),
             ].join(' '),
+            DiagramBlock(:final description) => description,
           };
           words += text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
         }

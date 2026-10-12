@@ -3,6 +3,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../app/session_store.dart';
+import '../engine/clock.dart';
+import '../engine/quiz.dart';
+import '../progress/gap_plan.dart';
+import '../progress/progress_store.dart';
 import '../content/models.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
@@ -64,6 +68,8 @@ class PracticeResultScreen extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
+          _ExamGaps(testId: testId, attempt: attempt),
+          const SizedBox(height: 16),
           Text(
             content.exam == null
                 ? 'By area'
@@ -117,7 +123,7 @@ class PracticeResultScreen extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               if (weak.isNotEmpty)
-                FilledButton.icon(
+                OutlinedButton.icon(
                   key: const ValueKey('review-missed-after-test'),
                   onPressed: () => context.go('/progress/review?kind=missed'),
                   icon: const Icon(Icons.replay),
@@ -138,6 +144,114 @@ class PracticeResultScreen extends StatelessWidget {
           const SizedBox(height: 8),
           AttemptReview(attempt: attempt),
         ],
+      ),
+    );
+  }
+}
+
+/// The competencies this exam showed as weak, and the way into a gap plan.
+class _ExamGaps extends StatelessWidget {
+  const _ExamGaps({required this.testId, required this.attempt});
+
+  final String testId;
+  final QuizAttempt attempt;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = context.read<ContentBundle>();
+    final progress = context.watch<ProgressStore>();
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final plan = planFromAttempt(
+      attempt,
+      testId: testId,
+      now: context.read<Clock>().now(),
+    );
+
+    if (plan == null) {
+      return Card(
+        key: const ValueKey('exam-no-gaps'),
+        child: ListTile(
+          leading: Icon(Icons.verified_outlined, color: scheme.primary),
+          title: const Text('No gaps found'),
+          subtitle: const Text(
+            'Every competency in this test scored 80% or more.',
+          ),
+        ),
+      );
+    }
+    final hasPlan = progress.gapPlan(content.subject.id) != null;
+    const shown = 4;
+    return Card(
+      key: const ValueKey('exam-gaps'),
+      color: scheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Your gaps',
+              style: textTheme.titleMedium?.copyWith(
+                color: scheme.onSecondaryContainer,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${plan.items.length} '
+              '${plan.items.length == 1 ? 'competency' : 'competencies'} '
+              'scored under 80% in this test:',
+              style: textTheme.bodyMedium?.copyWith(
+                color: scheme.onSecondaryContainer,
+              ),
+            ),
+            const SizedBox(height: 6),
+            for (final item in plan.items.take(shown))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        content.competencyText(item.competencyId) ??
+                            item.competencyId,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSecondaryContainer,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${item.examCorrect}/${item.examTotal}',
+                      style: textTheme.labelLarge?.copyWith(
+                        color: scheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (plan.items.length > shown)
+              Text(
+                'and ${plan.items.length - shown} more',
+                style: textTheme.bodySmall?.copyWith(
+                  color: scheme.onSecondaryContainer,
+                ),
+              ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              key: const ValueKey('build-plan'),
+              onPressed: () {
+                progress.setGapPlan(content.subject.id, plan);
+                context.go('/progress/plan');
+              },
+              icon: const Icon(Icons.flag),
+              label: Text(
+                hasPlan ? 'Replace my gap plan' : 'Build my gap plan',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

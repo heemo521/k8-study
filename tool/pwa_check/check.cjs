@@ -83,6 +83,15 @@ async function hasText(page, text) {
   return (await allText(page)).includes(text);
 }
 
+// Waits up to [ms] for [text] (page transitions take a moment).
+async function waitText(page, text, ms = 5000) {
+  for (let t = 0; t < ms; t += 250) {
+    if (await hasText(page, text)) return true;
+    await page.waitForTimeout(250);
+  }
+  return hasText(page, text);
+}
+
 async function shot(page, name) {
   fs.mkdirSync(SHOT_DIR, { recursive: true });
   await page.screenshot({ path: path.join(SHOT_DIR, `${name}.png`) });
@@ -115,7 +124,7 @@ async function noHorizontalScroll(page) {
 
   // ---- Load, manifest, service worker, installability ----------------------
   await go(page, '/');
-  check('app renders at 390×844', await hasText(page, 'topics complete'));
+  check('app renders at 390×844', await waitText(page, 'topics complete'));
   await shot(page, '01-home');
 
   const cdp = await ctx.newCDPSession(page);
@@ -142,7 +151,7 @@ async function noHorizontalScroll(page) {
     install.installabilityErrors.map((e) => e.errorId).join(', '));
 
   // ---- First-run intro ---------------------------------------------------------
-  check('first-run intro shown', await hasText(page, 'How it works'));
+  check('first-run intro shown', await waitText(page, 'How it works'));
   await tap(page, 'Got it');
   check('intro dismissed', !(await hasText(page, 'How it works')));
 
@@ -163,7 +172,7 @@ async function noHorizontalScroll(page) {
     await scrollDown(page);
   }
   const total = topic.sections.length;
-  check('all note sections marked read', await hasText(page, `${total}/${total}`));
+  check('all note sections marked read', await waitText(page, `${total}/${total}`));
   await shot(page, '04-notes-end');
 
   await tap(page, 'Next: Flashcards', false);
@@ -173,7 +182,7 @@ async function noHorizontalScroll(page) {
     if (i === 0) await shot(page, '06-flashcard-back');
     await tap(page, 'Got it', true);
   }
-  check('flashcard session completed', await hasText(page, 'Session done'));
+  check('flashcard session completed', await waitText(page, 'Session done'));
 
   await tap(page, 'Next: Quiz', false);
   for (let i = 0; i < 10; i++) {
@@ -187,26 +196,29 @@ async function noHorizontalScroll(page) {
     if (i === 0) await shot(page, '08-quiz-feedback');
     await tap(page, i === 9 ? 'See results' : 'Next');
   }
-  check('quiz results show 90%', await hasText(page, '90%'));
+  check('quiz results show 90%', await waitText(page, '90%'));
   await shot(page, '09-quiz-results');
 
   // ---- Persistence across reload --------------------------------------------
-  await go(page, '/');
+  // A real reload: changing only the hash would keep the page alive.
+  await page.goto(`${BASE}#/`);
+  await page.reload();
+  await waitApp(page);
   const topicCount = JSON.parse(fs.readFileSync(path.join(CONTENT_DIR, 'subject.json'), 'utf8')).topics.length;
-  check('progress persists after reload', await hasText(page, `1 of ${topicCount} topics complete`));
+  check('progress persists after reload', await waitText(page, `1 of ${topicCount} topics complete`));
   await shot(page, '10-home-after');
 
   // ---- Gaps view and search -------------------------------------------------
   await go(page, '/progress');
-  check('readiness shows accuracy for answered questions', await hasText(page, '% accuracy on'));
+  check('readiness shows accuracy for answered questions', await waitText(page, '% accuracy on'));
   await shot(page, '15-progress-readiness');
   for (let i = 0; i < 6 && !(await findIndex(page, 'Knowledge gaps', true) >= 0); i++) await scrollDown(page, 400);
-  check('gap analysis section present', await hasText(page, 'Knowledge gaps'));
+  check('gap analysis section present', await waitText(page, 'Knowledge gaps'));
   await shot(page, '16-progress-gaps');
   await go(page, '/search');
   await page.keyboard.type('taint');
   await page.waitForTimeout(800);
-  check('search returns results', await hasText(page, 'results'));
+  check('search returns results', await waitText(page, 'results'));
   await shot(page, '17-search');
 
   // ---- Practice test ---------------------------------------------------------
@@ -217,18 +229,22 @@ async function noHorizontalScroll(page) {
   await shot(page, '11-practice-run');
   await tap(page, 'Finish test');
   await tap(page, 'Finish');
-  check('practice per-domain breakdown', await hasText(page, 'By CKA domain'));
+  check('practice per-domain breakdown', await waitText(page, 'By CKA domain'));
   await shot(page, '12-practice-results');
+  check('exam shows its gaps', await waitText(page, 'Your gaps'));
+  await tap(page, 'Build my gap plan', false);
+  check('gap plan built from the exam', await waitText(page, 'gaps fixed'));
+  await shot(page, '20-gap-plan');
 
   // ---- Second subject (Docker) ----------------------------------------------
   await go(page, '/');
   await tap(page, 'Switch subject', false);
   await tap(page, 'Docker', false);
-  check('switch to the Docker subject', await hasText(page, 'Docker Overview & Architecture'));
+  check('switch to the Docker subject', await waitText(page, 'Docker Overview & Architecture'));
   await shot(page, '18-docker-home');
   await tap(page, 'Switch subject', false);
   await tap(page, 'Kubernetes', false);
-  check('switch back to Kubernetes', await hasText(page, '1 of '));
+  check('switch back to Kubernetes', await waitText(page, '1 of '));
 
   // ---- No horizontal scroll at 390 and 360 ----------------------------------
   const routes = ['/', '/topic/kubeadm', '/topic/kubeadm/notes', '/topic/kubeadm/cards',
@@ -245,16 +261,25 @@ async function noHorizontalScroll(page) {
   await page.setViewportSize(PHONE);
   await go(page, '/about');
   await shot(page, '13-about');
-  check('About shows CC BY 4.0 attribution', await hasText(page, 'CC BY 4.0'));
+  check('About shows CC BY 4.0 attribution', await waitText(page, 'CC BY 4.0'));
 
   // ---- Offline ---------------------------------------------------------------
   await ctx.setOffline(true);
   await page.reload();
   await waitApp(page);
-  check('offline reload renders the app', await hasText(page, 'K8 Study'));
+  check('offline reload renders the app', await waitText(page, 'K8 Study'));
   await go(page, '/topic/kubeadm/notes');
-  check('offline: topic notes render', await hasText(page, '1. Prepare the hosts'));
+  check('offline: topic notes render', await waitText(page, '1. Prepare the hosts'));
   await shot(page, '14-offline-notes');
+  await go(page, '/topic/architecture/notes');
+  check('offline: animated diagram renders', await waitText(page, 'Diagram: How the components talk'));
+  await shot(page, '19-offline-diagram');
+  const fontCached = await page.evaluate(async () => {
+    const keys = await caches.keys();
+    const cache = await caches.open(keys.find((k) => k.startsWith('k8study-')));
+    return (await cache.keys()).some((r) => r.url.includes('Inter-Regular'));
+  });
+  check('offline: bundled font is precached', fontCached);
   await ctx.setOffline(false);
 
   check('no uncaught page errors', pageErrors.length === 0, pageErrors.join(' | '));

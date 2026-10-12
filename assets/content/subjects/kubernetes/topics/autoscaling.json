@@ -75,6 +75,103 @@
           "text": "The HPA controller runs in the control plane as a loop, every **15 seconds** by default (`--horizontal-pod-autoscaler-sync-period` on kube-controller-manager). It finds the target via `scaleTargetRef`, selects its Pods by the target's selector, reads metrics, and sets the target's replicas through its `scale` subresource."
         },
         {
+          "type": "diagram",
+          "title": "The HPA control loop",
+          "width": 10,
+          "height": 3.3,
+          "nodes": [
+            {
+              "id": "ms",
+              "label": "Metrics API",
+              "x": 0,
+              "y": 0,
+              "w": 2.6,
+              "h": 0.9,
+              "kind": "generic"
+            },
+            {
+              "id": "pods",
+              "label": "Pods",
+              "x": 7.6,
+              "y": 1.2,
+              "w": 2.4,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "hpa",
+              "label": "HPA",
+              "x": 0,
+              "y": 2.3,
+              "w": 2.6,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "dep",
+              "label": "Deployment",
+              "x": 3.8,
+              "y": 2.3,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "worker"
+            }
+          ],
+          "edges": [
+            {
+              "from": "pods",
+              "to": "ms",
+              "label": "usage",
+              "flow": true
+            },
+            {
+              "from": "ms",
+              "to": "hpa",
+              "label": "metrics",
+              "flow": true
+            },
+            {
+              "from": "hpa",
+              "to": "dep",
+              "label": "scale"
+            },
+            {
+              "from": "dep",
+              "to": "pods"
+            }
+          ],
+          "steps": [
+            {
+              "text": "Pod resource usage is published through the metrics API, usually by metrics-server.",
+              "highlight": [
+                "pods",
+                "ms"
+              ]
+            },
+            {
+              "text": "The **HorizontalPodAutoscaler** controller compares the observed metric with the target, every 15 seconds by default.",
+              "highlight": [
+                "ms",
+                "hpa"
+              ]
+            },
+            {
+              "text": "It computes `desiredReplicas = ceil(currentReplicas × current / target)` and updates the target's scale.",
+              "highlight": [
+                "hpa",
+                "dep"
+              ]
+            },
+            {
+              "text": "The Deployment then adds or removes Pods to match.",
+              "highlight": [
+                "dep",
+                "pods"
+              ]
+            }
+          ]
+        },
+        {
           "type": "code",
           "lang": "text",
           "text": "desiredReplicas = ceil[ currentReplicas × ( currentMetricValue / desiredMetricValue ) ]"

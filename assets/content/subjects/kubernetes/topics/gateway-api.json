@@ -106,6 +106,113 @@
           ]
         },
         {
+          "type": "diagram",
+          "title": "Gateway API resources",
+          "width": 10,
+          "height": 3.4,
+          "nodes": [
+            {
+              "id": "gc",
+              "label": "GatewayClass",
+              "x": 0,
+              "y": 0.2,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "client",
+              "label": "Client",
+              "x": 3.6,
+              "y": 0.2,
+              "w": 2.6,
+              "h": 0.9,
+              "kind": "user"
+            },
+            {
+              "id": "gw",
+              "label": "Gateway",
+              "x": 0,
+              "y": 2.3,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "external"
+            },
+            {
+              "id": "route",
+              "label": "HTTPRoute",
+              "x": 3.6,
+              "y": 2.3,
+              "w": 2.6,
+              "h": 0.9,
+              "kind": "generic"
+            },
+            {
+              "id": "svc",
+              "label": "Service",
+              "x": 7.2,
+              "y": 2.3,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "service"
+            }
+          ],
+          "edges": [
+            {
+              "from": "gw",
+              "to": "gc",
+              "label": "class"
+            },
+            {
+              "from": "client",
+              "to": "gw",
+              "flow": true
+            },
+            {
+              "from": "gw",
+              "to": "route",
+              "label": "matches",
+              "flow": true
+            },
+            {
+              "from": "route",
+              "to": "svc",
+              "flow": true
+            }
+          ],
+          "steps": [
+            {
+              "text": "A **GatewayClass** defines a type of gateway, run by a controller. The infrastructure provider manages it.",
+              "highlight": [
+                "gc"
+              ]
+            },
+            {
+              "text": "A **Gateway** is an instance of traffic-handling infrastructure, such as a load balancer. The cluster operator manages it.",
+              "highlight": [
+                "gw",
+                "gc"
+              ]
+            },
+            {
+              "text": "An **HTTPRoute** attaches to a Gateway and maps requests to backends. Application developers manage it.",
+              "highlight": [
+                "route",
+                "gw"
+              ]
+            },
+            {
+              "text": "A request reaches the Gateway, matches a route rule and is sent to the backend Service.",
+              "highlight": [
+                "client",
+                "gw",
+                "route",
+                "svc"
+              ]
+            }
+          ]
+        },
+        {
           "type": "bullets",
           "items": [
             "These four kinds are **stable**.",

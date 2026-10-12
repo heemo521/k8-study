@@ -25,6 +25,200 @@
           "text": "A cluster is a **control plane** plus a set of worker machines called **nodes**. Nodes run the Pods that make up your application. Every cluster needs at least one worker node to run Pods."
         },
         {
+          "type": "diagram",
+          "title": "How the components talk",
+          "width": 10,
+          "height": 9,
+          "nodes": [
+            {
+              "id": "kubectl",
+              "label": "kubectl",
+              "x": 3.6,
+              "y": 0,
+              "w": 2.8,
+              "h": 0.8,
+              "kind": "user"
+            },
+            {
+              "id": "cp",
+              "label": "Control plane",
+              "x": 0,
+              "y": 1.2,
+              "w": 10,
+              "h": 3.4,
+              "kind": "control",
+              "group": true
+            },
+            {
+              "id": "scheduler",
+              "label": "kube-scheduler",
+              "x": 0.3,
+              "y": 1.7,
+              "w": 2.7,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "apiserver",
+              "label": "kube-apiserver",
+              "x": 3.6,
+              "y": 2.3,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "etcd",
+              "label": "etcd",
+              "x": 7.2,
+              "y": 2.3,
+              "w": 2.5,
+              "h": 0.9,
+              "kind": "storage"
+            },
+            {
+              "id": "cm",
+              "label": "kube-controller-\nmanager",
+              "x": 0.3,
+              "y": 3.2,
+              "w": 2.7,
+              "h": 1.1,
+              "kind": "control"
+            },
+            {
+              "id": "node",
+              "label": "Worker node",
+              "x": 0,
+              "y": 5.0,
+              "w": 10,
+              "h": 4,
+              "kind": "worker",
+              "group": true
+            },
+            {
+              "id": "kubelet",
+              "label": "kubelet",
+              "x": 3.6,
+              "y": 5.6,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "worker"
+            },
+            {
+              "id": "proxy",
+              "label": "kube-proxy",
+              "x": 7.2,
+              "y": 5.6,
+              "w": 2.5,
+              "h": 0.9,
+              "kind": "worker"
+            },
+            {
+              "id": "runtime",
+              "label": "container runtime",
+              "x": 3.6,
+              "y": 7.7,
+              "w": 2.8,
+              "h": 0.9,
+              "kind": "worker"
+            },
+            {
+              "id": "pod",
+              "label": "Pod",
+              "x": 7.2,
+              "y": 7.7,
+              "w": 2.5,
+              "h": 0.9,
+              "kind": "pod"
+            }
+          ],
+          "edges": [
+            {
+              "from": "kubectl",
+              "to": "apiserver",
+              "label": "requests",
+              "flow": true
+            },
+            {
+              "from": "apiserver",
+              "to": "etcd",
+              "flow": true
+            },
+            {
+              "from": "scheduler",
+              "to": "apiserver"
+            },
+            {
+              "from": "cm",
+              "to": "apiserver"
+            },
+            {
+              "from": "kubelet",
+              "to": "apiserver",
+              "label": "watch",
+              "flow": true
+            },
+            {
+              "from": "proxy",
+              "to": "apiserver"
+            },
+            {
+              "from": "kubelet",
+              "to": "runtime"
+            },
+            {
+              "from": "runtime",
+              "to": "pod"
+            }
+          ],
+          "steps": [
+            {
+              "text": "You talk to the cluster through **kube-apiserver**, the front end of the control plane. `kubectl` sends it API requests.",
+              "highlight": [
+                "kubectl",
+                "apiserver"
+              ]
+            },
+            {
+              "text": "The API server keeps all cluster data in **etcd**, a consistent key-value store.",
+              "highlight": [
+                "apiserver",
+                "etcd"
+              ]
+            },
+            {
+              "text": "**kube-scheduler** watches the API server for new Pods with no node assigned and picks a node for each.",
+              "highlight": [
+                "scheduler",
+                "apiserver"
+              ]
+            },
+            {
+              "text": "**kube-controller-manager** runs the controllers that move current state toward desired state.",
+              "highlight": [
+                "cm",
+                "apiserver"
+              ]
+            },
+            {
+              "text": "On every node, the **kubelet** makes sure the containers described in PodSpecs are running, through the **container runtime**.",
+              "highlight": [
+                "kubelet",
+                "apiserver",
+                "runtime",
+                "pod"
+              ]
+            },
+            {
+              "text": "**kube-proxy** maintains the network rules on each node that implement Services.",
+              "highlight": [
+                "proxy",
+                "apiserver"
+              ]
+            }
+          ]
+        },
+        {
           "type": "p",
           "text": "The control plane makes global decisions, such as scheduling, and reacts to cluster events. For example, it starts a new Pod when a Deployment's `replicas` field is not satisfied."
         },

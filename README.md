@@ -2,12 +2,26 @@
 
 Mobile-friendly, interactive Kubernetes study guide, built to be better than the
 ad-spammy tutorial apps out there. It has 33 topics covering all five CKA domains
-(432 flashcards, 451 questions), quizzes, CKA-domain practice tests, and progress
+(432 flashcards, 451 questions, 11 animated diagrams), quizzes, CKA-domain practice tests, and progress
 tracking: it shows where you are and which competencies are your weakest.
 The content model is multi-subject: a **Docker** subject (4 topics, from the
 Apache-2.0 Docker docs) ships alongside Kubernetes, and others such as Linux can be
 added as data with `python3 tool/new_subject.py`. It ships as an installable PWA and goes native only
 when the web version earns it.
+
+Highlights:
+
+- **Animated diagrams** in the notes: step-through walkthroughs of the
+  architecture, Deployments, Services, Ingress, storage, RBAC and more.
+- **Read-aloud**: notes are read to you section by section, with an on-device
+  voice so it works offline.
+- **Mock exam → gap plan**: a CKA-weighted mock exam shows which competencies
+  are under 80% and builds a plan for each one (re-read the notes, review the
+  flashcards, pass a targeted quiz), plus a re-test of what's still open.
+- **Works offline** once loaded, and installs as an app.
+
+Try it: <https://heemo521.github.io/k8-study/> (deployed from `main` by
+`.github/workflows/pages.yml` once GitHub Pages is set to "GitHub Actions").
 
 The full specification is in [`spec/SPEC.md`](spec/SPEC.md). Screens, data model,
 engine rules, ad placement and done-criteria are all defined there.

@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../ads/ads_service.dart';
+import '../audio/speech.dart';
 import '../content/models.dart';
 import '../engine/clock.dart';
 import '../progress/progress_store.dart';
@@ -21,6 +22,7 @@ class K8StudyApp extends StatefulWidget {
     required this.ads,
     this.clock = const SystemClock(),
     this.random,
+    this.speech,
     this.initialLocation = '/',
   });
 
@@ -29,6 +31,9 @@ class K8StudyApp extends StatefulWidget {
   final AdsService ads;
   final Clock clock;
   final Random? random;
+
+  /// Text-to-speech engine; defaults to the platform's.
+  final SpeechEngine? speech;
   final String initialLocation;
 
   @override
@@ -41,9 +46,13 @@ class _K8StudyAppState extends State<K8StudyApp> {
   );
   final _session = SessionStore();
   late final Random _random = widget.random ?? Random();
+  late final SpeechController _speech = SpeechController(
+    widget.speech ?? SpeechEngine.platform(),
+  );
 
   @override
   void dispose() {
+    _speech.dispose();
     _router.dispose();
     super.dispose();
   }
@@ -64,6 +73,7 @@ class _K8StudyAppState extends State<K8StudyApp> {
         Provider<Clock>.value(value: widget.clock),
         Provider<Random>.value(value: _random),
         Provider<SessionStore>.value(value: _session),
+        ChangeNotifierProvider<SpeechController>.value(value: _speech),
       ],
       child: MaterialApp.router(
         title: 'K8 Study',

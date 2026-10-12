@@ -27,6 +27,139 @@
           "text": "A Deployment is the usual way to run a **stateless** workload. You declare the desired state; the Deployment controller moves the cluster towards it at a controlled pace by creating and scaling **ReplicaSets**, which in turn create the Pods."
         },
         {
+          "type": "diagram",
+          "title": "Deployment, ReplicaSets and a rollout",
+          "width": 10,
+          "height": 5,
+          "nodes": [
+            {
+              "id": "deploy",
+              "label": "Deployment",
+              "x": 3,
+              "y": 0,
+              "w": 4,
+              "h": 0.9,
+              "kind": "control"
+            },
+            {
+              "id": "rsold",
+              "label": "ReplicaSet (old)",
+              "x": 0.3,
+              "y": 2,
+              "w": 4,
+              "h": 0.9,
+              "kind": "worker"
+            },
+            {
+              "id": "rsnew",
+              "label": "ReplicaSet (new)",
+              "x": 5.7,
+              "y": 2,
+              "w": 4,
+              "h": 0.9,
+              "kind": "worker"
+            },
+            {
+              "id": "o1",
+              "label": "Pod v1",
+              "x": 0.3,
+              "y": 4,
+              "w": 1.8,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "o2",
+              "label": "Pod v1",
+              "x": 2.5,
+              "y": 4,
+              "w": 1.8,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "n1",
+              "label": "Pod v2",
+              "x": 5.7,
+              "y": 4,
+              "w": 1.8,
+              "h": 0.9,
+              "kind": "pod"
+            },
+            {
+              "id": "n2",
+              "label": "Pod v2",
+              "x": 7.9,
+              "y": 4,
+              "w": 1.8,
+              "h": 0.9,
+              "kind": "pod"
+            }
+          ],
+          "edges": [
+            {
+              "from": "deploy",
+              "to": "rsold"
+            },
+            {
+              "from": "deploy",
+              "to": "rsnew",
+              "flow": true
+            },
+            {
+              "from": "rsold",
+              "to": "o1"
+            },
+            {
+              "from": "rsold",
+              "to": "o2"
+            },
+            {
+              "from": "rsnew",
+              "to": "n1",
+              "flow": true
+            },
+            {
+              "from": "rsnew",
+              "to": "n2",
+              "flow": true
+            }
+          ],
+          "steps": [
+            {
+              "text": "A **Deployment** declares the desired state: a Pod template and a number of replicas.",
+              "highlight": [
+                "deploy"
+              ]
+            },
+            {
+              "text": "It creates a **ReplicaSet**, which keeps that many Pods running and replaces any that fail.",
+              "highlight": [
+                "deploy",
+                "rsold",
+                "o1",
+                "o2"
+              ]
+            },
+            {
+              "text": "Changing the Pod template, for example the image, creates a **new ReplicaSet**. A RollingUpdate scales it up while the old one scales down.",
+              "highlight": [
+                "deploy",
+                "rsnew",
+                "n1",
+                "n2"
+              ]
+            },
+            {
+              "text": "The old ReplicaSet is kept with 0 replicas, so `kubectl rollout undo` can return to it.",
+              "highlight": [
+                "deploy",
+                "rsold"
+              ]
+            }
+          ]
+        },
+        {
           "type": "code",
           "lang": "yaml",
           "text": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: <name>\nspec:\n  replicas: 3            # optional, defaults to 1\n  selector:\n    matchLabels:\n      app: <label>       # must match the template labels\n  template:\n    metadata:\n      labels:\n        app: <label>\n    spec:\n      containers:\n      - name: <container>\n        image: <image>:<tag>"
