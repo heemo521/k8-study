@@ -241,4 +241,23 @@ void main() {
     );
     expect(score.right, greaterThan(1280 - 40));
   });
+
+  testWidgets('a "Study first" chip opens that topic and Back returns', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester, initialLocation: '/topic/helm-kustomize');
+    final chip = find.widgetWithText(ActionChip, 'kubectl Essentials');
+    await tester.ensureVisible(chip);
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    expect(find.text('kubectl Essentials'), findsWidgets);
+    expect(find.text('Topic 3 of 33'), findsOneWidget);
+    expect(h.progress.recentTopic(h.content.subject.id), 'kubectl-basics');
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.text('Helm & Kustomize'), findsOneWidget);
+    expect(find.text('Topic 27 of 33'), findsOneWidget);
+  });
 }

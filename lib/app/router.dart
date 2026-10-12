@@ -45,6 +45,7 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                   GoRoute(
                     path: 'topic/:topicId',
                     builder: (_, s) => TopicDetailScreen(
+                      key: ValueKey(s.pathParameters['topicId']),
                       topicId: s.pathParameters['topicId']!,
                     ),
                     routes: [

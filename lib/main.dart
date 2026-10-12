@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -20,5 +21,7 @@ Future<void> main() async {
       : const NoopAdsService();
   await ads.init();
 
+  // Pushed pages (e.g. a "Study first" topic) update the address bar too.
+  GoRouter.optionURLReflectsImperativeAPIs = true;
   runApp(K8StudyApp(catalog: catalog, progress: progress, ads: ads));
 }
