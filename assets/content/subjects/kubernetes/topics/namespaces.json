@@ -704,6 +704,28 @@
           "explanation": "The control plane sets it automatically on all namespaces."
         }
       ]
+    },
+    {
+      "id": "namespaces-cmd-01",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Create a namespace called `development`.",
+      "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/namespaces/",
+      "answers": [
+        "kubectl create namespace development"
+      ],
+      "explanation": "`kubectl create namespace <name>` creates it without a manifest."
+    },
+    {
+      "id": "namespaces-cmd-02",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Make `ggckad-s2` the default namespace for the current context.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl config set-context --current --namespace=ggckad-s2"
+      ],
+      "explanation": "The namespace is saved in the kubeconfig context, so later commands use it without `-n`."
     }
   ]
 }

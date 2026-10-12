@@ -950,6 +950,30 @@
           "explanation": "No such admission rejection is described."
         }
       ]
+    },
+    {
+      "id": "scheduling-cmd-01",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Taint node `node1` with key `key1`, value `value1` and effect `NoSchedule`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+      "answers": [
+        "kubectl taint nodes node1 key1=value1:NoSchedule"
+      ],
+      "explanation": "A taint is `key=value:Effect`. With `NoSchedule`, Pods without a matching toleration aren't scheduled on the node.",
+      "competencyId": "ws-admission-scheduling"
+    },
+    {
+      "id": "scheduling-cmd-02",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Remove the taint `key1=value1:NoSchedule` from node `node1`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/",
+      "answers": [
+        "kubectl taint nodes node1 key1=value1:NoSchedule-"
+      ],
+      "explanation": "A trailing `-` after the taint removes it.",
+      "competencyId": "ws-admission-scheduling"
     }
   ]
 }

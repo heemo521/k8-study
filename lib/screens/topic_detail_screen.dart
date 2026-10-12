@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../content/models.dart';
 import '../engine/clock.dart';
 import '../engine/flashcards.dart' as fc;
+import '../engine/labs.dart';
 import '../progress/progress_store.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
@@ -137,6 +138,22 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                 ),
               ),
           ],
+          if (!progress.topicStarted(topic) && topic.questions.length >= 3) ...[
+            const SizedBox(height: 16),
+            Card(
+              key: const ValueKey('warmup-card'),
+              child: ListTile(
+                leading: const Icon(Icons.lightbulb_outline),
+                title: const Text('Warm-up: try 3 questions first'),
+                subtitle: const Text(
+                  'Guessing before you read helps the notes stick. '
+                  'Nothing is scored.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go('$base/quiz?mode=warmup'),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           _StepTile(
             key: const ValueKey('step-notes'),
@@ -176,6 +193,26 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
             onPressed: () => context.go(nextPath),
             child: Text(nextLabel),
           ),
+          if (topic.labs.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text('Hands-on labs', style: textTheme.titleSmall),
+            const SizedBox(height: 4),
+            for (final lab in topic.labs)
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  key: ValueKey('lab-${lab.id}'),
+                  leading: const Icon(Icons.terminal),
+                  title: Text(lab.title),
+                  subtitle: Text(
+                    '${lab.steps.length} steps · '
+                    '${guidanceLabel(guidanceFor(progress.labRuns(lab.id)))}',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.go('$base/lab/${lab.id}'),
+                ),
+              ),
+          ],
           const SizedBox(height: 16),
           ExpansionTile(
             tilePadding: EdgeInsets.zero,

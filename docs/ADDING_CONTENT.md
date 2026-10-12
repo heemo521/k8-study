@@ -81,6 +81,11 @@ scales to the screen).
 - `single`: 3–5 options, exactly 1 correct.
 - `multi`: 3–5 options, ≥ 2 correct. The stem must contain `Select N`.
 - `truefalse`: options exactly `True` / `False`.
+- `command`: no `options`; instead `answers` (accepted commands, first shown as
+  the model answer) and `explanation`. The learner types the command; grading
+  accepts equivalent flag order and short/long forms (spec §15.5). Every
+  answer must appear on the source page; scenario names may fill in a page's
+  placeholder.
 - Every option needs an `explanation`, including correct ones.
 - `competencyId` feeds the per-competency gap view. Set it whenever a
   competency fits.

@@ -26,7 +26,7 @@ class TopicBrowserScreen extends StatelessWidget {
     final now = context.read<Clock>().now();
 
     final due = dueCardCount(content, progress, now);
-    final missed = missedQuestions(content, progress).length;
+    final missed = dueQuestions(content, progress, now).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -52,34 +52,8 @@ class TopicBrowserScreen extends StatelessWidget {
             const GapPlanSummaryCard(),
           ],
           if (due > 0 || missed > 0) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (due > 0)
-                  ActionChip(
-                    key: const ValueKey('chip-due-cards'),
-                    avatar: const Icon(Icons.style_outlined, size: 18),
-                    label: Text('$due ${due == 1 ? 'card' : 'cards'} due'),
-                    onPressed: () => context.go('/progress/cards'),
-                  ),
-                if (missed > 0)
-                  ActionChip(
-                    key: const ValueKey('chip-missed'),
-                    avatar: const Icon(Icons.replay, size: 18),
-                    label: Text(
-                      '$missed missed ${missed == 1 ? 'question' : 'questions'}',
-                    ),
-                    onPressed: () => context.go('/progress/review?kind=missed'),
-                  ),
-                ActionChip(
-                  avatar: const Icon(Icons.insights_outlined, size: 18),
-                  label: const Text('Find my gaps'),
-                  onPressed: () => context.go('/progress'),
-                ),
-              ],
-            ),
+            const SizedBox(height: 12),
+            _TodayCard(cards: due, questions: missed),
           ],
           const SizedBox(height: 16),
           for (final domain in content.domainsInDisplayOrder)
@@ -425,6 +399,77 @@ class _TopicCard extends StatelessWidget {
               Text('${topic.estMinutes}m', style: textTheme.labelSmall),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Today's review (spec §15.3): due flashcards, then due questions, both
+/// drawn across topics so practice is mixed rather than one topic at a time.
+class _TodayCard extends StatelessWidget {
+  const _TodayCard({required this.cards, required this.questions});
+
+  final int cards;
+  final int questions;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Card(
+      key: const ValueKey('today-card'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Today’s review', style: textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Mixed across topics. Short daily reviews beat long sessions.',
+              style: textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (cards > 0)
+                  ActionChip(
+                    key: const ValueKey('chip-due-cards'),
+                    avatar: const Icon(Icons.style_outlined, size: 18),
+                    label: Text('$cards ${cards == 1 ? 'card' : 'cards'} due'),
+                    onPressed: () => context.go('/progress/cards'),
+                  ),
+                if (questions > 0)
+                  ActionChip(
+                    key: const ValueKey('chip-missed'),
+                    avatar: const Icon(Icons.replay, size: 18),
+                    label: Text(
+                      '$questions ${questions == 1 ? 'question' : 'questions'} '
+                      'to review',
+                    ),
+                    onPressed: () => context.go('/progress/review?kind=missed'),
+                  ),
+                ActionChip(
+                  avatar: const Icon(Icons.insights_outlined, size: 18),
+                  label: const Text('Find my gaps'),
+                  onPressed: () => context.go('/progress'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const ValueKey('today-start'),
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Start today’s review'),
+              // Cards first (quick recall), then questions; the card session
+              // offers the questions when it ends.
+              onPressed: () => context.go(
+                cards > 0 ? '/progress/cards' : '/progress/review?kind=missed',
+              ),
+            ),
+          ],
         ),
       ),
     );

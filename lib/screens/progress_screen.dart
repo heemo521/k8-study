@@ -37,7 +37,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         .where((t) => progress.quizPassed(t.id))
         .length;
     final due = dueCardCount(content, progress, now);
-    final missed = missedQuestions(content, progress).length;
+    final missed = dueQuestions(content, progress, now).length;
     final readiness = domainReadiness(
       content,
       progress,
@@ -100,7 +100,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           if (due == 0 && missed == 0)
             Text(
               'Nothing to review yet. Flashcards come due after you study them, '
-              'and questions you get wrong in quizzes appear here.',
+              'and questions you get wrong or are unsure of appear here.',
               style: textTheme.bodyMedium,
             )
           else
@@ -123,9 +123,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     key: const ValueKey('review-missed'),
                     leading: const Icon(Icons.replay),
                     title: Text(
-                      '$missed missed ${missed == 1 ? 'question' : 'questions'}',
+                      '$missed ${missed == 1 ? 'question' : 'questions'} to review',
                     ),
-                    subtitle: const Text('Questions you got wrong last time'),
+                    subtitle: const Text(
+                      'Wrong or unsure answers, spaced over days',
+                    ),
                     trailing: const Icon(Icons.chevron_right),
                     enabled: missed > 0,
                     onTap: () => context.go('/progress/review?kind=missed'),

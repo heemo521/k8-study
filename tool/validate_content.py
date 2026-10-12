@@ -185,8 +185,32 @@ def check_topic(path, subject, comp_ids, domain_ids, allow, errors):
         elif ty == "truefalse":
             if n != 1 or sorted(o.get("text") for o in opts) != ["False", "True"]:
                 err(f"{qid}: truefalse needs exactly True/False with 1 correct")
+        elif ty == "command":
+            answers = q.get("answers")
+            if opts:
+                err(f"{qid}: command takes no options")
+            if not answers or not all(isinstance(a, str) and a.strip() for a in answers):
+                err(f"{qid}: command needs non-empty answers")
+            if not q.get("explanation"):
+                err(f"{qid}: command needs an explanation")
         else:
             err(f"{qid}: bad type {ty}")
+    for lab in t.get("labs", []):
+        lid = lab.get("id")
+        item_id(lid)
+        if not url_ok(lab.get("sourceUrl", "")):
+            err(f"{lid}: source not allow-listed")
+        if not lab.get("title") or not lab.get("scenario"):
+            err(f"{lid}: needs title and scenario")
+        steps = lab.get("steps") or []
+        if not steps:
+            err(f"{lid}: needs steps")
+        for i, st in enumerate(steps):
+            answers = st.get("answers")
+            if not st.get("prompt") or not st.get("explanation"):
+                err(f"{lid} step {i + 1}: needs prompt and explanation")
+            if not answers or not all(isinstance(a, str) and a.strip() for a in answers):
+                err(f"{lid} step {i + 1}: needs non-empty answers")
     return ids
 
 

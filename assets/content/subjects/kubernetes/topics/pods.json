@@ -882,6 +882,17 @@
           "explanation": "The API server doesn't touch node files."
         }
       ]
+    },
+    {
+      "id": "pods-cmd-01",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Start a single `nginx` Pod named `nginx` in the namespace `mynamespace`.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl run nginx --image=nginx -n mynamespace"
+      ],
+      "explanation": "`kubectl run` creates one Pod; `-n` (`--namespace`) chooses where."
     }
   ]
 }

@@ -1,6 +1,7 @@
 // Done-criteria §11.1/§11.4: one full study → flashcards → quiz loop at a
 // 390×844 phone viewport, with progress persisted.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:k8_study/content/models.dart';
 import 'package:k8_study/progress/insights.dart';
 import 'package:k8_study/progress/progress_store.dart';
 import 'package:k8_study/widgets/question_view.dart';
@@ -24,6 +25,15 @@ Future<void> answerCurrent(
 }) async {
   final view = tester.widget<QuestionView>(find.byType(QuestionView));
   final q = view.presented.question;
+  if (q.type == QuestionType.command) {
+    await tester.enterText(
+      find.byKey(const ValueKey('command-input')),
+      correctly ? q.answers.first : 'kubectl version',
+    );
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'submit');
+    return;
+  }
   final picks = correctly
       ? q.options.where((o) => o.correct)
       : [q.options.firstWhere((o) => !o.correct)];
@@ -170,7 +180,10 @@ void main() {
       find.byKey(const ValueKey('review-missed-after-test')),
       findsNothing,
     );
-    expect(missedQuestions(h.content, h.progress), isEmpty);
+    expect(
+      dueQuestions(h.content, h.progress, h.progress.clock.now()),
+      isEmpty,
+    );
     expect(
       h.progress.answerStats(view.presented.question.id)?.lastCorrect,
       isTrue,
@@ -208,6 +221,8 @@ void main() {
       '/topic/architecture/notes',
       '/topic/kubeadm/cards',
       '/topic/kubeadm/quiz',
+      '/topic/namespaces/quiz?mode=warmup',
+      '/topic/deployments/lab/deployments-lab-01',
       '/practice',
       '/progress',
       '/about',

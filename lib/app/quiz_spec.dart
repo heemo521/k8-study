@@ -13,20 +13,34 @@ sealed class QuizSpec {
 }
 
 class TopicQuizSpec extends QuizSpec {
-  const TopicQuizSpec(this.topicId, {this.retryMissed = false});
+  const TopicQuizSpec(
+    this.topicId, {
+    this.retryMissed = false,
+    this.warmup = false,
+  });
 
   final String topicId;
 
   /// Only questions missed last time; doesn't count toward best score.
   final bool retryMissed;
 
+  /// A few questions before the notes (spec §15.6): nothing is recorded,
+  /// and it leads straight into the notes.
+  final bool warmup;
+
   @override
-  String get resultPath => '/topic/$topicId/quiz/result';
+  String get resultPath =>
+      warmup ? '/topic/$topicId/notes' : '/topic/$topicId/quiz/result';
   @override
   String get exitPath => '/topic/$topicId';
   @override
   String get startPath =>
-      '/topic/$topicId/quiz${retryMissed ? '?mode=missed' : ''}';
+      '/topic/$topicId/quiz'
+      '${retryMissed
+          ? '?mode=missed'
+          : warmup
+          ? '?mode=warmup'
+          : ''}';
 }
 
 /// kind: `missed` (last answer wrong), `competency` or `domain` (with [id]).

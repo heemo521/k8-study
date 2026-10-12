@@ -68,9 +68,15 @@ void main() {
     expect(gaps.first.competency.id, q.competencyId);
     expect(gaps.first.accuracy, 0);
     expect(gaps.first.isGap, isTrue);
-    expect(missedQuestions(content, p).single.id, q.id);
+    expect(dueQuestions(content, p, p.clock.now()).single.id, q.id);
     expect(
-      reviewPool(content, p, kind: 'competency', id: q.competencyId),
+      reviewPool(
+        content,
+        p,
+        kind: 'competency',
+        id: q.competencyId,
+        now: p.clock.now(),
+      ),
       contains(q),
     );
   });
@@ -80,7 +86,7 @@ void main() {
     final q = content.allQuestions.first;
     p.recordAnswers(QuizAttempt([PresentedQuestion(q, q.options)]));
     expect(p.answerStats(q.id), isNull);
-    expect(missedQuestions(content, p), isEmpty);
+    expect(dueQuestions(content, p, p.clock.now()), isEmpty);
   });
 
   test('domain readiness covers every domain with topics', () async {

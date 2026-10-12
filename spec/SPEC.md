@@ -366,7 +366,9 @@ tested parser. Anything else renders literally.
   there, it is left out.
 - Values that change between versions are avoided, or phrased as "see the
   source page for current values".
-- Placeholders in commands use `<angle-brackets>`, never invented example values that look real.
+- Placeholders in commands use `<angle-brackets>`, never invented example values that look real
+  (Exception: `command` question stems may name scenario objects, see
+  §15.5.)
 - The PR that adds content includes a review checklist: one line per item,
   in the form `id → URL → where on the page`.
 
@@ -386,6 +388,7 @@ tested parser. Anything else renders literally.
 | `k8s.ads` | `{ quizzesSinceInterstitial, lastInterstitialAt }` |
 | `k8s.settings` | `{ practiceTimerOn }` |
 | `k8s.rewards` | `{ xp, streak, day: last study date, best }` (XP, daily streak; see §14) |
+| `k8s.labs` | `{ labId: completed runs }` (guided-lab fading; see §15.8) |
 
 - Content-version changes: entries for ids that no longer exist are ignored, not crashed on.
 - Topic **complete** = all sections read **and** quiz best score ≥ 80%.
@@ -693,3 +696,138 @@ assets/content/subjects/<id>/topics/*.json
   after the update, or a backup without it).
 - Shown on the continue card (level and streak), the Progress screen (level
   bar, XP to next level, streak and best) and quiz/practice results (+XP).
+
+## 15. Learning-science features
+
+Each feature below comes from the audit in
+[`docs/LEARNING.md`](../docs/LEARNING.md).
+
+### 15.1 Confidence rating
+
+- Topic and review quizzes submit with **Sure** or **Not sure** instead of a
+  single Submit. Desktop: Enter = Sure, U = Not sure.
+- After the reveal, one line explains what the rating means:
+  - wrong and sure: a *confident mistake*; read the explanation closely;
+  - right and unsure: it comes back for review tomorrow;
+  - wrong and unsure: it comes back for review.
+- Results show "N confident mistakes · M right but unsure" when either is
+  non-zero.
+- Answer history stores the latest rating (`sure: false` only when unsure;
+  absent means sure, so older data stays valid).
+- **Solid** = latest answer right *and* sure. Readiness accuracy and
+  competency gaps count only solid answers, so a lucky guess still shows as a
+  gap.
+- Practice tests don't ask for a rating, since they simulate the exam. Their
+  answers count as sure.
+
+### 15.2 Spaced review of questions
+
+- Questions get a review slot (box 1–5 and due date, stored as `box`/`due` in
+  `k8s.answers`) using the flashcard intervals (§7.1):
+  - wrong → box 1, due today;
+  - right but unsure → same box (1 if new), due tomorrow;
+  - right and sure → next box, due after that box's interval; a question with
+    no slot stays without one.
+- Answers saved before this existed: a wrong latest answer is due on the day
+  it was answered.
+- "Questions to review" (Home chip, Progress "Review now") lists the due
+  questions, earliest first. The review quiz (`kind=missed`) prioritises
+  confident mistakes.
+
+### 15.3 Today's review (interleaved)
+
+- Home shows a **Today's review** card when any flashcards or questions are
+  due. It shows both counts, links to each, and has a **Start today's review**
+  button.
+- Start runs the due-card session first, then the due questions. When the
+  due-card session ends (or there are no due cards), its next button reads
+  "Next: N questions to review" if questions are due.
+- Both steps draw across every topic and shuffle, so practice is mixed
+  instead of grouped by topic.
+
+### 15.4 Session nudges
+
+- The end of a due-card session and the results of a review quiz show when
+  the next review is due ("Next review tomorrow." / "Next review in N
+  days."), using the earliest future due date across cards and questions.
+- The app never prompts for extra sessions on the same day beyond what is
+  due.
+
+### 15.5 Typed-answer `command` questions
+
+- New question type `command`. The learner types a command and it is graded
+  against the accepted `answers`; the first is shown as the model answer.
+  This is practice in the exam's own format (typed `kubectl`), not
+  recognition.
+
+  ```jsonc
+  { "id": "deployments-cmd-01", "type": "command", "difficulty": 1,
+    "stem": "Scale the Deployment `nginx-deployment` to 10 replicas.",
+    "answers": ["kubectl scale deployment/nginx-deployment --replicas=10"],
+    "explanation": "…", "sourceUrl": "…", "competencyId": "ws-rollouts" }
+  ```
+
+  `options` is absent. `answers` (non-empty) and `explanation` are required.
+- **Grading** (`lib/engine/command_grading.dart`) compares the normalised
+  shape: positional words in order, plus flags as an unordered set.
+  Accepted equivalents: `k` for `kubectl`; a leading `$ ` prompt; short and
+  long flags (`-n`/`--namespace`, `-A`/`--all-namespaces`, `-it`/
+  `--stdin --tty`, …); `--flag=value` or `--flag value`; resource short
+  names and plurals (`deploy`, `deployments`); `type/name` or
+  `type name`; quotes around one word. Words after `--` must match
+  exactly. Anything else, such as a different name, value or verb, or a
+  missing flag, is wrong.
+- **UI**: a monospace field with no autocorrect. After the reveal it shows the
+  typed command (marked right or wrong), the model answer and the
+  explanation. Single-key shortcuts are off while the field has focus.
+- Command questions mix into topic quizzes, reviews and practice tests like
+  any other question.
+- **Authoring**: every accepted answer must appear on `sourceUrl`. Stems may
+  name scenario objects (a node, a Deployment), and the answer may use that
+  name where the page shows a placeholder. Prefer the page's own example
+  names. `content_test` checks that every accepted answer grades as correct.
+
+### 15.6 Warm-up before the notes
+
+- A topic that hasn't been started (no notes read, no cards, no quiz) shows a
+  **Warm-up: try 3 questions first** card on its hub
+  (`/topic/<id>/quiz?mode=warmup`).
+- It draws 3 multiple-choice questions, easiest first (no `command`
+  questions). Feedback is shown as usual.
+- Nothing is recorded: no answer history, no score, no ad. The last button
+  reads "Start the notes" and opens them.
+- Why: an attempt before studying, even a wrong one, makes the later
+  reading stick better (pretesting effect).
+
+### 15.7 "Why is it right?" prompt
+
+- In topic and review quizzes, a right answer to a multiple-choice question
+  with difficulty ≥ 2 shows the right/wrong marking but holds back the
+  explanations. A card asks the learner to explain the answer to themselves in
+  one sentence, then **Show the explanation**.
+- Not shown for wrong answers (they need the explanation now), `command`
+  questions or the warm-up. Next stays available, so it can be skipped.
+
+### 15.8 Guided labs with fading
+
+- A topic may have `labs`: a scenario and an ordered list of steps, each a
+  `prompt`, accepted `answers` and an `explanation`.
+
+  ```jsonc
+  "labs": [{ "id": "deployments-lab-01", "title": "…", "scenario": "…",
+             "sourceUrl": "…",
+             "steps": [{ "prompt": "…", "answers": ["kubectl …"], "explanation": "…" }] }]
+  ```
+
+- The topic hub lists them under **Hands-on labs** (`/topic/<id>/lab/<labId>`).
+- Each step is typed and checked with the §15.5 grading. A wrong answer can be
+  retried, or the answer shown. After a right (or shown) answer the
+  explanation appears and the lab moves on.
+- **Fading** by completed runs (`k8s.labs`: lab id → runs, included in
+  backup and reset):
+  - run 1, *Worked example*: the full command is shown;
+  - run 2, *Partly guided*: only its start (`kubectl rollout undo …`);
+  - run 3 and later, *On your own*: the prompt only.
+- The lab asks the learner to run each command in their own practice cluster.
+  The app checks the typed command, not the cluster.
+- Authoring follows §15.5: every answer appears on `sourceUrl`.

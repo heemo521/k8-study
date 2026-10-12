@@ -13,6 +13,7 @@ import '../content/models.dart';
 import '../engine/clock.dart';
 import '../engine/flashcards.dart';
 import '../engine/practice.dart';
+import '../engine/question_review.dart';
 import '../engine/quiz.dart';
 import 'rewards.dart';
 
@@ -31,6 +32,7 @@ abstract final class StorageKeys {
   static const recent = 'k8s.recent';
   static const activity = 'k8s.activity';
   static const plans = 'k8s.plans';
+  static const labs = 'k8s.labs';
   static const rewards = 'k8s.rewards';
 }
 
@@ -88,13 +90,16 @@ class GapPlan {
   );
 }
 
-/// Answer history for one question across quizzes, reviews and tests.
+/// Answer history for one question across quizzes, reviews and tests,
+/// plus its place in the question review schedule (spec §15.1–14.2).
 class AnswerStats {
   const AnswerStats({
     required this.seen,
     required this.correct,
     required this.lastCorrect,
     required this.lastAt,
+    this.lastSure = true,
+    this.review,
   });
 
   final int seen;
@@ -102,19 +107,51 @@ class AnswerStats {
   final bool lastCorrect;
   final DateTime lastAt;
 
+  /// Whether the latest answer was given with "Sure".
+  final bool lastSure;
+
+  /// Review schedule; null when the question isn't scheduled.
+  final ReviewSlot? review;
+
+  /// Right and sure: the only answer that counts as known.
+  bool get solid => lastCorrect && lastSure;
+
+  bool isDue(DateTime now) => review?.isDue(now) ?? false;
+
   Map<String, dynamic> toJson() => {
     'n': seen,
     'c': correct,
     'last': lastCorrect,
     'at': lastAt.toIso8601String(),
+    if (!lastSure) 'sure': false,
+    if (review != null) ...{
+      'box': review!.box,
+      'due': formatDate(review!.dueAt),
+    },
   };
 
-  static AnswerStats fromJson(Map<String, dynamic> j) => AnswerStats(
-    seen: j['n'] as int,
-    correct: j['c'] as int,
-    lastCorrect: j['last'] as bool,
-    lastAt: DateTime.parse(j['at'] as String),
-  );
+  static AnswerStats fromJson(Map<String, dynamic> j) {
+    final lastCorrect = j['last'] as bool;
+    final lastAt = DateTime.parse(j['at'] as String);
+    final box = j['box'] as int?;
+    final due = j['due'] as String?;
+    if (box != null && (box < 1 || box > maxBox)) {
+      throw FormatException('bad box: $box');
+    }
+    return AnswerStats(
+      seen: j['n'] as int,
+      correct: j['c'] as int,
+      lastCorrect: lastCorrect,
+      lastAt: lastAt,
+      lastSure: j['sure'] as bool? ?? true,
+      review: box != null && due != null
+          ? ReviewSlot(box: box, dueAt: dateOnly(DateTime.parse(due)))
+          // Saved before the schedule existed: a wrong answer is due now.
+          : lastCorrect
+          ? null
+          : ReviewSlot(box: 1, dueAt: dateOnly(lastAt)),
+    );
+  }
 }
 
 class QuizStats {
@@ -213,6 +250,9 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   Map<String, GapPlan> _plans = {};
   RewardsState _rewards = RewardsState.initial;
 
+  /// Completed runs per lab id (spec §15.8).
+  Map<String, int> _labs = {};
+
   // ---- loading -------------------------------------------------------------
 
   T _read<T>(String key, T fallback, T Function(dynamic json) parse) {
@@ -276,10 +316,15 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       e.key: GapPlan.fromJson(e.value as Map<String, dynamic>),
   };
 
+  static Map<String, int> _parseLabs(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries) e.key: e.value as int,
+  };
+
   static RewardsState _parseRewards(dynamic j) =>
       RewardsState.fromJson(j as Map<String, dynamic>);
 
   static final Map<String, Object Function(dynamic)> _parsers = {
+    StorageKeys.labs: _parseLabs,
     StorageKeys.rewards: _parseRewards,
     StorageKeys.plans: _parsePlans,
     StorageKeys.activity: _parseActivity,
@@ -314,6 +359,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _recent = _read(StorageKeys.recent, {}, _parseRecent);
     _activity = _read(StorageKeys.activity, {}, _parseActivity);
     _plans = _read(StorageKeys.plans, {}, _parsePlans);
+    _labs = _read(StorageKeys.labs, {}, _parseLabs);
     final rewards = _read<RewardsState?>(
       StorageKeys.rewards,
       null,
@@ -358,6 +404,18 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       streakDay: days.last,
       bestStreak: streak,
     );
+  }
+
+  // ---- labs ----------------------------------------------------------------
+
+  /// How many times the lab [labId] has been completed.
+  int labRuns(String labId) => _labs[labId] ?? 0;
+
+  void recordLabRun(String labId) {
+    _labs[labId] = labRuns(labId) + 1;
+    _bump('labs');
+    _write(StorageKeys.labs, _labs);
+    notifyListeners();
   }
 
   // ---- gap plans -----------------------------------------------------------
@@ -560,6 +618,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       final id = p.question.id;
       if (!attempt.isAnswered(id)) continue;
       final ok = attempt.correct(p);
+      final sure = attempt.isSure(id);
       xp += ok ? Xp.correctAnswer : Xp.wrongAnswer;
       final prev = _answers[id];
       _answers[id] = AnswerStats(
@@ -567,6 +626,8 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
         correct: (prev?.correct ?? 0) + (ok ? 1 : 0),
         lastCorrect: ok,
         lastAt: now,
+        lastSure: sure,
+        review: nextSlot(prev?.review, correct: ok, sure: sure, now: now),
       );
     }
     _write(StorageKeys.answers, {
@@ -679,6 +740,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     StorageKeys.recent,
     StorageKeys.activity,
     StorageKeys.plans,
+    StorageKeys.labs,
     StorageKeys.rewards,
     StorageKeys.settings,
   ];
@@ -749,12 +811,14 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       StorageKeys.recent,
       StorageKeys.activity,
       StorageKeys.plans,
+      StorageKeys.labs,
       StorageKeys.rewards,
     ]) {
       await _prefs.remove(key);
     }
     _rewards = RewardsState.initial;
     _plans = {};
+    _labs = {};
     _answers = {};
     _recent = {};
     _activity = {};

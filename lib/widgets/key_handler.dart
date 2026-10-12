@@ -46,7 +46,18 @@ class _KeyHandlerState extends State<KeyHandler> {
     super.dispose();
   }
 
+  /// Typing in a text field (a `command` answer) must not trigger
+  /// single-key shortcuts.
+  static bool get _typing =>
+      FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<EditableText>() !=
+      null;
+
   @override
-  Widget build(BuildContext context) =>
-      Focus(focusNode: _node, onKeyEvent: widget.onKey, child: widget.child);
+  Widget build(BuildContext context) => Focus(
+    focusNode: _node,
+    onKeyEvent: (node, event) =>
+        _typing ? KeyEventResult.ignored : widget.onKey(node, event),
+    child: widget.child,
+  );
 }
