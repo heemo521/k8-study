@@ -23,6 +23,9 @@ Highlights:
 Try it: <https://heemo521.github.io/k8-study/> (deployed from `main` by
 `.github/workflows/pages.yml` once GitHub Pages is set to "GitHub Actions").
 
+The learning-science basis and feature roadmap are in
+[`docs/LEARNING.md`](docs/LEARNING.md).
+
 The full specification is in [`spec/SPEC.md`](spec/SPEC.md). Screens, data model,
 engine rules, ad placement and done-criteria are all defined there.
 
