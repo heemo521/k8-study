@@ -372,6 +372,12 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
 
   List<PracticeRecord> get practiceHistory => List.unmodifiable(_practice);
 
+  /// Attempts at [testId], newest first.
+  List<PracticeRecord> practiceAttempts(String testId) => [
+    for (final r in _practice)
+      if (r.testId == testId) r,
+  ];
+
   int? bestPracticePct(String testId) {
     int? best;
     for (final r in _practice) {

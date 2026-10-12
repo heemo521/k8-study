@@ -64,7 +64,7 @@ class PracticeHubScreen extends StatelessWidget {
                   subtitle: Text(
                     '${_count(test, content)} questions · '
                     '${test.timeLimitMinutes} min'
-                    '${progress.bestPracticePct(test.id) == null ? '' : ' · best ${progress.bestPracticePct(test.id)}%'}'
+                    '${_scores(progress, test.id)}'
                     '\n${test.description}',
                   ),
                   isThreeLine: true,
@@ -86,6 +86,17 @@ class PracticeHubScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// " · last 60% · best 80% (3 attempts)", or "" before the first attempt.
+  static String _scores(ProgressStore progress, String testId) {
+    final attempts = progress.practiceAttempts(testId);
+    if (attempts.isEmpty) return '';
+    final best = progress.bestPracticePct(testId);
+    final n = attempts.length;
+    return n == 1
+        ? ' · scored ${attempts.first.pct}%'
+        : ' · last ${attempts.first.pct}% · best $best% ($n attempts)';
   }
 
   static int _count(PracticeTestDef test, ContentBundle content) {

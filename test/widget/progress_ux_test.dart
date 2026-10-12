@@ -6,6 +6,7 @@ import 'package:k8_study/content/models.dart';
 import 'package:k8_study/engine/flashcards.dart';
 import 'package:k8_study/engine/quiz.dart';
 import 'package:k8_study/progress/insights.dart';
+import 'package:k8_study/progress/progress_store.dart';
 import 'package:k8_study/widgets/question_view.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -317,5 +318,27 @@ void main() {
     // Read-only views (attempt review) don't show it.
     await show({q.options.first.id}, interactive: false);
     expect(find.byKey(const ValueKey('multi-count')), findsNothing);
+  });
+
+  testWidgets('practice hub shows last and best score', (tester) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester, initialLocation: '/practice');
+    final id = h.content.practiceTests.first.id;
+    for (final pct in [80, 60]) {
+      h.progress.recordPractice(
+        PracticeRecord(
+          testId: id,
+          pct: pct,
+          perDomain: const {},
+          durationSec: 60,
+          at: DateTime(2026),
+        ),
+      );
+    }
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('last 60% · best 80% (2 attempts)'),
+      findsOneWidget,
+    );
   });
 }
