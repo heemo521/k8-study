@@ -261,4 +261,13 @@ void main() {
     expect(find.text('Q 1/25'), findsOneWidget);
     expect(find.text('Flagged for review'), findsOneWidget);
   });
+
+  testWidgets('first-run intro shows once and stays dismissed', (tester) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester);
+    expect(find.byKey(const ValueKey('intro-card')), findsOneWidget);
+    await tapKey(tester, 'dismiss-intro');
+    expect(find.byKey(const ValueKey('intro-card')), findsNothing);
+    expect(h.progress.introDismissed, isTrue);
+  });
 }

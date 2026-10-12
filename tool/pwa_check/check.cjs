@@ -60,8 +60,9 @@ async function tap(page, text, exact = true) {
   for (let i = 0; i < 40 && idx < 0; i++) {
     idx = await findIndex(page, text, exact);
     if (idx >= 0) break;
-    // Present but off-screen? Scroll towards it; otherwise wait for a frame.
-    if (await hasText(page, text)) await scrollDown(page, 300);
+    // Present but off-screen, or beyond Flutter's semantics cache: scroll
+    // towards it. Give freshly-built screens a moment before scrolling.
+    if (await hasText(page, text) || i >= 8) await scrollDown(page, 300);
     else await page.waitForTimeout(250);
   }
   if (idx < 0) throw new Error(`no semantics node for "${text}"`);
@@ -139,6 +140,11 @@ async function noHorizontalScroll(page) {
   const install = await cdp.send('Page.getInstallabilityErrors');
   check('installable (no installability errors)', install.installabilityErrors.length === 0,
     install.installabilityErrors.map((e) => e.errorId).join(', '));
+
+  // ---- First-run intro ---------------------------------------------------------
+  check('first-run intro shown', await hasText(page, 'How it works'));
+  await tap(page, 'Got it');
+  check('intro dismissed', !(await hasText(page, 'How it works')));
 
   // ---- Full loop: study → flashcards → quiz → results ----------------------
   const topic = JSON.parse(fs.readFileSync(path.join(CONTENT_DIR, 'topics/namespaces.json'), 'utf8'));

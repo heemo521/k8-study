@@ -41,6 +41,10 @@ class TopicBrowserScreen extends StatelessWidget {
       ),
       body: PageList(
         children: [
+          if (!progress.introDismissed) ...[
+            _IntroCard(onDismiss: progress.dismissIntro),
+            const SizedBox(height: 12),
+          ],
           _ContinueCard(content: content, progress: progress),
           if (due > 0 || missed > 0) ...[
             const SizedBox(height: 8),
@@ -354,6 +358,66 @@ class _TopicCard extends StatelessWidget {
               Text('${topic.estMinutes}m', style: textTheme.labelSmall),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// First-run explainer of the study loop; dismissed once, remembered.
+class _IntroCard extends StatelessWidget {
+  const _IntroCard({required this.onDismiss});
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    Widget step(IconData icon, String text) => Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: textTheme.bodyMedium)),
+        ],
+      ),
+    );
+    return Card(
+      key: const ValueKey('intro-card'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('How it works', style: textTheme.titleMedium),
+            const SizedBox(height: 8),
+            step(
+              Icons.article_outlined,
+              'Read a topic\'s short notes. Each links to its source page.',
+            ),
+            step(
+              Icons.style_outlined,
+              'Review its flashcards. They come back on a spaced schedule.',
+            ),
+            step(
+              Icons.quiz_outlined,
+              'Pass its quiz with 80% or more to complete the topic.',
+            ),
+            step(
+              Icons.insights_outlined,
+              'Progress shows your weakest areas, with a review for each.',
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                key: const ValueKey('dismiss-intro'),
+                onPressed: onDismiss,
+                child: const Text('Got it'),
+              ),
+            ),
+          ],
         ),
       ),
     );

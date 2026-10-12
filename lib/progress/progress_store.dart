@@ -146,6 +146,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   AdCapState _ads = AdCapState.initial;
   bool _practiceTimerOn = true;
   String? _subjectId;
+  bool _introDismissed = false;
   Map<String, AnswerStats> _answers = {};
   Map<String, String> _recent = {};
 
@@ -226,6 +227,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     );
     _practiceTimerOn = settings['practiceTimerOn'] as bool? ?? true;
     _subjectId = settings['subjectId'] as String?;
+    _introDismissed = settings['introDismissed'] as bool? ?? false;
     _answers = _read(StorageKeys.answers, {}, _parseAnswers);
     _recent = _read(StorageKeys.recent, {}, _parseRecent);
   }
@@ -423,12 +425,22 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   void _saveSettings() => _write(StorageKeys.settings, {
     'practiceTimerOn': _practiceTimerOn,
     if (_subjectId != null) 'subjectId': _subjectId,
+    if (_introDismissed) 'introDismissed': true,
   });
 
   bool get practiceTimerOn => _practiceTimerOn;
 
   set practiceTimerOn(bool value) {
     _practiceTimerOn = value;
+    _saveSettings();
+    notifyListeners();
+  }
+
+  /// Whether the first-run "how it works" card was dismissed.
+  bool get introDismissed => _introDismissed;
+
+  void dismissIntro() {
+    _introDismissed = true;
     _saveSettings();
     notifyListeners();
   }
