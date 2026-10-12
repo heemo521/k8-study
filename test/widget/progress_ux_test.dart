@@ -289,4 +289,33 @@ void main() {
     expect(find.byKey(const ValueKey('streak')), findsOneWidget);
     expect(find.text('Today: 1 section'), findsOneWidget);
   });
+
+  testWidgets('multi-select questions show how many to pick', (tester) async {
+    final h = await pumpApp(tester);
+    final q = h.content.allQuestions.firstWhere(
+      (q) => q.type == QuestionType.multi,
+    );
+    final need = q.options.where((o) => o.correct).length;
+    final p = PresentedQuestion(q, q.options);
+    Future<void> show(Set<String> selected, {bool interactive = true}) =>
+        tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: QuestionView(
+                  presented: p,
+                  selected: selected,
+                  revealed: false,
+                  onChanged: interactive ? (_) {} : null,
+                ),
+              ),
+            ),
+          ),
+        );
+    await show({q.options.first.id});
+    expect(find.text('Selected 1 of $need'), findsOneWidget);
+    // Read-only views (attempt review) don't show it.
+    await show({q.options.first.id}, interactive: false);
+    expect(find.byKey(const ValueKey('multi-count')), findsNothing);
+  });
 }

@@ -66,6 +66,13 @@ class QuestionView extends StatelessWidget {
               onTap: () => _tap(o.id),
             ),
           ),
+        if (_multi && !revealed && onChanged != null)
+          Text(
+            'Selected ${selected.length} of '
+            '${q.options.where((o) => o.correct).length}',
+            key: const ValueKey('multi-count'),
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
         if (revealed) SourceLink(url: q.sourceUrl),
       ],
     );
