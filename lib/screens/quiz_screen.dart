@@ -259,7 +259,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         Expanded(
                           child: Text(
                             'Score $score/$answered',
-                            key: const ValueKey('quiz-score'),
+                            key: const ValueKey('quiz-running-score'),
                             textAlign: TextAlign.end,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.labelLarge,
