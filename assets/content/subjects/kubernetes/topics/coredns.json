@@ -22,6 +22,11 @@
       "sourceTitle": "DNS for Services and Pods",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The **port phone directory** (cluster DNS) lists port numbers and bays by name, so nobody memorises digits. A normal entry like `my-svc.my-namespace.svc...` gives the Service's internal extension. A headless entry gives every selected bay's own number instead. Named lines get an SRV entry with the line number and a name; for headless numbers, there's one answer per bay. The cargo officer (kubelet) sets up each bay's access to the directory."
+        },
+        {
           "type": "p",
           "text": "Kubernetes creates DNS records for **Services and Pods**, so clients can use stable names instead of IPs. The kubelet configures each Pod's DNS."
         },
@@ -63,6 +68,11 @@
       "sourceTitle": "DNS for Services and Pods",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Each bay carries a **speed-dial card** (`/etc/resolv.conf`) written by the cargo officer. Dial a short name and it is tried first in your own yard, then more widely. So a bay in yard `test` asking for `data` won't reach the `data` number in yard `prod`; dial `data.prod` or the full `data.prod.svc.cluster.local` instead. The card fits at most 32 search entries, or 2048 characters across them all."
+        },
+        {
           "type": "p",
           "text": "An unqualified name is looked up in the **Pod's own namespace**. The kubelet writes each Pod's `/etc/resolv.conf`, and its `search` list expands short names:"
         },
@@ -88,6 +98,11 @@
       "sourceTitle": "DNS for Services and Pods",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Bays can be listed too. A bay's name is its `metadata.name` unless you set `hostname`. With `hostname: foo` and `subdomain: bar`, it becomes `foo.bar.my-namespace.svc.cluster.local`, but that entry only appears if a headless port number named `bar` exists in the same yard, and only once the bay is ready (unless `publishNotReadyAddresses` is set). The old style listed a bay by its dashed number, like `172-17-0-3.default.pod.cluster.local`."
+        },
+        {
           "type": "bullets",
           "items": [
             "Legacy kube-dns Pod A record form (from before the DNS specification): `<pod-IPv4-address>.<namespace>.pod.<cluster-domain>` with dots in the IP turned into dashes, e.g. `172-17-0-3.default.pod.cluster.local`.",
@@ -106,6 +121,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/",
       "sourceTitle": "DNS for Services and Pods",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Each bay chooses which directory to consult (`dnsPolicy`). `ClusterFirst`, the real default, asks the port directory and sends outside names upstream. Confusingly, `Default` means borrowing the ship's own phone book. Bays wired straight into the ship's line (`hostNetwork`) need `ClusterFirstWithHostNet` to keep using the port directory. `None` ignores port settings entirely, so you hand the bay its own instructions in `dnsConfig`: up to three nameservers, searches and options."
+        },
         {
           "type": "table",
           "header": [
@@ -148,6 +168,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/",
       "sourceTitle": "Customizing DNS Service",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The directory office follows a **rulebook** called the Corefile, kept as an instruction sheet (ConfigMap `coredns`) in the `kube-system` yard. Its port number still uses the old name `kube-dns`. Rules include `kubernetes` (answer for port entries), `forward` (pass outside questions upstream), `cache 30`, plus health and metrics checks. A stub domain is an extra page sending one domain to its own nameserver. Edit the sheet and `reload` applies it within about two minutes."
+        },
         {
           "type": "bullets",
           "items": [
@@ -208,6 +233,11 @@
       "sourceTitle": "Using CoreDNS for Service Discovery",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Most ports run the same directory service: CoreDNS, the default cluster DNS and a CNCF-hosted project. When the construction crew (`kubeadm`) upgrades the port, it carries your existing rulebook (the Corefile) across automatically. If you upgrade the directory by hand, keeping that rulebook safe is your job. Think of moving the directory office: the furniture may be new, but your custom pages must come along."
+        },
+        {
           "type": "bullets",
           "items": [
             "CoreDNS is the **default** cluster DNS implementation; it's a CNCF-hosted project.",
@@ -223,6 +253,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
       "sourceTitle": "Debugging DNS Resolution",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "When names won't resolve, the port investigator sets up a **test phone**: a throwaway bay (`dnsutils`) that dials `nslookup kubernetes.default`. If it fails, follow the clues in order: the bay's speed-dial card (`resolv.conf`), the directory bays (tag `k8s-app=kube-dns`), their logs, the `kube-dns` port number, then its switchboard cards (EndpointSlices). Add the `log` rule to hear every query, and check the directory's badge lets it read Services and EndpointSlices."
+        },
         {
           "type": "code",
           "lang": "sh",

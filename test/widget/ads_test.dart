@@ -1,5 +1,6 @@
 // Spec §9: placements, flag behaviour and the interstitial cap.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:k8_study/content/models.dart';
 import 'package:k8_study/ads/frequency_cap.dart';
 import 'package:k8_study/ads/impl/placeholder_ads_service.dart';
 import 'package:k8_study/progress/progress_store.dart';
@@ -72,16 +73,24 @@ void main() {
 
     for (var i = 0; i < 10; i++) {
       final view = tester.widget<QuestionView>(find.byType(QuestionView));
-      final o = view.presented.question.options.firstWhere((o) => o.correct);
-      final f = find
-          .descendant(
-            of: find.byType(QuestionView),
-            matching: find.text(o.text),
-          )
-          .first;
-      await tester.ensureVisible(f);
-      await tester.pumpAndSettle();
-      await tester.tap(f);
+      final q = view.presented.question;
+      if (q.type == QuestionType.command) {
+        await tester.enterText(
+          find.byKey(const ValueKey('command-input')),
+          q.answers.first,
+        );
+      } else {
+        final o = q.options.firstWhere((o) => o.correct);
+        final f = find
+            .descendant(
+              of: find.byType(QuestionView),
+              matching: find.text(o.text),
+            )
+            .first;
+        await tester.ensureVisible(f);
+        await tester.pumpAndSettle();
+        await tester.tap(f);
+      }
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const ValueKey('submit')));
       await tester.pumpAndSettle();

@@ -22,6 +22,11 @@
       "sourceTitle": "Storage",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Anything a container writes lands in its private **scratch layer** on top of the read-only template layers. Scrap the container and it goes too; getting data out is awkward. For keeping things, attach storage: an **external locker the port manages** (volume), a **hose from your own garage** (bind mount) to a host path you choose, or a **chalkboard** (tmpfs) in memory that wipes on stop. Inside, each just looks like a folder. Never poke at locker contents from the host."
+        },
+        {
           "type": "p",
           "text": "Files a container creates land in a **writable container layer** on top of the read-only image layers. That layer is unique to the container and is **lost when the container is destroyed**, and it's hard to get data out of it."
         },
@@ -67,6 +72,11 @@
       "sourceTitle": "Persisting container data",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A **locker** (volume) outlives any container. Attach `postgres_data` to a database container, scrap that container, start a new one with the same locker, and the data is still there. If you name a locker that doesn't exist, `docker run -v` creates it. Several containers can share one locker. `docker volume ls` lists them, `docker volume prune` clears unused ones, and `docker volume rm` refuses while a container still holds the key, so remove the container first."
+        },
+        {
           "type": "p",
           "text": "A volume outlives any single container. Mount the same volume into a new container and the files are still there."
         },
@@ -96,6 +106,11 @@
       "sourceUrl": "https://docs.docker.com/engine/storage/volumes/",
       "sourceTitle": "Volumes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Lockers (volumes) are the **preferred** way to keep container data: easy to back up and move, managed by the crane's own commands, safe to share and fast, since writing to the scratch layer goes through a slower storage driver. They don't add to the container's size. Unlike a real locker, an empty one fills itself with the files already in the folder it covers; a non-empty one hides them. Unused lockers aren't cleared automatically."
+        },
         {
           "type": "bullets",
           "items": [
@@ -135,6 +150,11 @@
       "sourceTitle": "Volumes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "You can request a locker two ways. The short slip (`-v`) has three colon fields in fixed order: `name:path:opts`; leave the name off for a nameless locker. The long form (`--mount`) uses `key=value` pairs in any order and is generally preferred, and required for driver options or a subfolder. Add `ro` to make it read-only. To check what's attached, read the `Mounts` section of `docker inspect`, where `RW` is false for read-only."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "docker run --mount type=volume,src=<volume-name>,dst=<mount-path> <image>\ndocker run -v <volume-name>:<mount-path> <image>\n\n# read-only\ndocker run -d --name=nginxtest --mount source=nginx-vol,destination=/usr/share/nginx/html,readonly nginx:latest\ndocker run -d --name=nginxtest -v nginx-vol:/usr/share/nginx/html:ro nginx:latest"
@@ -165,6 +185,11 @@
       "sourceUrl": "https://docs.docker.com/engine/storage/bind-mounts/",
       "sourceTitle": "Bind mounts",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A **hose from your own garage** (bind mount) runs a host file or folder straight into the container, handy for sharing code during development. The hose is two-way by default, so the container can change or delete your files; add `ro` to stop that. The garage is on the operator's host, not your handset's. With `-v`, a missing garage path is created as a folder; `--mount` errors instead. Unlike a locker, nothing is copied; the hose hides what was there."
+        },
         {
           "type": "p",
           "text": "A bind mount puts a host file or directory into the container. Typical uses: sharing source code or build output in development, writing files back to the host, and sharing config files (Docker mounts the host's `/etc/resolv.conf` this way for DNS)."
@@ -209,6 +234,11 @@
       "sourceTitle": "Sharing local files with containers",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Is this data the container makes and must keep after stopping? Rent a **locker** (volume). Do you want the container to see specific files from your own garage, like config or code in progress? Run a **hose** (bind mount). Either way, mark access with `:ro` to stop the container changing your files, or `:rw` to let changes flow back. Docker suggests `--mount`, because it complains about a missing path instead of quietly creating one."
+        },
+        {
           "type": "bullets",
           "items": [
             "Data the container creates or changes and must keep after it stops → **volume**.",
@@ -234,6 +264,11 @@
       "sourceUrl": "https://docs.docker.com/reference/cli/docker/container/run/",
       "sourceTitle": "docker container run",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A few run flags shape storage. `--tmpfs` gives a container a **chalkboard** in memory, with the same options as Linux tmpfs mounts. `--read-only` locks the container's own floor so it can only write into the lockers you hand it. `--rm` scraps nameless lockers along with the container, but keeps named ones: in `-v /foo -v awesome:/bar`, `/foo` is cleared while `awesome` stays."
+        },
         {
           "type": "code",
           "lang": "shell",

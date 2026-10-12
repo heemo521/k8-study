@@ -162,7 +162,8 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
     final content = context.read<ContentBundle>();
     final duration = _timer.elapsed(_clock.now());
     final breakdown = domainBreakdown(attempt, content);
-    final progress = context.read<ProgressStore>()..recordAnswers(attempt);
+    final progress = context.read<ProgressStore>();
+    final xp = progress.recordAnswers(attempt);
     progress.recordPractice(
       PracticeRecord(
         testId: widget.testId,
@@ -177,6 +178,7 @@ class _PracticeRunScreenState extends State<PracticeRunScreen> {
       attempt: attempt,
       duration: duration,
       breakdown: breakdown,
+      xpEarned: xp,
     );
     await context.read<AdsService>().maybeShowInterstitial(
       context,

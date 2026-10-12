@@ -23,6 +23,11 @@
       "sourceTitle": "Pods",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "On a cargo ship, containers aren't loaded one by one. They go into a **bay**: a reserved slot with its own phone number (the Pod IP), a shared power line, and a shared locker (volumes). Containers in the same bay talk over the bay intercom (`localhost`). The port tracks bays, not loose containers, and a bay always sits on one ship (node)."
+        },
+        {
           "type": "p",
           "text": "A Pod is the **smallest deployable unit** in Kubernetes: one or more containers that share network and storage, plus a spec saying how to run them. Its containers are always placed on the same node and scheduled together."
         },
@@ -50,6 +55,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
       "sourceTitle": "Init Containers",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Before any cargo goes into a bay, a **prep crew** goes in first: one worker sweeps, the next checks the power, the next confirms the customer has paid. They go one at a time, in order, and each must finish before the next starts. Only then is the real cargo loaded. If the bay has to be set up again, the whole prep crew repeats its checklist."
+        },
         {
           "type": "p",
           "text": "Init containers live in the `initContainers` field and run **before** the app containers. Use them for setup tools or to wait for a dependency."
@@ -79,6 +89,11 @@
       "sourceTitle": "Sidecar Containers",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some cargo needs company for the whole voyage, such as a **cooling unit** clipped to a container of fish, or a GPS tracker. That helper boards early, stays running alongside the cargo the entire trip, and is switched off only after the cargo is unloaded. That is a sidecar."
+        },
+        {
           "type": "p",
           "text": "A native sidecar is an entry in `initContainers` with `restartPolicy: Always`. Instead of exiting, it keeps running for the Pod's whole life, alongside the app (stable since v1.33)."
         },
@@ -106,6 +121,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/",
       "sourceTitle": "Pod Lifecycle",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every bay has a status on the harbor office board. **Pending**: booked, waiting for a ship or for cargo to arrive. **Running**: at sea. **Succeeded**: delivered. **Failed**: something went wrong for good. **Unknown**: the ship has gone quiet on the radio. A bay never moves to another ship. If its ship sinks, the office books a brand-new bay somewhere else."
+        },
         {
           "type": "table",
           "header": [
@@ -158,6 +178,11 @@
       "sourceTitle": "Pod Lifecycle",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "When a container's machinery stops mid-voyage, the ship's **cargo officer** (the kubelet) follows the bay's standing rule: always restart it, restart only if it broke, or never touch it. If it keeps breaking, the officer waits a little longer before each retry so they don't spend the whole trip fixing one box."
+        },
+        {
           "type": "p",
           "text": "The Pod-level `restartPolicy` covers app containers and regular init containers. It takes `Always` (the default), `OnFailure` or `Never`."
         },
@@ -204,6 +229,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
       "sourceTitle": "Liveness, Readiness, and Startup Probes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Inspectors walk the deck with three questions. **Startup**: \"Has this slow unit finished warming up?\" (the other inspectors wait until it has). **Liveness**: \"Is it still working?\" If not, it is restarted. **Readiness**: \"Can it take deliveries right now?\" If not, it is taken off the delivery list for a while, but left alone."
+        },
         {
           "type": "table",
           "header": [
@@ -253,6 +283,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/",
       "sourceTitle": "Create static Pods",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Most cargo is booked through the harbor office. But a ship's officer can also load cargo straight from a **logbook in their own cabin** (a manifest directory on the node). The office shows only a **mirror** entry for it. Crossing out the mirror entry at the office does nothing; you have to go aboard and change the logbook."
+        },
         {
           "type": "p",
           "text": "A static Pod is defined by a manifest file on one node and run directly by that node's kubelet. Set `staticPodPath: <the directory>` in the kubelet config, e.g. `/etc/kubernetes/manifests`."
@@ -847,6 +882,17 @@
           "explanation": "The API server doesn't touch node files."
         }
       ]
+    },
+    {
+      "id": "pods-cmd-01",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Start a single `nginx` Pod named `nginx` in the namespace `mynamespace`.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "answers": [
+        "kubectl run nginx --image=nginx -n mynamespace"
+      ],
+      "explanation": "`kubectl run` creates one Pod; `-n` (`--namespace`) chooses where."
     }
   ]
 }

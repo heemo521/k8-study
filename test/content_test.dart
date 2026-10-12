@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:k8_study/content/content_loader.dart';
 import 'package:k8_study/content/models.dart';
+import 'package:k8_study/engine/command_grading.dart';
+import 'package:k8_study/engine/quiz.dart';
 import 'package:k8_study/engine/practice.dart';
 
 void main() {
@@ -121,8 +123,46 @@ void main() {
             'True',
             'False',
           }, reason: q.id);
+        case QuestionType.command:
+          expect(q.options, isEmpty, reason: q.id);
+          expect(q.answers, isNotEmpty, reason: '${q.id}: needs answers');
+          expect(
+            q.explanation?.trim(),
+            isNotEmpty,
+            reason: '${q.id}: needs an explanation',
+          );
+          // Every accepted answer grades as correct, and a blank never does.
+          for (final a in q.answers) {
+            expect(isCorrect(q, {a}), isTrue, reason: '${q.id}: $a');
+          }
+          expect(isCorrect(q, {''}), isFalse, reason: q.id);
       }
       expect(q.difficulty, inInclusiveRange(1, 3), reason: q.id);
+    }
+  });
+
+  subjectTest('lab rules', (content) {
+    for (final t in content.topics) {
+      for (final lab in t.labs) {
+        expect(lab.id, startsWith('${t.id}-'), reason: lab.id);
+        expect(
+          content.subject.sourceAllowed(t.id, lab.sourceUrl),
+          isTrue,
+          reason: lab.id,
+        );
+        expect(lab.steps, isNotEmpty, reason: lab.id);
+        for (final s in lab.steps) {
+          expect(s.prompt.trim(), isNotEmpty, reason: lab.id);
+          expect(s.explanation.trim(), isNotEmpty, reason: lab.id);
+          for (final a in s.answers) {
+            expect(
+              commandMatches(a, s.answers),
+              isTrue,
+              reason: '${lab.id}: $a',
+            );
+          }
+        }
+      }
     }
   });
 

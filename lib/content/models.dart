@@ -289,7 +289,8 @@ class CodeBlock extends NoteBlock {
   final String text;
 }
 
-enum CalloutKind { key, exam, warn }
+/// [story] is the analogy narrative that opens a section (Port of Kube).
+enum CalloutKind { key, exam, warn, story }
 
 class CalloutBlock extends NoteBlock {
   const CalloutBlock({required this.kind, required this.text});
@@ -523,7 +524,9 @@ class Flashcard {
       };
 }
 
-enum QuestionType { single, multi, truefalse }
+/// `command`: the learner types a command, graded against [Question.answers]
+/// (spec §15.5).
+enum QuestionType { single, multi, truefalse, command }
 
 class AnswerOption {
   const AnswerOption({
@@ -559,6 +562,8 @@ class Question {
     required this.sourceUrl,
     required this.difficulty,
     this.competencyId,
+    this.answers = const [],
+    this.explanation,
   });
 
   final String id;
@@ -570,6 +575,12 @@ class Question {
   final int difficulty;
   final String? competencyId;
 
+  /// `command` only: accepted commands, the first shown as the model answer.
+  final List<String> answers;
+
+  /// `command` only: why the model answer is right.
+  final String? explanation;
+
   Set<String> get correctIds => {
     for (final o in options)
       if (o.correct) o.id,
@@ -578,21 +589,90 @@ class Question {
   static Question Function(dynamic, String) parser(String topicId) =>
       (raw, path) {
         final json = _map(raw, path);
-        final type = _field<String>(json, 'type', path);
+        final typeName = _field<String>(json, 'type', path);
+        final type = QuestionType.values.firstWhere(
+          (t) => t.name == typeName,
+          orElse: () =>
+              throw FormatException('$path.type: unknown "$typeName"'),
+        );
+        final command = type == QuestionType.command;
         return Question(
           id: _field<String>(json, 'id', path),
           topicId: topicId,
-          type: QuestionType.values.firstWhere(
-            (t) => t.name == type,
-            orElse: () => throw FormatException('$path.type: unknown "$type"'),
-          ),
+          type: type,
           stem: _field<String>(json, 'stem', path),
-          options: _list(json, 'options', path, AnswerOption.fromJson),
+          options: command
+              ? const []
+              : _list(json, 'options', path, AnswerOption.fromJson),
+          answers: command ? _list(json, 'answers', path, _string) : const [],
+          explanation: command
+              ? _field<String>(json, 'explanation', path)
+              : null,
           sourceUrl: _field<String>(json, 'sourceUrl', path),
           difficulty: _field<int>(json, 'difficulty', path),
           competencyId: _optional<String>(json, 'competencyId', path),
         );
       };
+}
+
+/// One step of a guided lab: a task and the commands that do it.
+class LabStep {
+  const LabStep({
+    required this.prompt,
+    required this.answers,
+    required this.explanation,
+  });
+
+  final String prompt;
+
+  /// Accepted commands; the first is the model answer.
+  final List<String> answers;
+  final String explanation;
+
+  factory LabStep.fromJson(dynamic raw, String path) {
+    final json = _map(raw, path);
+    final answers = _list(json, 'answers', path, _string);
+    if (answers.isEmpty) throw FormatException('$path.answers: empty');
+    return LabStep(
+      prompt: _field<String>(json, 'prompt', path),
+      answers: answers,
+      explanation: _field<String>(json, 'explanation', path),
+    );
+  }
+}
+
+/// A guided hands-on scenario (spec §15.8): a sequence of typed commands
+/// whose guidance fades with each completed run.
+class Lab {
+  const Lab({
+    required this.id,
+    required this.topicId,
+    required this.title,
+    required this.scenario,
+    required this.sourceUrl,
+    required this.steps,
+  });
+
+  final String id;
+  final String topicId;
+  final String title;
+  final String scenario;
+  final String sourceUrl;
+  final List<LabStep> steps;
+
+  static Lab Function(dynamic, String) parser(String topicId) => (raw, path) {
+    final json = _map(raw, path);
+    final steps = _list(json, 'steps', path, LabStep.fromJson);
+    if (steps.isEmpty) throw FormatException('$path.steps: empty');
+    return Lab(
+      id: _field<String>(json, 'id', path),
+      topicId: topicId,
+      title: _field<String>(json, 'title', path),
+      scenario: _field<String>(json, 'scenario', path),
+      sourceUrl: _field<String>(json, 'sourceUrl', path),
+      steps: steps,
+    );
+  };
 }
 
 class Topic {
@@ -609,6 +689,7 @@ class Topic {
     required this.flashcards,
     required this.questions,
     this.prerequisites = const [],
+    this.labs = const [],
   });
 
   final String id;
@@ -629,6 +710,9 @@ class Topic {
   final List<Flashcard> flashcards;
   final List<Question> questions;
 
+  /// Guided hands-on labs; optional.
+  final List<Lab> labs;
+
   String get primaryDomainId => domainIds.first;
 
   /// Every source URL used by this topic, de-duplicated, in first-use order.
@@ -639,6 +723,7 @@ class Topic {
         ...sections.map((s) => s.sourceUrl),
         ...flashcards.map((c) => c.sourceUrl),
         ...questions.map((q) => q.sourceUrl),
+        ...labs.map((l) => l.sourceUrl),
       ])
         if (seen.add(url)) url,
     ];
@@ -666,6 +751,9 @@ class Topic {
       prerequisites: json['prerequisites'] == null
           ? const []
           : _list(json, 'prerequisites', file, _string),
+      labs: json['labs'] == null
+          ? const []
+          : _list(json, 'labs', file, Lab.parser(id)),
     );
   }
 }

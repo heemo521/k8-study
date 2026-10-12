@@ -23,6 +23,11 @@
       "sourceTitle": "Debug Services",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A caller dials a port number (Service) and nobody answers. The investigator works outward, one layer at a time: do the bays answer directly? Does the number exist? Is a fence (NetworkPolicy) in the way? Does the phone directory know the name? Does the raw number work? Is the spec right? Does the switchboard list any bays (EndpointSlices)? Is the switchboard operator (`kube-proxy`) on duty? Test from a throwaway bay with a shell."
+        },
+        {
           "type": "p",
           "text": "A Service gives no response. Work through these in order; each step rules out a layer."
         },
@@ -99,6 +104,11 @@
       "sourceTitle": "Debug Services",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "If the short name fails in the phone directory, dial more of the address: `<service-name>.<namespace>`, then the full `svc.cluster.local` form. If only the yard-qualified name works, you're calling from another yard. If only the full address works, check the bay's dialing card (`/etc/resolv.conf`): its `nameserver` must be the directory's number, and its `search` list must include the yard suffixes. If even `kubernetes.default` fails, debug the directory itself."
+        },
+        {
           "type": "p",
           "text": "If the short name fails, try wider names. The suffix is `<namespace>.svc.<cluster-domain>`, usually `cluster.local`."
         },
@@ -126,6 +136,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/",
       "sourceTitle": "Debug Services",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Check the number's settings like a switchboard engineer: is the dialed port listed, does `targetPort` match where the bays actually listen, is it a number rather than a string, and is the protocol right? If the switchboard lists no bays (`ENDPOINTS <none>`), the number's tag filter (`spec.selector`) doesn't match the bays' coloured tags, often a typo or `app` versus `run`. Compare with `kubectl get pods -l`."
+        },
         {
           "type": "bullets",
           "items": [
@@ -161,6 +176,11 @@
       "sourceTitle": "Debug Services",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "If the number exists, lists bays, and the bays answer, suspect the switchboard operator (`kube-proxy`). Is it running on the ship? Do its routing rules mention your Service, in iptables or IPVS mode? Its logbook should say `Setting endpoints` for your Service; if not, restart it with `-v` set to 4. A bay that can't call itself through its own number points to hairpin mode on the cargo officer (`kubelet`)."
+        },
+        {
           "type": "p",
           "text": "If the Service exists, has endpoints and the Pods answer, suspect the proxy layer. These apply only if your cluster uses kube-proxy."
         },
@@ -192,6 +212,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
       "sourceTitle": "Debugging DNS Resolution",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "When the phone directory (CoreDNS) itself is suspect, send a test bay (`dnsutils`) to look up `kubernetes.default` and read its dialing card. Then check the directory staff: are CoreDNS Pods running, any odd lines in their logs, does the `kube-dns` Service exist with endpoints? CoreDNS keeps the old `kube-dns` name. The `log` plugin records every lookup, and `SERVFAIL` may mean CoreDNS lacks the badge to list services and endpointslices."
+        },
         {
           "type": "p",
           "text": "Create the `dnsutils` test Pod from the docs example, then:"
@@ -247,6 +272,11 @@
       "sourceUrl": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/",
       "sourceTitle": "Debugging DNS Resolution",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A few directory problems are well known. On Ubuntu, systemd-resolved can swap in a stub dialing card that sends calls in a loop; point the kubelet's `--resolv-conf` at the real file (kubeadm does this for you). glibc reads only 3 nameservers and Kubernetes needs one of them, so extras get dropped. Alpine 3.17 or earlier may lose DNS answers over 512 bytes; use 3.18 or later."
+        },
         {
           "type": "bullets",
           "items": [

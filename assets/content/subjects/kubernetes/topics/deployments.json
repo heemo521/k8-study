@@ -23,6 +23,11 @@
       "sourceTitle": "Deployments",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A shipping contract (Deployment) says \"keep 3 bays of this cargo.\" You state the goal; the contract supervisor hires a dispatcher (ReplicaSet) who stamps out bays from the contract's template. The contract must name the tag it looks for (selector) and the template's bays must wear it, or the front desk refuses. Each dispatcher's name ends in a code (`pod-template-hash`). Never share those tags with other bays, or the supervisors will fight."
+        },
+        {
           "type": "p",
           "text": "A Deployment is the usual way to run a **stateless** workload. You declare the desired state; the Deployment controller moves the cluster towards it at a controlled pace by creating and scaling **ReplicaSets**, which in turn create the Pods."
         },
@@ -188,6 +193,11 @@
       "sourceTitle": "ReplicaSet",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The dispatcher (ReplicaSet) carries a tag to look for, a count and a template. If a bay vanishes, maybe because its ship sank, the dispatcher fills a new one. Loose bays with no dispatcher are not replaced. The dispatcher also adopts any unowned bay wearing its tag, and retags remove a bay from its count. Dispatchers don't upgrade gradually; that's the contract's job. When cutting back, stuck bays go first, then cheaper ones, then crowded ships, then newer bays."
+        },
+        {
           "type": "p",
           "text": "A ReplicaSet keeps a fixed number of identical Pods running. It has a **selector**, a **replica count** and a **Pod template**, and it creates or deletes Pods to hit the count. Each Pod points back to its ReplicaSet through `metadata.ownerReferences`."
         },
@@ -213,6 +223,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
       "sourceTitle": "Deployments",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A contract upgrade starts **only** when the bay template changes, like a new packing template (image); changing the count alone doesn't. By default the new dispatcher fills bays while the old one empties them, within limits: a few spare bays above the count (`maxSurge`) and a few allowed missing (`maxUnavailable`), both 25%. Or everything is cleared first and rebuilt (Recreate), leaving a gap. Change plans mid-upgrade and a fresh dispatcher takes over at once (rollover)."
+        },
         {
           "type": "callout",
           "kind": "key",
@@ -273,6 +288,11 @@
       "sourceTitle": "Deployments",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Hand the front desk a new packing template (`kubectl set image`) or edit the contract, then watch progress with `kubectl rollout status`. It reports success with exit code 0, or 1 if the upgrade blows its deadline (`progressDeadlineSeconds`, default 600). A stalled upgrade is only reported, never reversed automatically. Common snags: quota, failing readiness checks, template pull errors, permissions, or a misconfigured app. A finished one says `NewReplicaSetAvailable`."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "kubectl set image deployment/<name> <container>=<image>:<tag>\nkubectl edit deployment/<name>        # or edit .spec.template directly\nkubectl rollout status deployment/<name>\nkubectl describe deployment <name>    # events show RS scaled up/down"
@@ -300,6 +320,11 @@
       "sourceTitle": "Deployments",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The port keeps old dispatchers on file, and each holds a past revision of the bay template. `kubectl rollout history` lists them, and `rollout undo` brings back the previous one or a chosen revision. Note the reason for a change with the `kubernetes.io/change-cause` annotation. Only the template rolls back, not the bay count. Keep 10 by default (`revisionHistoryLimit`); set it to 0 and there's nothing to return to. A paused contract must resume first."
+        },
+        {
           "type": "code",
           "lang": "shell",
           "text": "kubectl rollout history deployment/<name>\nkubectl rollout history deployment/<name> --revision=<n>\nkubectl rollout undo deployment/<name>                    # previous revision\nkubectl rollout undo deployment/<name> --to-revision=<n>\nkubectl annotate deployment/<name> kubernetes.io/change-cause=\"<message>\""
@@ -321,6 +346,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
       "sourceTitle": "Deployments",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Pause a contract (`kubectl rollout pause`) to make several template edits, then resume to roll them out as **one** upgrade. Changing the bay count (`kubectl scale`) is separate, but a later `kubectl apply` of the form will overwrite it. If an automatic bay-adder (HPA) runs the contract, leave the count out of your form. Scale mid-upgrade and the extra bays are shared between dispatchers by size (proportional scaling)."
+        },
         {
           "type": "p",
           "text": "Pause a Deployment to batch several template changes into **one** rollout. While paused, template edits don't start a rollout and the progress deadline isn't checked."
@@ -871,6 +901,118 @@
           "text": "Nothing; undo works while paused",
           "correct": false,
           "explanation": "The docs say you can't roll back while paused."
+        }
+      ]
+    },
+    {
+      "id": "deployments-cmd-01",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Scale the Deployment `nginx-deployment` to 10 replicas.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl scale deployment/nginx-deployment --replicas=10"
+      ],
+      "explanation": "`kubectl scale` sets the Deployment's replica count; the ReplicaSet then adds or removes Pods to match.",
+      "competencyId": "ws-rollouts"
+    },
+    {
+      "id": "deployments-cmd-02",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Update the container `nginx` in Deployment `nginx-deployment` to the image `nginx:1.16.1`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl set image deployment/nginx-deployment nginx=nginx:1.16.1"
+      ],
+      "explanation": "`kubectl set image` takes `<container>=<image>` pairs. Changing the Pod template image starts a rollout.",
+      "competencyId": "ws-rollouts"
+    },
+    {
+      "id": "deployments-cmd-03",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Check the progress of the rollout of `nginx-deployment`.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl rollout status deployment/nginx-deployment"
+      ],
+      "explanation": "`kubectl rollout status` follows the rollout until it finishes or fails.",
+      "competencyId": "ws-rollouts"
+    },
+    {
+      "id": "deployments-cmd-04",
+      "type": "command",
+      "difficulty": 1,
+      "stem": "Roll `nginx-deployment` back to the previous revision.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl rollout undo deployment/nginx-deployment"
+      ],
+      "explanation": "`kubectl rollout undo` without a revision returns to the previous one.",
+      "competencyId": "ws-rollouts"
+    },
+    {
+      "id": "deployments-cmd-05",
+      "type": "command",
+      "difficulty": 2,
+      "stem": "Roll `nginx-deployment` back to revision 2.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "answers": [
+        "kubectl rollout undo deployment/nginx-deployment --to-revision=2"
+      ],
+      "explanation": "`--to-revision` picks a specific revision from `kubectl rollout history`.",
+      "competencyId": "ws-rollouts"
+    }
+  ],
+  "labs": [
+    {
+      "id": "deployments-lab-01",
+      "title": "Roll out a new image, then roll back",
+      "scenario": "You run the example `nginx-deployment`, update its image, watch the rollout and then undo it.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "steps": [
+        {
+          "prompt": "Create the Deployment from the example manifest at `https://k8s.io/examples/controllers/nginx-deployment.yaml`.",
+          "answers": [
+            "kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml"
+          ],
+          "explanation": "`kubectl apply -f` creates (or updates) the objects in a manifest, here read from a URL."
+        },
+        {
+          "prompt": "Check that the Deployment exists.",
+          "answers": [
+            "kubectl get deployments"
+          ],
+          "explanation": "The READY, UP-TO-DATE and AVAILABLE columns show how far it has got."
+        },
+        {
+          "prompt": "Update the `nginx` container to the image `nginx:1.16.1`.",
+          "answers": [
+            "kubectl set image deployment/nginx-deployment nginx=nginx:1.16.1"
+          ],
+          "explanation": "Changing the Pod template image starts a rolling update."
+        },
+        {
+          "prompt": "Follow the rollout until it finishes.",
+          "answers": [
+            "kubectl rollout status deployment/nginx-deployment"
+          ],
+          "explanation": "`rollout status` waits and reports when the new ReplicaSet is fully rolled out."
+        },
+        {
+          "prompt": "List the Deployment's revisions.",
+          "answers": [
+            "kubectl rollout history deployment/nginx-deployment"
+          ],
+          "explanation": "Each change to the Pod template creates a revision you can roll back to."
+        },
+        {
+          "prompt": "Roll back to the previous revision.",
+          "answers": [
+            "kubectl rollout undo deployment/nginx-deployment"
+          ],
+          "explanation": "`rollout undo` returns the Pod template to the previous revision."
         }
       ]
     }

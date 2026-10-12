@@ -13,7 +13,9 @@ import '../content/models.dart';
 import '../engine/clock.dart';
 import '../engine/flashcards.dart';
 import '../engine/practice.dart';
+import '../engine/question_review.dart';
 import '../engine/quiz.dart';
+import 'rewards.dart';
 
 const schemaVersion = 1;
 const maxPracticeHistory = 50;
@@ -30,6 +32,8 @@ abstract final class StorageKeys {
   static const recent = 'k8s.recent';
   static const activity = 'k8s.activity';
   static const plans = 'k8s.plans';
+  static const labs = 'k8s.labs';
+  static const rewards = 'k8s.rewards';
 }
 
 /// One competency an exam showed as weak, with the exam's result for it.
@@ -86,13 +90,16 @@ class GapPlan {
   );
 }
 
-/// Answer history for one question across quizzes, reviews and tests.
+/// Answer history for one question across quizzes, reviews and tests,
+/// plus its place in the question review schedule (spec §15.1–14.2).
 class AnswerStats {
   const AnswerStats({
     required this.seen,
     required this.correct,
     required this.lastCorrect,
     required this.lastAt,
+    this.lastSure = true,
+    this.review,
   });
 
   final int seen;
@@ -100,19 +107,51 @@ class AnswerStats {
   final bool lastCorrect;
   final DateTime lastAt;
 
+  /// Whether the latest answer was given with "Sure".
+  final bool lastSure;
+
+  /// Review schedule; null when the question isn't scheduled.
+  final ReviewSlot? review;
+
+  /// Right and sure: the only answer that counts as known.
+  bool get solid => lastCorrect && lastSure;
+
+  bool isDue(DateTime now) => review?.isDue(now) ?? false;
+
   Map<String, dynamic> toJson() => {
     'n': seen,
     'c': correct,
     'last': lastCorrect,
     'at': lastAt.toIso8601String(),
+    if (!lastSure) 'sure': false,
+    if (review != null) ...{
+      'box': review!.box,
+      'due': formatDate(review!.dueAt),
+    },
   };
 
-  static AnswerStats fromJson(Map<String, dynamic> j) => AnswerStats(
-    seen: j['n'] as int,
-    correct: j['c'] as int,
-    lastCorrect: j['last'] as bool,
-    lastAt: DateTime.parse(j['at'] as String),
-  );
+  static AnswerStats fromJson(Map<String, dynamic> j) {
+    final lastCorrect = j['last'] as bool;
+    final lastAt = DateTime.parse(j['at'] as String);
+    final box = j['box'] as int?;
+    final due = j['due'] as String?;
+    if (box != null && (box < 1 || box > maxBox)) {
+      throw FormatException('bad box: $box');
+    }
+    return AnswerStats(
+      seen: j['n'] as int,
+      correct: j['c'] as int,
+      lastCorrect: lastCorrect,
+      lastAt: lastAt,
+      lastSure: j['sure'] as bool? ?? true,
+      review: box != null && due != null
+          ? ReviewSlot(box: box, dueAt: dateOnly(DateTime.parse(due)))
+          // Saved before the schedule existed: a wrong answer is due now.
+          : lastCorrect
+          ? null
+          : ReviewSlot(box: 1, dueAt: dateOnly(lastAt)),
+    );
+  }
 }
 
 class QuizStats {
@@ -209,6 +248,10 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   /// Per-day counts: {'yyyy-mm-dd': {'sections': n, 'cards': n, 'quizzes': n}}.
   Map<String, Map<String, int>> _activity = {};
   Map<String, GapPlan> _plans = {};
+  RewardsState _rewards = RewardsState.initial;
+
+  /// Completed runs per lab id (spec §15.8).
+  Map<String, int> _labs = {};
 
   // ---- loading -------------------------------------------------------------
 
@@ -273,7 +316,16 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       e.key: GapPlan.fromJson(e.value as Map<String, dynamic>),
   };
 
+  static Map<String, int> _parseLabs(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries) e.key: e.value as int,
+  };
+
+  static RewardsState _parseRewards(dynamic j) =>
+      RewardsState.fromJson(j as Map<String, dynamic>);
+
   static final Map<String, Object Function(dynamic)> _parsers = {
+    StorageKeys.labs: _parseLabs,
+    StorageKeys.rewards: _parseRewards,
     StorageKeys.plans: _parsePlans,
     StorageKeys.activity: _parseActivity,
     StorageKeys.notes: _parseNotes,
@@ -307,6 +359,63 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _recent = _read(StorageKeys.recent, {}, _parseRecent);
     _activity = _read(StorageKeys.activity, {}, _parseActivity);
     _plans = _read(StorageKeys.plans, {}, _parsePlans);
+    _labs = _read(StorageKeys.labs, {}, _parseLabs);
+    final rewards = _read<RewardsState?>(
+      StorageKeys.rewards,
+      null,
+      _parseRewards,
+    );
+    if (rewards != null) {
+      _rewards = rewards;
+    } else {
+      _rewards = _seedRewards();
+      _write(StorageKeys.rewards, _rewards.toJson());
+    }
+  }
+
+  /// Rewards for progress made before XP existed (or restored from a backup
+  /// without them): XP for what's already done, and the streak from the
+  /// daily activity log.
+  RewardsState _seedRewards() {
+    var xp = 0;
+    for (final s in _notes.values) {
+      xp += s.length * Xp.sectionRead;
+    }
+    xp += _cards.length * Xp.cardReviewed;
+    for (final a in _answers.values) {
+      xp +=
+          a.correct * Xp.correctAnswer + (a.seen - a.correct) * Xp.wrongAnswer;
+    }
+    xp +=
+        _quiz.values.where((q) => q.bestPct >= masteryPercent).length *
+        Xp.quizMastered;
+
+    final days = _activity.keys.toList()..sort();
+    if (days.isEmpty) return RewardsState(xp: xp);
+    var day = DateTime.parse(days.last);
+    var streak = 0;
+    while (_activity.containsKey(formatDate(day))) {
+      streak++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return RewardsState(
+      xp: xp,
+      streak: streak,
+      streakDay: days.last,
+      bestStreak: streak,
+    );
+  }
+
+  // ---- labs ----------------------------------------------------------------
+
+  /// How many times the lab [labId] has been completed.
+  int labRuns(String labId) => _labs[labId] ?? 0;
+
+  void recordLabRun(String labId) {
+    _labs[labId] = labRuns(labId) + 1;
+    _bump('labs');
+    _write(StorageKeys.labs, _labs);
+    notifyListeners();
   }
 
   // ---- gap plans -----------------------------------------------------------
@@ -346,7 +455,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   void markSectionRead(String topicId, String sectionId) {
     final set = _notes.putIfAbsent(topicId, () => {});
     if (!set.add(sectionId)) return;
-    _bump('sections');
+    _bump('sections', xp: Xp.sectionRead);
     _write(StorageKeys.notes, {
       for (final e in _notes.entries) e.key: e.value.toList(),
     });
@@ -368,7 +477,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   CardState? cardState(String cardId) => _cards[cardId];
 
   void setCardState(String cardId, CardState state) {
-    _bump('cards');
+    _bump('cards', xp: Xp.cardReviewed);
     _cards[cardId] = state;
     _write(StorageKeys.cards, {
       for (final e in _cards.entries) e.key: e.value.toJson(),
@@ -388,8 +497,11 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   });
 
   /// A full quiz attempt finished: counts toward attempts and best score.
-  void recordQuiz(String topicId, int pct, Set<String> missed) {
+  /// Returns the bonus XP earned (for mastering the topic the first time).
+  int recordQuiz(String topicId, int pct, Set<String> missed) {
     final prev = _quiz[topicId];
+    final firstMastery =
+        pct >= masteryPercent && (prev?.bestPct ?? 0) < masteryPercent;
     _quiz[topicId] = QuizStats(
       attempts: (prev?.attempts ?? 0) + 1,
       bestPct: prev == null ? pct : (pct > prev.bestPct ? pct : prev.bestPct),
@@ -398,7 +510,10 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       missed: missed.toList(),
     );
     _saveQuiz();
+    final bonus = firstMastery ? Xp.quizMastered : 0;
+    if (bonus > 0) _saveRewards(_rewards.addXp(bonus));
     notifyListeners();
+    return bonus;
   }
 
   /// A "retry missed" run finished: only updates the missed set.
@@ -495,26 +610,32 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
 
   /// Records the answered questions of a finished attempt. Skipped ones
   /// (a practice test finished early) are no evidence either way, so they
-  /// don't count towards accuracy or gaps.
-  void recordAnswers(QuizAttempt attempt) {
-    _bump('quizzes');
+  /// don't count towards accuracy or gaps. Returns the XP earned.
+  int recordAnswers(QuizAttempt attempt) {
     final now = clock.now();
+    var xp = 0;
     for (final p in attempt.questions) {
       final id = p.question.id;
       if (!attempt.isAnswered(id)) continue;
       final ok = attempt.correct(p);
+      final sure = attempt.isSure(id);
+      xp += ok ? Xp.correctAnswer : Xp.wrongAnswer;
       final prev = _answers[id];
       _answers[id] = AnswerStats(
         seen: (prev?.seen ?? 0) + 1,
         correct: (prev?.correct ?? 0) + (ok ? 1 : 0),
         lastCorrect: ok,
         lastAt: now,
+        lastSure: sure,
+        review: nextSlot(prev?.review, correct: ok, sure: sure, now: now),
       );
     }
     _write(StorageKeys.answers, {
       for (final e in _answers.entries) e.key: e.value.toJson(),
     });
+    _bump('quizzes', xp: xp);
     notifyListeners();
+    return xp;
   }
 
   // ---- where the learner is ------------------------------------------------
@@ -569,7 +690,9 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
 
   static const _activityDays = 60;
 
-  void _bump(String kind) {
+  /// Logs a study action for today, keeps the streak going and awards [xp].
+  void _bump(String kind, {int xp = 0}) {
+    _saveRewards(_rewards.studiedOn(clock.now()).addXp(xp));
     final today = formatDate(clock.now());
     final day = _activity.putIfAbsent(today, () => {});
     day[kind] = (day[kind] ?? 0) + 1;
@@ -587,20 +710,24 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _activity[formatDate(clock.now())] ?? const <String, int>{},
   );
 
+  // ---- rewards -------------------------------------------------------------
+
+  void _saveRewards(RewardsState value) {
+    _rewards = value;
+    _write(StorageKeys.rewards, value.toJson());
+  }
+
+  /// Total XP earned.
+  int get xp => _rewards.xp;
+
+  LevelInfo get level => LevelInfo.fromXp(_rewards.xp);
+
   /// Consecutive days with any study activity, ending today — or yesterday,
   /// so the streak isn't shown as broken before today's first session.
-  int get streak {
-    var day = dateOnly(clock.now());
-    if (!_activity.containsKey(formatDate(day))) {
-      day = day.subtract(const Duration(days: 1));
-    }
-    var n = 0;
-    while (_activity.containsKey(formatDate(day))) {
-      n++;
-      day = day.subtract(const Duration(days: 1));
-    }
-    return n;
-  }
+  int get streak => _rewards.currentStreak(clock.now());
+
+  /// Longest streak so far.
+  int get bestStreak => _rewards.bestStreak;
 
   // ---- backup ----------------------------------------------------------------
 
@@ -613,6 +740,8 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     StorageKeys.recent,
     StorageKeys.activity,
     StorageKeys.plans,
+    StorageKeys.labs,
+    StorageKeys.rewards,
     StorageKeys.settings,
   ];
 
@@ -682,10 +811,14 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       StorageKeys.recent,
       StorageKeys.activity,
       StorageKeys.plans,
+      StorageKeys.labs,
+      StorageKeys.rewards,
     ]) {
       await _prefs.remove(key);
     }
+    _rewards = RewardsState.initial;
     _plans = {};
+    _labs = {};
     _answers = {};
     _recent = {};
     _activity = {};

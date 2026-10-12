@@ -17,6 +17,11 @@
       "sourceTitle": "Overview",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Welcome to the **Port of Kube**, a busy shipping port. Your apps are cargo, packed in standard shipping containers. Nobody here carries boxes by hand. You file an order like \"always keep three containers of medicine on the water\", and the port's crews make it happen and keep it true. Fittingly, **Kubernetes** is Greek for **helmsman**."
+        },
+        {
           "type": "p",
           "text": "Kubernetes is an open source platform for running and managing **containerized workloads and services**. It is portable and extensible, and it supports both **declarative configuration** and automation."
         },
@@ -41,6 +46,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
       "sourceTitle": "Overview",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Ships break down, crates go missing, and demand spikes before holidays. A good port handles that without the customer noticing: it swaps broken containers, spreads cargo across ships with spare room, and adds ships when orders pile up. Each row below is one of those port services."
+        },
         {
           "type": "p",
           "text": "In production something has to restart a crashed container, spread traffic and roll out new versions. Kubernetes provides a framework for running distributed systems resiliently."
@@ -103,6 +113,11 @@
       "sourceTitle": "Overview",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The port moves and looks after containers. It does not run the factory that packs them (your build and CI/CD), and it does not sell you the goods inside (databases, caches, message buses). It hands you cranes, docks and rules, and lets you choose your own suppliers."
+        },
+        {
           "type": "p",
           "text": "Kubernetes is **not a traditional, all-inclusive PaaS**. It works at the container level and gives you building blocks; the defaults it does ship are optional and pluggable."
         },
@@ -130,6 +145,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/overview/",
       "sourceTitle": "Overview",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Shipping used to mean loose sacks thrown into one ship's hold, where a leaking barrel could ruin everyone's cargo (physical servers). Then every customer got a small ship of their own, carried inside a big one, with its own engine and crew (VMs). Then came the **standard container**: sealed boxes that share one ship's engine and crew, and fit any ship, truck or train (containers)."
+        },
         {
           "type": "table",
           "header": [
@@ -176,6 +196,11 @@
       "sourceTitle": "Kubernetes Components",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every port has a **harbor office** that keeps the books and makes the decisions (the control plane), and a fleet of **cargo ships** that actually carry the containers (worker nodes). The table at the end of this section is your cast list for every story in this course."
+        },
+        {
           "type": "p",
           "text": "A Kubernetes cluster is a **control plane** plus **one or more worker nodes**. The control plane manages the overall state of the cluster; node components keep Pods running."
         },
@@ -185,6 +210,232 @@
             "Control plane: `kube-apiserver`, `etcd`, `kube-scheduler`, `kube-controller-manager`, and optionally `cloud-controller-manager`.",
             "Every node: `kubelet`, a container runtime, and optionally `kube-proxy`.",
             "Addons extend the cluster, for example cluster DNS, the Dashboard web UI, resource monitoring and cluster-level logging."
+          ]
+        },
+        {
+          "type": "diagram",
+          "title": "An order moving through the Port of Kube",
+          "width": 10,
+          "height": 9,
+          "nodes": [
+            {
+              "id": "you",
+              "label": "You (kubectl)",
+              "x": 3.6,
+              "y": 0,
+              "w": 2.8,
+              "h": 0.8,
+              "kind": "user"
+            },
+            {
+              "id": "office",
+              "label": "Harbor office (control plane)",
+              "x": 0,
+              "y": 1.2,
+              "w": 10,
+              "h": 3.4,
+              "kind": "control",
+              "group": true
+            },
+            {
+              "id": "planner",
+              "label": "Load planner\nkube-scheduler",
+              "x": 0.3,
+              "y": 1.7,
+              "w": 2.9,
+              "h": 1.0,
+              "kind": "control"
+            },
+            {
+              "id": "desk",
+              "label": "Front desk\nkube-apiserver",
+              "x": 3.6,
+              "y": 2.3,
+              "w": 2.8,
+              "h": 1.0,
+              "kind": "control"
+            },
+            {
+              "id": "ledger",
+              "label": "Ledger\netcd",
+              "x": 7.2,
+              "y": 2.3,
+              "w": 2.5,
+              "h": 1.0,
+              "kind": "storage"
+            },
+            {
+              "id": "super",
+              "label": "Supervisors\ncontroller-manager",
+              "x": 0.3,
+              "y": 3.3,
+              "w": 2.9,
+              "h": 1.1,
+              "kind": "control"
+            },
+            {
+              "id": "ship",
+              "label": "Cargo ship (worker node)",
+              "x": 0,
+              "y": 5.0,
+              "w": 10,
+              "h": 4,
+              "kind": "worker",
+              "group": true
+            },
+            {
+              "id": "officer",
+              "label": "Cargo officer\nkubelet",
+              "x": 3.6,
+              "y": 5.6,
+              "w": 2.8,
+              "h": 1.0,
+              "kind": "worker"
+            },
+            {
+              "id": "crane",
+              "label": "Crane\ncontainer runtime",
+              "x": 3.6,
+              "y": 7.6,
+              "w": 2.8,
+              "h": 1.0,
+              "kind": "worker"
+            },
+            {
+              "id": "bay",
+              "label": "Bay\nPod",
+              "x": 7.2,
+              "y": 7.6,
+              "w": 2.5,
+              "h": 1.0,
+              "kind": "pod"
+            }
+          ],
+          "edges": [
+            {
+              "from": "you",
+              "to": "desk",
+              "label": "order",
+              "flow": true
+            },
+            {
+              "from": "desk",
+              "to": "ledger",
+              "flow": true
+            },
+            {
+              "from": "planner",
+              "to": "desk"
+            },
+            {
+              "from": "super",
+              "to": "desk"
+            },
+            {
+              "from": "officer",
+              "to": "desk",
+              "label": "watch",
+              "flow": true
+            },
+            {
+              "from": "officer",
+              "to": "crane"
+            },
+            {
+              "from": "crane",
+              "to": "bay"
+            }
+          ],
+          "steps": [
+            {
+              "text": "You hand an order to the **front desk** (`kube-apiserver`). Every order and report goes through it.",
+              "highlight": [
+                "you",
+                "desk"
+              ]
+            },
+            {
+              "text": "The desk writes the order into the **ledger** (`etcd`), the record of what should exist.",
+              "highlight": [
+                "desk",
+                "ledger"
+              ]
+            },
+            {
+              "text": "The **load planner** (`kube-scheduler`) sees a new bay with no ship and picks a ship with room.",
+              "highlight": [
+                "planner",
+                "desk"
+              ]
+            },
+            {
+              "text": "The **cargo officer** on that ship (`kubelet`) sees the assignment and has the **crane** (container runtime) load the containers into the **bay** (Pod).",
+              "highlight": [
+                "officer",
+                "crane",
+                "bay"
+              ]
+            },
+            {
+              "text": "The **supervisors** (`kube-controller-manager`) keep comparing the ledger with reality and fix any gap, such as a missing bay.",
+              "highlight": [
+                "super",
+                "desk"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "Kubernetes",
+            "At the Port of Kube"
+          ],
+          "rows": [
+            [
+              "Cluster",
+              "The whole port: harbor office plus its fleet"
+            ],
+            [
+              "Control plane",
+              "The harbor office"
+            ],
+            [
+              "`kube-apiserver`",
+              "The front desk: every order and report goes through it"
+            ],
+            [
+              "`etcd`",
+              "The master ledger of what should exist"
+            ],
+            [
+              "`kube-scheduler`",
+              "The load planner who picks a ship with room"
+            ],
+            [
+              "`kube-controller-manager`",
+              "Supervisors who compare the ledger with the docks and fix gaps"
+            ],
+            [
+              "Worker node",
+              "A cargo ship"
+            ],
+            [
+              "`kubelet`",
+              "The ship's cargo officer"
+            ],
+            [
+              "Container runtime",
+              "The ship's crane"
+            ],
+            [
+              "Pod",
+              "A bay on a ship"
+            ],
+            [
+              "Container",
+              "A shipping container"
+            ]
           ]
         },
         {

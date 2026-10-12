@@ -5,12 +5,14 @@ import 'package:provider/provider.dart';
 import '../app/quiz_spec.dart';
 import '../app/session_store.dart';
 import '../content/models.dart';
+import '../engine/clock.dart';
 import '../engine/quiz.dart';
 import '../progress/insights.dart';
 import '../progress/progress_store.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
 import '../widgets/question_view.dart';
+import '../widgets/rewards_view.dart';
 
 /// S6 — score, review, retry, and what to do next.
 class QuizResultScreen extends StatelessWidget {
@@ -52,6 +54,20 @@ class QuizResultScreen extends StatelessWidget {
         style: textTheme.titleMedium,
         textAlign: TextAlign.center,
       ),
+      if (attempt.confidentMistakes > 0 || attempt.luckyGuesses > 0)
+        Text(
+          [
+            if (attempt.confidentMistakes > 0)
+              '${attempt.confidentMistakes} confident '
+                  '${attempt.confidentMistakes == 1 ? 'mistake' : 'mistakes'}',
+            if (attempt.luckyGuesses > 0)
+              '${attempt.luckyGuesses} right but unsure',
+          ].join(' · '),
+          key: const ValueKey('confidence-summary'),
+          style: textTheme.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
+      XpEarned(result.xpEarned),
       const SizedBox(height: 8),
     ];
     final actions = <Widget>[];
@@ -128,13 +144,25 @@ class QuizResultScreen extends StatelessWidget {
           ),
         ]);
       case ReviewQuizSpec():
-        children.add(
+        final nudge = comeBackText(
+          content,
+          progress,
+          context.read<Clock>().now(),
+        );
+        children.addAll([
           Text(
             'Answers count toward your gap analysis.',
             style: textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),
-        );
+          if (nudge != null)
+            Text(
+              nudge,
+              key: const ValueKey('come-back'),
+              style: textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+        ]);
         actions.addAll([
           FilledButton(
             key: const ValueKey('review-again'),

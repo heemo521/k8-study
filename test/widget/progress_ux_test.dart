@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:k8_study/content/models.dart';
 import 'package:k8_study/engine/flashcards.dart';
+import 'package:k8_study/engine/labs.dart';
 import 'package:k8_study/engine/quiz.dart';
 import 'package:k8_study/progress/insights.dart';
 import 'package:k8_study/progress/progress_store.dart';
+import 'package:k8_study/screens/study_notes_screen.dart';
 import 'package:k8_study/widgets/question_view.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -110,7 +112,35 @@ void main() {
     await tapKey(tester, 'next');
     expect(find.text('Review results'), findsOneWidget);
     expect(h.progress.answerStats(q.id)!.lastCorrect, isTrue);
-    expect(missedQuestions(h.content, h.progress), isEmpty);
+    expect(
+      dueQuestions(h.content, h.progress, h.progress.clock.now()),
+      isEmpty,
+    );
+  });
+
+  testWidgets('"Not sure" on a right answer brings it back tomorrow', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    final catalog = await loadCatalog(tester);
+    final topic = catalog.subjects.first.topics.first;
+    final h = await pumpApp(
+      tester,
+      catalog: catalog,
+      initialLocation: '/topic/${topic.id}/quiz',
+    );
+    final view = tester.widget<QuestionView>(find.byType(QuestionView));
+    final q = view.presented.question;
+    final f = find.descendant(
+      of: find.byType(QuestionView),
+      matching: find.text(q.options.firstWhere((o) => o.correct).text),
+    );
+    await tester.tap(f.first);
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'submit-unsure');
+    expect(find.byKey(const ValueKey('confidence-feedback')), findsOneWidget);
+    // Leave without finishing: nothing is recorded mid-quiz.
+    expect(h.progress.answerStats(q.id), isNull);
   });
 
   testWidgets('due flashcards across topics are reviewed in one session', (
@@ -135,6 +165,152 @@ void main() {
     }
     expect(find.byKey(const ValueKey('cards-summary')), findsOneWidget);
     expect(cards.every((c) => h.progress.cardState(c.id)!.box == 3), isTrue);
+    // Box 2 -> 3 is a 3-day gap: the nudge says when to come back.
+    expect(find.text('Next review in 3 days.'), findsOneWidget);
+  });
+
+  testWidgets("today's review: due cards, then due questions", (tester) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester);
+    final card = h.content.topics[0].flashcards.first;
+    h.progress.setCardState(card.id, CardState(box: 2, dueAt: testNow));
+    final q = h.content.topics[1].questions.first;
+    h.progress.recordAnswers(
+      QuizAttempt([PresentedQuestion(q, q.options)])
+        ..answer(q.id, {q.options.firstWhere((o) => !o.correct).id}),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('today-card')), findsOneWidget);
+    await tapKey(tester, 'today-start');
+    expect(find.text('Due flashcards'), findsOneWidget);
+    await tapKey(tester, 'flip');
+    await tapKey(tester, 'got-it');
+    expect(find.text('Next: 1 question to review'), findsOneWidget);
+    await tester.tap(find.text('Next: 1 question to review'));
+    await tester.pumpAndSettle();
+    expect(find.text('Questions to review'), findsOneWidget);
+    expect(find.text('Q 1/1'), findsOneWidget);
+  });
+
+  testWidgets('warm-up: 3 unscored questions, then the notes', (tester) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester, initialLocation: '/topic/namespaces');
+    await tapKey(tester, 'warmup-card');
+    expect(find.text('Q 1/3'), findsOneWidget);
+    for (var i = 0; i < 3; i++) {
+      final view = tester.widget<QuestionView>(find.byType(QuestionView));
+      final o = view.presented.question.options.first;
+      final f = find.descendant(
+        of: find.byType(QuestionView),
+        matching: find.text(o.text),
+      );
+      await tester.ensureVisible(f.first);
+      await tester.pumpAndSettle();
+      await tester.tap(f.first);
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'submit-unsure');
+      await tapKey(tester, 'next');
+    }
+    // Straight into the notes; nothing recorded.
+    expect(find.byType(StudyNotesScreen), findsOneWidget);
+    expect(h.progress.answerHistory, isEmpty);
+    expect(h.progress.quizStats('namespaces'), isNull);
+  });
+
+  testWidgets('a right answer to a harder question asks "why?" first', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    await pumpApp(tester, initialLocation: '/topic/deployments/quiz');
+    for (var i = 0; i < 10; i++) {
+      final q = tester
+          .widget<QuestionView>(find.byType(QuestionView))
+          .presented
+          .question;
+      if (q.type == QuestionType.command) {
+        await tester.enterText(
+          find.byKey(const ValueKey('command-input')),
+          q.answers.first,
+        );
+      } else {
+        for (final o in q.options.where((o) => o.correct)) {
+          final f = find.descendant(
+            of: find.byType(QuestionView),
+            matching: find.text(o.text),
+          );
+          await tester.ensureVisible(f.first);
+          await tester.pumpAndSettle();
+          await tester.tap(f.first);
+        }
+      }
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'submit');
+      final asks = q.difficulty >= 2 && q.type != QuestionType.command;
+      expect(
+        find.byKey(const ValueKey('why-prompt')),
+        asks ? findsOneWidget : findsNothing,
+        reason: q.id,
+      );
+      if (asks) {
+        final why = q.options.firstWhere((o) => o.correct).explanation;
+        expect(find.text(why), findsNothing);
+        await tapKey(tester, 'show-why');
+        expect(find.byKey(const ValueKey('why-prompt')), findsNothing);
+        expect(find.textContaining(why.split('`').first), findsWidgets);
+        return;
+      }
+      await tapKey(tester, 'next');
+    }
+    fail('no difficulty-2+ multiple-choice question was drawn');
+  });
+
+  testWidgets('lab: worked run, then less guidance next time', (tester) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester, initialLocation: '/topic/cluster-upgrade');
+    final lab = h.content.topic('cluster-upgrade')!.labs.first;
+    await tapKey(tester, 'lab-${lab.id}');
+    expect(find.text('Worked example'), findsOneWidget);
+    for (final (i, step) in lab.steps.indexed) {
+      // Worked: the full command is shown.
+      expect(find.text(step.answers.first), findsOneWidget);
+      if (i == 0) {
+        await tester.enterText(
+          find.byKey(const ValueKey('lab-input-0')),
+          'kubectl get pods',
+        );
+        await tapKey(tester, 'lab-check');
+        expect(find.byKey(const ValueKey('lab-wrong')), findsOneWidget);
+      }
+      await tester.enterText(
+        find.byKey(ValueKey('lab-input-$i')),
+        step.answers.first,
+      );
+      await tapKey(tester, 'lab-check');
+      expect(find.byKey(const ValueKey('lab-right')), findsOneWidget);
+      await tapKey(tester, 'lab-next');
+    }
+    expect(find.byKey(const ValueKey('lab-done')), findsOneWidget);
+    expect(h.progress.labRuns(lab.id), 1);
+  });
+
+  testWidgets('lab: second run shows only how each command starts', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    final catalog = await loadCatalog(tester);
+    final lab = catalog.subjects.first.topic('deployments')!.labs.first;
+    await pumpApp(
+      tester,
+      catalog: catalog,
+      prefs: {'k8s.labs': '{"${lab.id}": 1}'},
+      initialLocation: '/topic/deployments/lab/${lab.id}',
+    );
+    expect(find.text('Partly guided'), findsOneWidget);
+    final first = lab.steps.first.answers.first;
+    expect(find.text(first), findsNothing);
+    expect(find.text(partialHint(first)), findsOneWidget);
+    await tapKey(tester, 'lab-show');
+    expect(find.text(first), findsOneWidget);
   });
 
   testWidgets('search finds a note section and jumps to it', (tester) async {
@@ -292,6 +468,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('streak')), findsOneWidget);
     expect(find.text('Today: 1 section'), findsOneWidget);
+    expect(find.text('Lv 1'), findsOneWidget);
   });
 
   testWidgets('multi-select questions show how many to pick', (tester) async {

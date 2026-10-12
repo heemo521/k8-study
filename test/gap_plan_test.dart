@@ -139,7 +139,7 @@ void main() {
     final c = competencyWithMost();
     final plan = planFromAttempt(attemptFor({c: 0}, 3), testId: 't', now: now)!;
     p.setGapPlan(content.subject.id, plan);
-    final pool = reviewPool(content, p, kind: 'plan');
+    final pool = reviewPool(content, p, kind: 'plan', now: now);
     expect(pool, isNotEmpty);
     expect(pool.every((q) => q.competencyId == c), isTrue);
   });

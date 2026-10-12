@@ -307,7 +307,10 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
           ),
         ),
       ),
-      body: PageList(controller: _scroll, children: children),
+      // Notes text is selectable so commands and terms can be copied.
+      body: SelectionArea(
+        child: PageList(controller: _scroll, children: children),
+      ),
       bottomNavigationBar: speech.status == SpeechStatus.idle
           ? null
           : _ListenBar(

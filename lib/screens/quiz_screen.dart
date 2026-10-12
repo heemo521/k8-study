@@ -9,6 +9,7 @@ import '../ads/ads_service.dart';
 import '../app/quiz_spec.dart';
 import '../app/session_store.dart';
 import '../content/models.dart';
+import '../engine/clock.dart';
 import '../engine/quiz.dart';
 import '../progress/insights.dart';
 import '../progress/progress_store.dart';
@@ -35,6 +36,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int _index = 0;
   Set<String> _selected = {};
   bool _revealed = false;
+  bool _whyShown = false;
   bool _finishing = false;
 
   @override
@@ -44,6 +46,14 @@ class _QuizScreenState extends State<QuizScreen> {
     final progress = context.read<ProgressStore>();
     final random = context.read<Random>();
     switch (_spec) {
+      case TopicQuizSpec(:final topicId, warmup: true):
+        final topic = content.topic(topicId);
+        if (topic == null) return;
+        progress.markTopicVisited(content.subject.id, topicId);
+        _title = '${topic.title} · Warm-up';
+        _attempt = QuizAttempt(
+          drawWarmup(bank: topic.questions, random: random),
+        );
       case TopicQuizSpec(:final topicId, :final retryMissed):
         final topic = content.topic(topicId);
         if (topic == null) return;
@@ -73,18 +83,29 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
         );
       case ReviewQuizSpec(:final kind, :final id):
-        final pool = reviewPool(content, progress, kind: kind, id: id);
+        final pool = reviewPool(
+          content,
+          progress,
+          kind: kind,
+          id: id,
+          now: context.read<Clock>().now(),
+        );
         _title = switch (kind) {
-          'missed' => 'Review missed questions',
+          'missed' => 'Questions to review',
           'plan' => 'Re-test my gaps',
           'competency' => 'Review: ${content.competencyText(id ?? '') ?? id}',
           'domain' => 'Review: ${content.domain(id ?? '')?.title ?? id}',
           _ => 'Review',
         };
-        // Prioritise questions answered wrong last time, then unseen ones.
+        // Due reviews: confident mistakes first. Other reviews: anything
+        // not answered right-and-sure last time, then unseen ones.
         final weak = {
           for (final q in pool)
-            if (progress.answerStats(q.id)?.lastCorrect != true) q.id,
+            if (progress.answerStats(q.id) case final s?
+                when kind == 'missed' ? !s.lastCorrect && s.lastSure : !s.solid)
+              q.id
+            else if (kind != 'missed' && progress.answerStats(q.id) == null)
+              q.id,
         };
         _attempt = QuizAttempt(
           drawQuiz(bank: pool, random: random, priorityIds: weak),
@@ -94,7 +115,22 @@ class _QuizScreenState extends State<QuizScreen> {
 
   PresentedQuestion get _current => _attempt!.questions[_index];
 
-  /// Desktop shortcuts: 1–5 pick an option, Enter submits / continues.
+  /// Self-explanation prompt (spec §15.7): after a right answer to a harder
+  /// multiple-choice question, ask "why?" before showing the explanations.
+  bool get _askWhy =>
+      _revealed &&
+      !_isWarmup &&
+      _current.question.difficulty >= 2 &&
+      _current.question.type != QuestionType.command &&
+      _attempt!.correct(_current);
+
+  bool get _isWarmup {
+    final spec = _spec;
+    return spec is TopicQuizSpec && spec.warmup;
+  }
+
+  /// Desktop shortcuts: 1–5 pick an option, Enter submits as sure (U as not
+  /// sure) / continues.
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent || _attempt == null) {
       return KeyEventResult.ignored;
@@ -118,10 +154,14 @@ class _QuizScreenState extends State<QuizScreen> {
       );
       return KeyEventResult.handled;
     }
+    if (key == LogicalKeyboardKey.keyU && !_revealed && _selected.isNotEmpty) {
+      _submit(sure: false);
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
       if (!_revealed && _selected.isNotEmpty) {
-        _submit();
+        _submit(sure: true);
       } else if (_revealed) {
         _next();
       }
@@ -130,8 +170,8 @@ class _QuizScreenState extends State<QuizScreen> {
     return KeyEventResult.ignored;
   }
 
-  void _submit() {
-    _attempt!.answer(_current.question.id, _selected);
+  void _submit({required bool sure}) {
+    _attempt!.answer(_current.question.id, _selected, sure: sure);
     setState(() => _revealed = true);
   }
 
@@ -141,6 +181,7 @@ class _QuizScreenState extends State<QuizScreen> {
         _index++;
         _selected = {};
         _revealed = false;
+        _whyShown = false;
       });
       return;
     }
@@ -151,18 +192,24 @@ class _QuizScreenState extends State<QuizScreen> {
     if (_finishing) return;
     _finishing = true;
     final attempt = _attempt!;
+    // A warm-up is a guess before studying: no evidence, no score, no ad.
+    if (_isWarmup) {
+      context.go(_spec.resultPath);
+      return;
+    }
     final progress = context.read<ProgressStore>();
-    progress.recordAnswers(attempt);
+    var xp = progress.recordAnswers(attempt);
     if (_spec case TopicQuizSpec(:final topicId, :final retryMissed)) {
       if (retryMissed) {
         progress.recordRetryMissed(topicId, attempt.missedIds);
       } else {
-        progress.recordQuiz(topicId, attempt.percent, attempt.missedIds);
+        xp += progress.recordQuiz(topicId, attempt.percent, attempt.missedIds);
       }
     }
     context.read<SessionStore>().lastQuiz = QuizResult(
       spec: _spec,
       attempt: attempt,
+      xpEarned: xp,
     );
     // Interstitial (if any) shows before the results screen renders.
     await context.read<AdsService>().maybeShowInterstitial(
@@ -288,23 +335,147 @@ class _QuizScreenState extends State<QuizScreen> {
                 presented: _current,
                 selected: _selected,
                 revealed: _revealed,
+                hideExplanations: _askWhy && !_whyShown,
                 onChanged: (s) => setState(() => _selected = s),
               ),
+              if (_askWhy && !_whyShown)
+                _WhyPrompt(onShow: () => setState(() => _whyShown = true)),
               const SizedBox(height: 16),
               if (!_revealed)
-                FilledButton(
-                  key: const ValueKey('submit'),
-                  onPressed: _selected.isEmpty ? null : _submit,
-                  child: const Text('Submit'),
+                _ConfidenceButtons(
+                  enabled: _selected.isNotEmpty,
+                  onSubmit: (sure) => _submit(sure: sure),
                 )
-              else
+              else ...[
+                _ConfidenceFeedback(
+                  correct: attempt.correct(_current),
+                  sure: attempt.isSure(_current.question.id),
+                ),
                 FilledButton(
                   key: const ValueKey('next'),
                   onPressed: _next,
-                  child: Text(_index + 1 < total ? 'Next' : 'See results'),
+                  child: Text(
+                    _index + 1 < total
+                        ? 'Next'
+                        : _isWarmup
+                        ? 'Start the notes'
+                        : 'See results',
+                  ),
                 ),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Submit with a confidence rating (spec §15.1): "Sure" or "Not sure".
+class _ConfidenceButtons extends StatelessWidget {
+  const _ConfidenceButtons({required this.enabled, required this.onSubmit});
+
+  final bool enabled;
+  final ValueChanged<bool> onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          container: true,
+          child: Text(
+            'How sure are you?',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                key: const ValueKey('submit-unsure'),
+                onPressed: enabled ? () => onSubmit(false) : null,
+                child: const Text('Not sure'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                key: const ValueKey('submit'),
+                onPressed: enabled ? () => onSubmit(true) : null,
+                child: const Text('Sure'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// One line on what the answer's confidence means for review.
+class _ConfidenceFeedback extends StatelessWidget {
+  const _ConfidenceFeedback({required this.correct, required this.sure});
+
+  final bool correct;
+  final bool sure;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = switch ((correct, sure)) {
+      (false, true) =>
+        'Confident mistake: read the explanation closely. '
+            'Corrected surprises tend to stick.',
+      (true, false) =>
+        'Right, but unsure: it will come back for review tomorrow.',
+      (false, false) => 'It will come back for review.',
+      (true, true) => null,
+    };
+    if (text == null) return const SizedBox.shrink();
+    return Padding(
+      key: const ValueKey('confidence-feedback'),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+    );
+  }
+}
+
+/// Asks the learner to explain a right answer before reading why.
+class _WhyPrompt extends StatelessWidget {
+  const _WhyPrompt({required this.onShow});
+
+  final VoidCallback onShow;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Card(
+      key: const ValueKey('why-prompt'),
+      margin: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Why is it right?', style: textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Explain it to yourself in one sentence, then check.',
+              style: textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const ValueKey('show-why'),
+                onPressed: onShow,
+                child: const Text('Show the explanation'),
+              ),
+            ),
+          ],
         ),
       ),
     );

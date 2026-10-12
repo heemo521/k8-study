@@ -22,6 +22,11 @@
       "sourceTitle": "Volumes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "When a container crashes, it restarts empty, and containers in a bay can't easily share files. The fix is a **locker attached to the bay** (a volume). Some lockers vanish with the bay; others outlast it. Either way, contents survive container restarts. List lockers once (`.spec.volumes`); each container mounts them where it likes (`volumeMounts`)."
+        },
+        {
           "type": "p",
           "text": "Files written inside a container are lost when it crashes: the kubelet restarts it with a **clean state**. Containers in one Pod also have no easy way to share files. Volumes fix both."
         },
@@ -48,6 +53,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
       "sourceTitle": "Volumes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "An `emptyDir` locker appears **empty** when the bay lands on a ship, shared by every container in the bay. It survives container crashes, but when the bay leaves the ship, its contents are gone for good. `medium: Memory` makes a fast RAM locker that counts against the writer's memory limit; `sizeLimit` caps it."
+        },
         {
           "type": "p",
           "text": "An `emptyDir` is created **empty** when the Pod is assigned to a node. All containers in the Pod can read and write it, at the same or different paths. When the Pod leaves the node for any reason, the data is **deleted permanently**. A container crash does not remove the Pod, so the data survives crashes."
@@ -79,6 +89,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
       "sourceTitle": "Volumes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A `hostPath` locker is a hatch into the **ship's own hold**. It is risky: the hold may contain keys enabling container escape, and identical bays act differently on different ships. Avoid it when you can. Fair uses: reading `/var/log` read-only, or a config file for a static bay. Its `type` says what must already exist."
+        },
         {
           "type": "p",
           "text": "`hostPath` mounts a file or directory from the **node** into the Pod. Few Pods need it, and the docs say to avoid it when you can, for example by using a `local` PersistentVolume instead."
@@ -140,6 +155,11 @@
       "sourceTitle": "Volumes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some lockers come pre-stocked: the bay's instruction sheet (ConfigMap) or sealed envelope (Secret) appears as files. The sheet or envelope must **exist first**, and the locker is always read-only. Secret lockers sit in memory (tmpfs), never on disk. Use `items` to choose file names. Caution: a container mounting one through `subPath` never sees later updates."
+        },
+        {
           "type": "p",
           "text": "These volumes turn API data into files. Name the object in the volume; optionally use `items` to map a `key` to a file `path` under the mount point."
         },
@@ -171,6 +191,11 @@
       "sourceTitle": "Projected Volumes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A `projected` locker gathers several deliveries into **one shelf**: an instruction sheet, a sealed envelope, a robot crew badge token (`serviceAccountToken`) and more. All must come from the bay's own company yard. A badge token lasts one hour by default, and at least 600 seconds. As usual, a `subPath` mount sees no updates."
+        },
+        {
           "type": "p",
           "text": "A `projected` volume merges several sources into **one directory**. Allowed sources: `secret`, `downwardAPI`, `configMap`, `serviceAccountToken`, `clusterTrustBundle` and `podCertificate`. Every source must be in the **same namespace** as the Pod."
         },
@@ -197,6 +222,11 @@
       "sourceTitle": "Volumes",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "One big locker can be split into labelled drawers with `subPath`, so a database and a web server each use their own folder of the same locker. `subPathExpr` names the drawer from an environment variable, like the bay's name, but you can't use both. `readOnly: true` locks the drawer for that container only."
+        },
+        {
           "type": "p",
           "text": "`volumeMounts[*].subPath` mounts a sub-path of the volume instead of its root, so one volume can serve several mounts. For example, a database and a web server can each mount their own folder of one PVC."
         },
@@ -221,6 +251,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/",
       "sourceTitle": "Ephemeral Volumes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some lockers are listed right on the bay's paperwork and come and go with it. The cargo officer (kubelet) runs the simple ones. A **generic ephemeral** locker instead files a real warehouse rental request (PVC) named after the bay, which the bay owns, so it is removed with the bay. Quota still applies."
+        },
         {
           "type": "p",
           "text": "Ephemeral volumes are declared **inline** in the Pod spec and are created and deleted with the Pod."
@@ -251,6 +286,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/storage/volumes/",
       "sourceTitle": "Volumes",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Locker types were once built into the port itself (in-tree). Now a standard **warehouse plug** (CSI) lets vendors ship drivers separately. With a driver installed, a bay can use it through a rental request (PVC), a generic ephemeral locker, or an inline CSI locker. Many old built-in types now redirect to CSI."
+        },
         {
           "type": "p",
           "text": "Volume plugins used to be **in-tree**: compiled and shipped inside Kubernetes. **CSI** (Container Storage Interface) and the deprecated **FlexVolume** are out-of-tree, so vendors can ship drivers without touching the Kubernetes code base."

@@ -3,6 +3,7 @@ library;
 
 import 'gap_plan.dart';
 import '../content/models.dart';
+import '../engine/clock.dart';
 import '../engine/flashcards.dart' as fc;
 import '../engine/quiz.dart';
 import 'progress_store.dart';
@@ -96,7 +97,8 @@ class DomainReadiness {
   final int questionsSeen;
   final int questionsTotal;
 
-  /// Share of seen questions whose latest answer was right; null if none seen.
+  /// Share of seen questions whose latest answer was right and sure; null if
+  /// none seen.
   final double? accuracy;
 
   bool get hasContent => topics.isNotEmpty;
@@ -126,7 +128,7 @@ List<DomainReadiness> domainReadiness(ContentBundle content, ProgressStore p) {
           questionsTotal: questions.length,
           accuracy: seen.isEmpty
               ? null
-              : seen.where((s) => s.lastCorrect).length / seen.length,
+              : seen.where((s) => s.solid).length / seen.length,
         );
       }(),
   ];
@@ -145,6 +147,8 @@ class CompetencyGap {
   final Domain domain;
   final List<String> questionIds;
   final int seen;
+
+  /// Answered right *and* sure last time; a lucky guess isn't counted.
   final int rightLastTime;
 
   int get total => questionIds.length;
@@ -173,7 +177,7 @@ List<CompetencyGap> competencyGaps(ContentBundle content, ProgressStore p) {
           questionIds: e.value,
           seen: e.value.where((id) => p.answerStats(id) != null).length,
           rightLastTime: e.value
-              .where((id) => p.answerStats(id)?.lastCorrect ?? false)
+              .where((id) => p.answerStats(id)?.solid ?? false)
               .length,
         ),
   ];
@@ -193,11 +197,23 @@ List<Topic> weakTopics(ContentBundle content, ProgressStore p) =>
         .toList()
       ..sort((a, b) => p.topicProgress(a).compareTo(p.topicProgress(b)));
 
-/// Questions whose most recent answer was wrong.
-List<Question> missedQuestions(ContentBundle content, ProgressStore p) => [
-  for (final q in content.allQuestions)
-    if (p.answerStats(q.id)?.lastCorrect == false) q,
-];
+/// Questions due in the review schedule: answered wrong or unsure, brought
+/// back on a spaced schedule (spec §15.2). Earliest due first.
+List<Question> dueQuestions(
+  ContentBundle content,
+  ProgressStore p,
+  DateTime now,
+) =>
+    [
+      for (final q in content.allQuestions)
+        if (p.answerStats(q.id)?.isDue(now) ?? false) q,
+    ]..sort(
+      (a, b) => p
+          .answerStats(a.id)!
+          .review!
+          .dueAt
+          .compareTo(p.answerStats(b.id)!.review!.dueAt),
+    );
 
 int dueCardCount(ContentBundle content, ProgressStore p, DateTime now) =>
     content.allFlashcards
@@ -218,11 +234,12 @@ List<Question> reviewPool(
   ContentBundle content,
   ProgressStore p, {
   required String kind,
+  required DateTime now,
   String? id,
 }) {
   switch (kind) {
     case 'missed':
-      return missedQuestions(content, p);
+      return dueQuestions(content, p, now);
     case 'competency':
       return content.allQuestions.where((q) => q.competencyId == id).toList();
     case 'plan':
@@ -235,6 +252,35 @@ List<Question> reviewPool(
     default:
       return const [];
   }
+}
+
+/// Earliest future review date across flashcards and scheduled questions,
+/// or null when nothing is scheduled after today.
+DateTime? nextReviewDate(ContentBundle content, ProgressStore p, DateTime now) {
+  final today = dateOnly(now);
+  DateTime? next;
+  void consider(DateTime? d) {
+    if (d == null || !d.isAfter(today)) return;
+    if (next == null || d.isBefore(next!)) next = d;
+  }
+
+  for (final c in content.allFlashcards) {
+    consider(p.cardState(c.id)?.dueAt);
+  }
+  for (final q in content.allQuestions) {
+    consider(p.answerStats(q.id)?.review?.dueAt);
+  }
+  return next;
+}
+
+/// End-of-session nudge (spec §15.4): spacing beats one long session.
+String? comeBackText(ContentBundle content, ProgressStore p, DateTime now) {
+  final next = nextReviewDate(content, p, now);
+  if (next == null) return null;
+  final days = next.difference(dateOnly(now)).inDays;
+  return days == 1
+      ? 'Next review tomorrow. Sleep helps it stick.'
+      : 'Next review in $days days.';
 }
 
 /// Re-exported so screens only import insights for card counts.

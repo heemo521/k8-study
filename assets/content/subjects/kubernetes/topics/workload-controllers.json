@@ -22,6 +22,11 @@
       "sourceTitle": "DaemonSet",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some items belong on every ship, like a lifeboat (DaemonSet): a log collector, a storage helper, a monitoring agent. A new ship gets one; a departing ship's lifeboat is cleared away. Restrict it to certain ships with node rules, or it goes everywhere. Lifeboats carry built-in permits for trouble signs like \"not ready\" or \"no new cargo\", but not for the harbor office's \"hazmat only\" sign (control-plane taint). Add that permit (toleration) yourself."
+        },
+        {
           "type": "p",
           "text": "A DaemonSet makes all (or some) nodes run a copy of a Pod. When a node joins, it gets the Pod; when a node leaves, its Pod is garbage collected. Typical uses: a storage daemon, a log collector or a node monitoring agent on every node. Network plugins often ship a DaemonSet component."
         },
@@ -79,6 +84,11 @@
       "sourceTitle": "StatefulSets",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some cargo can't swap bays freely. Numbered reserved berths (StatefulSet) give each bay a fixed number and name, like `web-0`, `web-1`, `web-2`, kept even after moving ships. Each berth gets its own named locker from a rental request template (`volumeClaimTemplates`). A directory that lists berths by name (a headless Service) must exist so each one is reachable. Shrink or remove the berths and their lockers stay by default (`Retain`)."
+        },
+        {
           "type": "p",
           "text": "Like a Deployment, a StatefulSet runs Pods from one template, but the Pods are **not interchangeable**. Each keeps its identity across rescheduling. Use it when you need stable network IDs, stable persistent storage, or ordered deployment, scaling and rolling updates."
         },
@@ -105,6 +115,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
       "sourceTitle": "StatefulSets",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Numbered berths fill in order: berth 0 must be up and Ready before berth 1 starts. Emptying runs backwards, highest number first. Choose `Parallel` and they all move at once. Upgrades swap one berth at a time from the top down, and `partition` limits which numbers change; `OnDelete` waits for you to clear each one. Removing the whole set skips the ordering, so scale to 0 first."
+        },
         {
           "type": "bullets",
           "items": [
@@ -154,6 +169,11 @@
       "sourceTitle": "Jobs",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "A one-off delivery run (Job) keeps sending out bays until enough deliveries **succeed**. If a bay fails or its ship sinks, another goes out, so prefer a run over a loose bay. You set how many successes are needed (`completions`) and how many work at once (`parallelism`), or let workers pull from a queue. Setting parallelism to 0 pauses the run; `suspend` stops it and recalls the workers."
+        },
+        {
           "type": "p",
           "text": "A Job creates Pods and keeps retrying until a set number of them **succeed**. If a Pod fails or its node dies, the Job starts a new one, so prefer a Job over a bare Pod even for a single task."
         },
@@ -199,6 +219,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/job/",
       "sourceTitle": "Jobs",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Delivery runs fail sometimes. Each failed bay is resent after a growing wait (10s, 20s, 40s, up to six minutes), until the retry budget (`backoffLimit`, default 6) runs out. A hard time limit on the whole run (`activeDeadlineSeconds`) beats that budget. With `OnFailure` the container restarts in the same bay; with `Never` a fresh bay goes out. A failed run stays failed, and finished runs stick around for their logs until cleaned up (`ttlSecondsAfterFinished`)."
+        },
         {
           "type": "table",
           "header": [
@@ -246,6 +271,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/",
       "sourceTitle": "CronJob",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A scheduled delivery run (CronJob) starts a one-off run on a timetable written like a crontab line, such as `0 3 * * 1` for Mondays at 03:00. Decide what happens if the last run is still going (`concurrencyPolicy`), skip late starts, suspend future runs, and keep a few finished runs on file. The timetable is approximate, so a run may happen twice or not at all: make every delivery safe to repeat (idempotent)."
+        },
         {
           "type": "p",
           "text": "A CronJob creates a Job on a repeating schedule, like one line of a crontab. `.spec.schedule` and `.spec.jobTemplate` are required."

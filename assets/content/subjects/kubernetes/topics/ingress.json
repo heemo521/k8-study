@@ -22,6 +22,11 @@
       "sourceTitle": "Ingress",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Visitors from the city arrive at the **main port gate** (Ingress). A receptionist reads each visitor's host name and path and sends them to the right port phone number (Service), which forwards to bays. The gate only takes web visitors (HTTP and HTTPS); other traffic needs a `NodePort` or `LoadBalancer` entrance. Posting the rules alone does nothing without a receptionist on duty. The port now recommends the newer gate system (Gateway API), and this gate's rulebook is frozen."
+        },
+        {
           "type": "p",
           "text": "An Ingress is an API object (`networking.k8s.io/v1`) that manages **external access to Services**, typically HTTP. Rules on the Ingress decide which Service gets each request."
         },
@@ -162,6 +167,11 @@
       "sourceTitle": "Ingress Controllers",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "The gate's rulebook needs someone to follow it: a **receptionist agency** (the Ingress controller) that you hire and set up yourself. The port maintains the AWS and GCE agencies; many outside ones exist, such as NGINX, Traefik and HAProxy. You may hire several at once, so each rulebook names its agency with `ingressClassName`, pointing to an IngressClass. Each agency works a little differently, so read its handbook."
+        },
+        {
           "type": "p",
           "text": "An Ingress only works if an ingress controller is **running in the cluster**. You choose at least one and set it up yourself."
         },
@@ -183,6 +193,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
       "sourceTitle": "Ingress",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A rulebook page (the Ingress resource) says: visitors for this host and this path go to that port phone number (`service.name` plus a port). Both host and path must match. Leave the host blank and the rule covers every web visitor at the gate. A path can instead point to another kind of desk in the same yard (`resource`), but never to both. Agencies may also read sticky notes (annotations) for extras."
+        },
         {
           "type": "code",
           "lang": "yaml",
@@ -207,6 +222,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
       "sourceTitle": "Ingress",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every path rule must say how strictly to compare (`pathType`). **Exact** wants the whole path, letter for letter. **Prefix** compares folder by folder, so `/foo/bar` covers `/foo/bar/baz` but not `/foo/barbaz`. **ImplementationSpecific** leaves it to the agency. When several rules fit, the longest path wins, and on a tie Exact beats Prefix. A wildcard host covers one extra name label only: `bar.foo.com` fits, `baz.bar.foo.com` does not."
+        },
         {
           "type": "p",
           "text": "Every path **must** have a `pathType`; a path without one fails validation."
@@ -249,6 +269,11 @@
       "sourceTitle": "Ingress",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Each agency registers a **port-wide agency card** (IngressClass, always cluster-scoped) naming who runs it (`.spec.controller`) and, optionally, where its extra settings live (`.spec.parameters`). One card can be stamped \"default\" with the `is-default-class` annotation, and rulebooks that name no agency get it. Stamp two cards default and the front desk turns away new rulebooks with no `ingressClassName`. The old `kubernetes.io/ingress.class` sticky note is replaced."
+        },
+        {
           "type": "p",
           "text": "An **IngressClass** names the controller that implements it (`.spec.controller`) and can point at extra config through `.spec.parameters`. The IngressClass API is always **cluster-scoped**."
         },
@@ -279,6 +304,11 @@
       "sourceTitle": "Ingress",
       "blocks": [
         {
+          "type": "callout",
+          "kind": "story",
+          "text": "Some rulebooks have no rules at all, just a fallback desk (`.spec.defaultBackend`) for every visitor; when the rules list is empty, that fallback is required. One host can fan out by path to several port numbers, saving entrances. Or several host names can share one gate, sorted by the name the visitor asks for. To change a live rulebook, edit it with your radio (`kubectl edit ingress`) and the agency reconfigures."
+        },
+        {
           "type": "bullets",
           "items": [
             "**`.spec.defaultBackend`** handles requests that match no rule. If `.spec.rules` is empty, `.spec.defaultBackend` is **required**. If it isn't set, unmatched requests are handled however the controller decides.",
@@ -305,6 +335,11 @@
       "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
       "sourceTitle": "Ingress",
       "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "For secure visitors, the receptionist keeps a sealed envelope (a `kubernetes.io/tls` Secret holding `tls.crt` and `tls.key`) and checks credentials at the gate, on door 443 only. Past the gate, visitors walk to the bays unescorted (plaintext). Several secure host names can share door 443 if the agency supports SNI. The catch-all rule gets no secure check, so each secure host must match a named host rule."
+        },
         {
           "type": "p",
           "text": "Secure an Ingress by referencing a Secret of type `kubernetes.io/tls` whose keys are **`tls.crt`** and **`tls.key`**."
