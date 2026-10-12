@@ -191,12 +191,20 @@ class _QuizScreenState extends State<QuizScreen> {
   Widget build(BuildContext context) {
     final attempt = _attempt;
     if (attempt == null || attempt.questions.isEmpty) {
-      return NotFoundView(
-        message: _spec is ReviewQuizSpec
-            ? 'Nothing to review here yet. Take some quizzes first.'
-            : 'Quiz not available.',
-        backTo: _spec.exitPath,
-      );
+      return _spec is ReviewQuizSpec
+          ? const NotFoundView(
+              title: 'Review',
+              icon: Icons.task_alt,
+              message:
+                  'Nothing to review yet. Questions you get wrong in '
+                  'quizzes and practice tests will show up here.',
+              backTo: '/',
+              actionLabel: 'Find a topic to study',
+            )
+          : NotFoundView(
+              message: 'Quiz not available.',
+              backTo: _spec.exitPath,
+            );
     }
     final total = attempt.questions.length;
     final answered = attempt.answers.length;

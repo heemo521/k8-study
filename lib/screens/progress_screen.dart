@@ -89,35 +89,42 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
           // ---- reviews -------------------------------------------------------
           heading('Review now'),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  key: const ValueKey('review-due-cards'),
-                  leading: const Icon(Icons.style_outlined),
-                  title: Text(
-                    '$due ${due == 1 ? 'flashcard' : 'flashcards'} due',
+          if (due == 0 && missed == 0)
+            Text(
+              'Nothing to review yet. Flashcards come due after you study them, '
+              'and questions you get wrong in quizzes appear here.',
+              style: textTheme.bodyMedium,
+            )
+          else
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    key: const ValueKey('review-due-cards'),
+                    leading: const Icon(Icons.style_outlined),
+                    title: Text(
+                      '$due ${due == 1 ? 'flashcard' : 'flashcards'} due',
+                    ),
+                    subtitle: const Text('Spaced repetition across all topics'),
+                    trailing: const Icon(Icons.chevron_right),
+                    enabled: due > 0,
+                    onTap: () => context.go('/progress/cards'),
                   ),
-                  subtitle: const Text('Spaced repetition across all topics'),
-                  trailing: const Icon(Icons.chevron_right),
-                  enabled: due > 0,
-                  onTap: () => context.go('/progress/cards'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  key: const ValueKey('review-missed'),
-                  leading: const Icon(Icons.replay),
-                  title: Text(
-                    '$missed missed ${missed == 1 ? 'question' : 'questions'}',
+                  const Divider(height: 1),
+                  ListTile(
+                    key: const ValueKey('review-missed'),
+                    leading: const Icon(Icons.replay),
+                    title: Text(
+                      '$missed missed ${missed == 1 ? 'question' : 'questions'}',
+                    ),
+                    subtitle: const Text('Questions you got wrong last time'),
+                    trailing: const Icon(Icons.chevron_right),
+                    enabled: missed > 0,
+                    onTap: () => context.go('/progress/review?kind=missed'),
                   ),
-                  subtitle: const Text('Questions you got wrong last time'),
-                  trailing: const Icon(Icons.chevron_right),
-                  enabled: missed > 0,
-                  onTap: () => context.go('/progress/review?kind=missed'),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
           // ---- readiness by domain ------------------------------------------
           heading(
