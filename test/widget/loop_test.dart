@@ -170,7 +170,10 @@ void main() {
       find.byKey(const ValueKey('review-missed-after-test')),
       findsNothing,
     );
-    expect(missedQuestions(h.content, h.progress), isEmpty);
+    expect(
+      dueQuestions(h.content, h.progress, h.progress.clock.now()),
+      isEmpty,
+    );
     expect(
       h.progress.answerStats(view.presented.question.id)?.lastCorrect,
       isTrue,

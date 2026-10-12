@@ -13,6 +13,7 @@ import '../content/models.dart';
 import '../engine/clock.dart';
 import '../engine/flashcards.dart';
 import '../engine/practice.dart';
+import '../engine/question_review.dart';
 import '../engine/quiz.dart';
 
 const schemaVersion = 1;
@@ -86,13 +87,16 @@ class GapPlan {
   );
 }
 
-/// Answer history for one question across quizzes, reviews and tests.
+/// Answer history for one question across quizzes, reviews and tests,
+/// plus its place in the question review schedule (spec §14.1–14.2).
 class AnswerStats {
   const AnswerStats({
     required this.seen,
     required this.correct,
     required this.lastCorrect,
     required this.lastAt,
+    this.lastSure = true,
+    this.review,
   });
 
   final int seen;
@@ -100,19 +104,51 @@ class AnswerStats {
   final bool lastCorrect;
   final DateTime lastAt;
 
+  /// Whether the latest answer was given with "Sure".
+  final bool lastSure;
+
+  /// Review schedule; null when the question isn't scheduled.
+  final ReviewSlot? review;
+
+  /// Right and sure: the only answer that counts as known.
+  bool get solid => lastCorrect && lastSure;
+
+  bool isDue(DateTime now) => review?.isDue(now) ?? false;
+
   Map<String, dynamic> toJson() => {
     'n': seen,
     'c': correct,
     'last': lastCorrect,
     'at': lastAt.toIso8601String(),
+    if (!lastSure) 'sure': false,
+    if (review != null) ...{
+      'box': review!.box,
+      'due': formatDate(review!.dueAt),
+    },
   };
 
-  static AnswerStats fromJson(Map<String, dynamic> j) => AnswerStats(
-    seen: j['n'] as int,
-    correct: j['c'] as int,
-    lastCorrect: j['last'] as bool,
-    lastAt: DateTime.parse(j['at'] as String),
-  );
+  static AnswerStats fromJson(Map<String, dynamic> j) {
+    final lastCorrect = j['last'] as bool;
+    final lastAt = DateTime.parse(j['at'] as String);
+    final box = j['box'] as int?;
+    final due = j['due'] as String?;
+    if (box != null && (box < 1 || box > maxBox)) {
+      throw FormatException('bad box: $box');
+    }
+    return AnswerStats(
+      seen: j['n'] as int,
+      correct: j['c'] as int,
+      lastCorrect: lastCorrect,
+      lastAt: lastAt,
+      lastSure: j['sure'] as bool? ?? true,
+      review: box != null && due != null
+          ? ReviewSlot(box: box, dueAt: dateOnly(DateTime.parse(due)))
+          // Saved before the schedule existed: a wrong answer is due now.
+          : lastCorrect
+          ? null
+          : ReviewSlot(box: 1, dueAt: dateOnly(lastAt)),
+    );
+  }
 }
 
 class QuizStats {
@@ -503,12 +539,15 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       final id = p.question.id;
       if (!attempt.isAnswered(id)) continue;
       final ok = attempt.correct(p);
+      final sure = attempt.isSure(id);
       final prev = _answers[id];
       _answers[id] = AnswerStats(
         seen: (prev?.seen ?? 0) + 1,
         correct: (prev?.correct ?? 0) + (ok ? 1 : 0),
         lastCorrect: ok,
         lastAt: now,
+        lastSure: sure,
+        review: nextSlot(prev?.review, correct: ok, sure: sure, now: now),
       );
     }
     _write(StorageKeys.answers, {

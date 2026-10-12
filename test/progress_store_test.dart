@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:k8_study/ads/frequency_cap.dart';
+import 'package:k8_study/content/models.dart';
 import 'package:k8_study/engine/clock.dart';
 import 'package:k8_study/engine/flashcards.dart';
 import 'package:k8_study/engine/practice.dart';
+import 'package:k8_study/engine/quiz.dart';
 import 'package:k8_study/progress/progress_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -179,5 +183,56 @@ void main() {
     expect(s.streak, 2);
     clock.t = DateTime(2026, 10, 13, 9);
     expect(s.streak, 0, reason: 'a missed day breaks the streak');
+  });
+
+  test('confidence and review schedule are recorded per answer', () async {
+    final p = await store();
+    final q = Question(
+      id: 'q1',
+      topicId: 't',
+      type: QuestionType.single,
+      stem: 'stem',
+      options: const [
+        AnswerOption(id: 'a', text: 'A', correct: true, explanation: 'x'),
+        AnswerOption(id: 'b', text: 'B', correct: false, explanation: 'y'),
+      ],
+      sourceUrl: 'https://kubernetes.io/docs/',
+      difficulty: 1,
+    );
+    QuizAttempt run(String pick, {required bool sure}) =>
+        QuizAttempt([PresentedQuestion(q, q.options)])
+          ..answer(q.id, {pick}, sure: sure);
+
+    // Right but unsure: not solid, due tomorrow.
+    p.recordAnswers(run('a', sure: false));
+    var s = p.answerStats('q1')!;
+    expect(s.lastCorrect, isTrue);
+    expect(s.solid, isFalse);
+    expect(s.isDue(DateTime(2026, 10, 11)), isFalse);
+    expect(s.isDue(DateTime(2026, 10, 12)), isTrue);
+
+    // Wrong: due today. Survives a reload.
+    p.recordAnswers(run('b', sure: true));
+    final b = ProgressStore(
+      await SharedPreferences.getInstance(),
+      clock: p.clock,
+    );
+    s = b.answerStats('q1')!;
+    expect(s.lastSure, isTrue);
+    expect(s.review!.box, 1);
+    expect(s.isDue(DateTime(2026, 10, 11)), isTrue);
+  });
+
+  test('answers saved before the schedule: wrong ones are due', () async {
+    final p = await store({
+      StorageKeys.answers: jsonEncode({
+        'wrong': {'n': 1, 'c': 0, 'last': false, 'at': '2026-10-01T10:00:00'},
+        'right': {'n': 1, 'c': 1, 'last': true, 'at': '2026-10-01T10:00:00'},
+      }),
+    });
+    final now = DateTime(2026, 10, 11);
+    expect(p.answerStats('wrong')!.isDue(now), isTrue);
+    expect(p.answerStats('wrong')!.lastSure, isTrue);
+    expect(p.answerStats('right')!.review, isNull);
   });
 }

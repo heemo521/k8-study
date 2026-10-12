@@ -52,6 +52,19 @@ class QuizResultScreen extends StatelessWidget {
         style: textTheme.titleMedium,
         textAlign: TextAlign.center,
       ),
+      if (attempt.confidentMistakes > 0 || attempt.luckyGuesses > 0)
+        Text(
+          [
+            if (attempt.confidentMistakes > 0)
+              '${attempt.confidentMistakes} confident '
+                  '${attempt.confidentMistakes == 1 ? 'mistake' : 'mistakes'}',
+            if (attempt.luckyGuesses > 0)
+              '${attempt.luckyGuesses} right but unsure',
+          ].join(' · '),
+          key: const ValueKey('confidence-summary'),
+          style: textTheme.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
       const SizedBox(height: 8),
     ];
     final actions = <Widget>[];

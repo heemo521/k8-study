@@ -26,7 +26,7 @@ class TopicBrowserScreen extends StatelessWidget {
     final now = context.read<Clock>().now();
 
     final due = dueCardCount(content, progress, now);
-    final missed = missedQuestions(content, progress).length;
+    final missed = dueQuestions(content, progress, now).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -69,7 +69,7 @@ class TopicBrowserScreen extends StatelessWidget {
                     key: const ValueKey('chip-missed'),
                     avatar: const Icon(Icons.replay, size: 18),
                     label: Text(
-                      '$missed missed ${missed == 1 ? 'question' : 'questions'}',
+                      '$missed ${missed == 1 ? 'question' : 'questions'} to review',
                     ),
                     onPressed: () => context.go('/progress/review?kind=missed'),
                   ),

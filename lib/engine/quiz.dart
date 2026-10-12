@@ -61,8 +61,19 @@ class QuizAttempt {
   final List<PresentedQuestion> questions;
   final Map<String, Set<String>> answers = {};
 
-  void answer(String questionId, Set<String> selected) =>
-      answers[questionId] = Set.unmodifiable(selected);
+  /// Questions answered with "Not sure" (spec §14.1).
+  final Set<String> unsure = {};
+
+  void answer(String questionId, Set<String> selected, {bool sure = true}) {
+    answers[questionId] = Set.unmodifiable(selected);
+    if (sure) {
+      unsure.remove(questionId);
+    } else {
+      unsure.add(questionId);
+    }
+  }
+
+  bool isSure(String questionId) => !unsure.contains(questionId);
 
   bool isAnswered(String questionId) =>
       (answers[questionId] ?? const {}).isNotEmpty;
@@ -82,4 +93,14 @@ class QuizAttempt {
     for (final p in questions)
       if (!correct(p)) p.question.id,
   };
+
+  /// Wrong answers given with "Sure": the misconceptions worth fixing first.
+  int get confidentMistakes => questions
+      .where((p) => isAnswered(p.question.id))
+      .where((p) => !correct(p) && isSure(p.question.id))
+      .length;
+
+  /// Right answers given with "Not sure": they come back for review.
+  int get luckyGuesses =>
+      questions.where((p) => correct(p) && !isSure(p.question.id)).length;
 }

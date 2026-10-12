@@ -676,3 +676,40 @@ assets/content/subjects/<id>/topics/*.json
   They feed answer history but not topic best scores.
 - **Due-card session** (`/progress/cards`) reviews every due flashcard in the
   subject in one Leitner session.
+
+## 14. v1.2 — learning-science features
+
+Each feature below comes from the audit in
+[`docs/LEARNING.md`](../docs/LEARNING.md).
+
+### 14.1 Confidence rating
+
+- Topic and review quizzes submit with **Sure** or **Not sure** instead of a
+  single Submit. Desktop: Enter = Sure, U = Not sure.
+- After the reveal, one line explains what the rating means:
+  - wrong and sure: a *confident mistake*; read the explanation closely;
+  - right and unsure: it comes back for review tomorrow;
+  - wrong and unsure: it comes back for review.
+- Results show "N confident mistakes · M right but unsure" when either is
+  non-zero.
+- Answer history stores the latest rating (`sure: false` only when unsure;
+  absent means sure, so older data stays valid).
+- **Solid** = latest answer right *and* sure. Readiness accuracy and
+  competency gaps count only solid answers, so a lucky guess still shows as a
+  gap.
+- Practice tests don't ask for a rating, since they simulate the exam. Their
+  answers count as sure.
+
+### 14.2 Spaced review of questions
+
+- Questions get a review slot (box 1–5 and due date, stored as `box`/`due` in
+  `k8s.answers`) using the flashcard intervals (§7.1):
+  - wrong → box 1, due today;
+  - right but unsure → same box (1 if new), due tomorrow;
+  - right and sure → next box, due after that box's interval; a question with
+    no slot stays without one.
+- Answers saved before this existed: a wrong latest answer is due on the day
+  it was answered.
+- "Questions to review" (Home chip, Progress "Review now") lists the due
+  questions, earliest first. The review quiz (`kind=missed`) prioritises
+  confident mistakes.

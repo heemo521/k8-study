@@ -96,7 +96,8 @@ class DomainReadiness {
   final int questionsSeen;
   final int questionsTotal;
 
-  /// Share of seen questions whose latest answer was right; null if none seen.
+  /// Share of seen questions whose latest answer was right and sure; null if
+  /// none seen.
   final double? accuracy;
 
   bool get hasContent => topics.isNotEmpty;
@@ -126,7 +127,7 @@ List<DomainReadiness> domainReadiness(ContentBundle content, ProgressStore p) {
           questionsTotal: questions.length,
           accuracy: seen.isEmpty
               ? null
-              : seen.where((s) => s.lastCorrect).length / seen.length,
+              : seen.where((s) => s.solid).length / seen.length,
         );
       }(),
   ];
@@ -145,6 +146,8 @@ class CompetencyGap {
   final Domain domain;
   final List<String> questionIds;
   final int seen;
+
+  /// Answered right *and* sure last time; a lucky guess isn't counted.
   final int rightLastTime;
 
   int get total => questionIds.length;
@@ -173,7 +176,7 @@ List<CompetencyGap> competencyGaps(ContentBundle content, ProgressStore p) {
           questionIds: e.value,
           seen: e.value.where((id) => p.answerStats(id) != null).length,
           rightLastTime: e.value
-              .where((id) => p.answerStats(id)?.lastCorrect ?? false)
+              .where((id) => p.answerStats(id)?.solid ?? false)
               .length,
         ),
   ];
@@ -193,11 +196,23 @@ List<Topic> weakTopics(ContentBundle content, ProgressStore p) =>
         .toList()
       ..sort((a, b) => p.topicProgress(a).compareTo(p.topicProgress(b)));
 
-/// Questions whose most recent answer was wrong.
-List<Question> missedQuestions(ContentBundle content, ProgressStore p) => [
-  for (final q in content.allQuestions)
-    if (p.answerStats(q.id)?.lastCorrect == false) q,
-];
+/// Questions due in the review schedule: answered wrong or unsure, brought
+/// back on a spaced schedule (spec §14.2). Earliest due first.
+List<Question> dueQuestions(
+  ContentBundle content,
+  ProgressStore p,
+  DateTime now,
+) =>
+    [
+      for (final q in content.allQuestions)
+        if (p.answerStats(q.id)?.isDue(now) ?? false) q,
+    ]..sort(
+      (a, b) => p
+          .answerStats(a.id)!
+          .review!
+          .dueAt
+          .compareTo(p.answerStats(b.id)!.review!.dueAt),
+    );
 
 int dueCardCount(ContentBundle content, ProgressStore p, DateTime now) =>
     content.allFlashcards
@@ -218,11 +233,12 @@ List<Question> reviewPool(
   ContentBundle content,
   ProgressStore p, {
   required String kind,
+  required DateTime now,
   String? id,
 }) {
   switch (kind) {
     case 'missed':
-      return missedQuestions(content, p);
+      return dueQuestions(content, p, now);
     case 'competency':
       return content.allQuestions.where((q) => q.competencyId == id).toList();
     case 'plan':

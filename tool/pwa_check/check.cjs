@@ -192,7 +192,7 @@ async function noHorizontalScroll(page) {
     const picks = i === 0 ? [q.options.find((o) => !o.correct)] : q.options.filter((o) => o.correct);
     for (const o of picks) await tap(page, strip(o.text), false);
     if (i === 0) await shot(page, '07-quiz-question');
-    await tap(page, 'Submit');
+    await tap(page, 'Sure');
     if (i === 0) await shot(page, '08-quiz-feedback');
     await tap(page, i === 9 ? 'See results' : 'Next');
   }

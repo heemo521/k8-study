@@ -110,7 +110,35 @@ void main() {
     await tapKey(tester, 'next');
     expect(find.text('Review results'), findsOneWidget);
     expect(h.progress.answerStats(q.id)!.lastCorrect, isTrue);
-    expect(missedQuestions(h.content, h.progress), isEmpty);
+    expect(
+      dueQuestions(h.content, h.progress, h.progress.clock.now()),
+      isEmpty,
+    );
+  });
+
+  testWidgets('"Not sure" on a right answer brings it back tomorrow', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    final catalog = await loadCatalog(tester);
+    final topic = catalog.subjects.first.topics.first;
+    final h = await pumpApp(
+      tester,
+      catalog: catalog,
+      initialLocation: '/topic/${topic.id}/quiz',
+    );
+    final view = tester.widget<QuestionView>(find.byType(QuestionView));
+    final q = view.presented.question;
+    final f = find.descendant(
+      of: find.byType(QuestionView),
+      matching: find.text(q.options.firstWhere((o) => o.correct).text),
+    );
+    await tester.tap(f.first);
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'submit-unsure');
+    expect(find.byKey(const ValueKey('confidence-feedback')), findsOneWidget);
+    // Leave without finishing: nothing is recorded mid-quiz.
+    expect(h.progress.answerStats(q.id), isNull);
   });
 
   testWidgets('due flashcards across topics are reviewed in one session', (
