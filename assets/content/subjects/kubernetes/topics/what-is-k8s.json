@@ -22,6 +22,11 @@
           "text": "Welcome to the **Port of Kube**, a busy shipping port. Your apps are cargo, packed in standard shipping containers. Nobody here carries boxes by hand. You file an order like \"always keep three containers of medicine on the water\", and the port's crews make it happen and keep it true. Fittingly, **Kubernetes** is Greek for **helmsman**."
         },
         {
+          "type": "scene",
+          "scene": "port-welcome",
+          "caption": "Your app is cargo packed in a **container**. Kubernetes is the port that runs it."
+        },
+        {
           "type": "p",
           "text": "Kubernetes is an open source platform for running and managing **containerized workloads and services**. It is portable and extensible, and it supports both **declarative configuration** and automation."
         },
@@ -50,6 +55,11 @@
           "type": "callout",
           "kind": "story",
           "text": "Ships break down, crates go missing, and demand spikes before holidays. A good port handles that without the customer noticing: it swaps broken containers, spreads cargo across ships with spare room, and adds ships when orders pile up. Each row below is one of those port services."
+        },
+        {
+          "type": "scene",
+          "scene": "port-services",
+          "caption": "The port swaps broken containers, adds copies when it gets busy, and upgrades a few at a time."
         },
         {
           "type": "p",
@@ -118,6 +128,11 @@
           "text": "The port moves and looks after containers. It does not run the factory that packs them (your build and CI/CD), and it does not sell you the goods inside (databases, caches, message buses). It hands you cranes, docks and rules, and lets you choose your own suppliers."
         },
         {
+          "type": "scene",
+          "scene": "port-scope",
+          "caption": "Kubernetes runs the port. Building containers and the services inside them are your choice."
+        },
+        {
           "type": "p",
           "text": "Kubernetes is **not a traditional, all-inclusive PaaS**. It works at the container level and gives you building blocks; the defaults it does ship are optional and pluggable."
         },
@@ -149,6 +164,11 @@
           "type": "callout",
           "kind": "story",
           "text": "Shipping used to mean loose sacks thrown into one ship's hold, where a leaking barrel could ruin everyone's cargo (physical servers). Then every customer got a small ship of their own, carried inside a big one, with its own engine and crew (VMs). Then came the **standard container**: sealed boxes that share one ship's engine and crew, and fit any ship, truck or train (containers)."
+        },
+        {
+          "type": "scene",
+          "scene": "shipping-eras",
+          "caption": "Loose cargo, then a boat per customer, then standard containers that share one ship."
         },
         {
           "type": "table",
@@ -198,7 +218,12 @@
         {
           "type": "callout",
           "kind": "story",
-          "text": "Every port has a **harbor office** that keeps the books and makes the decisions (the control plane), and a fleet of **cargo ships** that actually carry the containers (worker nodes). The table at the end of this section is your cast list for every story in this course."
+          "text": "Every port has a **harbor office** that keeps the books and makes the decisions (the control plane), and a fleet of **cargo ships** that actually carry the containers (worker nodes). The picture at the end of this section is your cast list for every story in this course."
+        },
+        {
+          "type": "scene",
+          "scene": "port-overview",
+          "caption": "The **harbor office** (control plane) on shore sends orders to the **cargo ships** (worker nodes)."
         },
         {
           "type": "p",
@@ -386,57 +411,9 @@
           ]
         },
         {
-          "type": "table",
-          "header": [
-            "Kubernetes",
-            "At the Port of Kube"
-          ],
-          "rows": [
-            [
-              "Cluster",
-              "The whole port: harbor office plus its fleet"
-            ],
-            [
-              "Control plane",
-              "The harbor office"
-            ],
-            [
-              "`kube-apiserver`",
-              "The front desk: every order and report goes through it"
-            ],
-            [
-              "`etcd`",
-              "The master ledger of what should exist"
-            ],
-            [
-              "`kube-scheduler`",
-              "The load planner who picks a ship with room"
-            ],
-            [
-              "`kube-controller-manager`",
-              "Supervisors who compare the ledger with the docks and fix gaps"
-            ],
-            [
-              "Worker node",
-              "A cargo ship"
-            ],
-            [
-              "`kubelet`",
-              "The ship's cargo officer"
-            ],
-            [
-              "Container runtime",
-              "The ship's crane"
-            ],
-            [
-              "Pod",
-              "A bay on a ship"
-            ],
-            [
-              "Container",
-              "A shipping container"
-            ]
-          ]
+          "type": "scene",
+          "scene": "port-cast",
+          "caption": "The cast for every Port story in this course: each Kubernetes part and its role at the port."
         },
         {
           "type": "callout",

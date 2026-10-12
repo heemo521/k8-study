@@ -24,7 +24,10 @@ void main() {
       // A bottom bar, not a full-screen overlay.
       final bar = tester.getRect(find.byKey(const ValueKey('listen-bar')));
       expect(bar.height, lessThan(160 * scale));
-      expect(bar.bottom, 740);
+      // Stacked on the page Back/Next bar at the bottom of the screen.
+      final nav = tester.getRect(find.byKey(const ValueKey('notes-nav')));
+      expect(bar.bottom, nav.top);
+      expect(nav.bottom, 740);
     });
   }
 }

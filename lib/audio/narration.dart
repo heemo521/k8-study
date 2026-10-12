@@ -33,6 +33,7 @@ Iterable<String> _sectionChunks(NoteSection section, int index) sync* {
             ].join('; '),
           ),
       ].join(' '),
+      SceneBlock(:final caption) => 'Picture. ${_sentence(caption)}',
       DiagramBlock(:final title, :final steps) => [
         'Diagram: ${_sentence(title)}',
         for (final s in steps) _sentence(s.text),

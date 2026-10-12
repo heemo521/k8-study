@@ -13,7 +13,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent / "assets" / "content"
-BLOCK_TYPES = {"p", "bullets", "code", "callout", "table", "diagram"}
+# Must match PortScene ids in lib/content/models.dart.
+SCENES = {"port-welcome", "port-overview", "port-services", "port-scope", "shipping-eras", "port-cast"}
+BLOCK_TYPES = {"p", "bullets", "code", "callout", "table", "diagram", "scene"}
 DIAGRAM_KINDS = {"control", "worker", "pod", "service", "storage", "external", "user", "generic"}
 CALLOUTS = {"key", "exam", "warn", "story"}
 
@@ -120,6 +122,12 @@ def check_topic(path, subject, comp_ids, domain_ids, allow, errors):
                 err(f"{s['id']}: bad block type {ty}")
             elif ty in ("p",):
                 total_words += words(b.get("text", ""))
+            elif ty == "scene":
+                if b.get("scene") not in SCENES:
+                    err(f"{s['id']}: unknown scene {b.get('scene')}")
+                if not isinstance(b.get("caption"), str) or not b["caption"].strip():
+                    err(f"{s['id']}: scene needs a caption")
+                total_words += words(b.get("caption", ""))
             elif ty == "diagram":
                 total_words += check_diagram(s["id"], b, err)
             elif ty == "bullets":

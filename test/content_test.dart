@@ -230,6 +230,7 @@ void main() {
               ...rows.expand((r) => r),
             ].join(' '),
             DiagramBlock(:final description) => description,
+            SceneBlock(:final caption) => caption,
           };
           words += text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
         }

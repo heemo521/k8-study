@@ -1,4 +1,5 @@
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
@@ -8,19 +9,22 @@ import '../audio/narration.dart';
 import '../audio/speech.dart';
 import '../content/models.dart';
 import '../progress/progress_store.dart';
+import '../widgets/key_handler.dart';
 import '../widgets/note_block_view.dart';
 import '../widgets/not_found.dart';
 import '../widgets/page_body.dart';
 import '../widgets/source_link.dart';
 
-/// S3 — the topic's note sections. A section is marked read when its foot
-/// scrolls into view, via "Mark read", or once it has been read aloud.
+/// S3 — the topic's note sections, one page per section. Swipe, tap
+/// Next/Back or use the arrow keys to turn pages. A section is marked read
+/// when its foot scrolls into view, when the reader moves on with Next, via
+/// "Mark read", or once it has been read aloud.
 class StudyNotesScreen extends StatefulWidget {
   const StudyNotesScreen({super.key, required this.topicId, this.sectionId});
 
   final String topicId;
 
-  /// Section to scroll to on open (e.g. from search).
+  /// Section to open on (e.g. from search).
   final String? sectionId;
 
   @override
@@ -28,10 +32,11 @@ class StudyNotesScreen extends StatefulWidget {
 }
 
 class _StudyNotesScreenState extends State<StudyNotesScreen> {
-  final _scroll = ScrollController();
+  late final PageController _pages;
+  final Map<String, ScrollController> _scrolls = {};
   final Map<String, GlobalKey> _footerKeys = {};
-  final Map<String, GlobalKey> _headingKeys = {};
   late final SpeechController _speech = context.read<SpeechController>();
+  int _page = 0;
   int? _spokenGroup;
   String? _shownError;
 
@@ -40,7 +45,10 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
   @override
   void initState() {
     super.initState();
-    _scroll.addListener(_checkVisible);
+    final sections = _topic?.sections ?? const <NoteSection>[];
+    final start = sections.indexWhere((s) => s.id == widget.sectionId);
+    _page = start < 0 ? 0 : start;
+    _pages = PageController(initialPage: _page);
     _speech.addListener(_followSpeech);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final topic = _topic;
@@ -49,27 +57,62 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
         context.read<ContentBundle>().subject.id,
         topic.id,
       );
-      if (widget.sectionId != null) {
-        _jumpTo(widget.sectionId!);
-      } else {
-        _checkVisible();
-      }
+      _checkVisible();
     });
   }
 
-  void _jumpTo(String sectionId) {
-    final ctx = _headingKeys[sectionId]?.currentContext;
-    if (ctx == null) return;
-    Scrollable.ensureVisible(
-      ctx,
-      duration: const Duration(milliseconds: 250),
-      alignment: 0.02,
+  ScrollController _scrollFor(NoteSection section) =>
+      _scrolls.putIfAbsent(section.id, () {
+        final controller = ScrollController();
+        controller.addListener(_checkVisible);
+        return controller;
+      });
+
+  void _goTo(int page, {bool animate = true}) {
+    final topic = _topic;
+    if (topic == null || !_pages.hasClients) return;
+    final target = page.clamp(0, topic.sections.length - 1);
+    if (animate && !MediaQuery.of(context).disableAnimations) {
+      _pages.animateToPage(
+        target,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _pages.jumpToPage(target);
+    }
+  }
+
+  /// Next: the current section counts as read once the reader moves on.
+  void _next(Topic topic) {
+    context.read<ProgressStore>().markSectionRead(
+      topic.id,
+      topic.sections[_page].id,
     );
+    if (_page < topic.sections.length - 1) {
+      _goTo(_page + 1);
+    } else {
+      context.go('/topic/${topic.id}/cards');
+    }
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    final topic = _topic;
+    if (topic == null || event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      if (_page < topic.sections.length - 1) _next(topic);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      _goTo(_page - 1);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   Future<void> _showSections(Topic topic) async {
     final read = context.read<ProgressStore>().readSections(topic.id);
-    final picked = await showModalBottomSheet<String>(
+    final picked = await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,
       builder: (sheet) => SafeArea(
@@ -78,40 +121,25 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
           children: [
             for (var i = 0; i < topic.sections.length; i++)
               ListTile(
+                selected: i == _page,
                 leading: Icon(
                   read.contains(topic.sections[i].id)
                       ? Icons.check_circle
                       : Icons.radio_button_unchecked,
                 ),
                 title: Text('${i + 1}. ${topic.sections[i].heading}'),
-                onTap: () => Navigator.pop(sheet, topic.sections[i].id),
+                onTap: () => Navigator.pop(sheet, i),
               ),
           ],
         ),
       ),
     );
-    if (picked != null) _jumpTo(picked);
+    if (picked != null) _goTo(picked, animate: false);
   }
 
-  /// Index of the section the reader is looking at: the last one whose
-  /// heading is at or above the upper part of the screen.
-  int _visibleSection(Topic topic) {
-    var visible = 0;
-    for (var i = 0; i < topic.sections.length; i++) {
-      final box = _headingKeys[topic.sections[i].id]?.currentContext
-          ?.findRenderObject();
-      if (box is! RenderBox || !box.attached) continue;
-      final viewport = RenderAbstractViewport.maybeOf(box);
-      if (viewport == null) continue;
-      final top = viewport.getOffsetToReveal(box, 0).offset;
-      if (top <= _scroll.offset + 120) visible = i;
-    }
-    return visible;
-  }
-
-  /// Starts reading aloud at section [from] (default: the one on screen).
+  /// Starts reading aloud at section [from] (default: the page on screen).
   void _listen(Topic topic, {int? from}) {
-    final start = from ?? _visibleSection(topic);
+    final start = from ?? _page;
     final progress = context.read<ProgressStore>();
     _speech.onGroupDone = (group) {
       if (group < topic.sections.length) {
@@ -122,7 +150,7 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
     _speech.play(narrateTopic(topic), startGroup: start);
   }
 
-  /// Keeps the section being read on screen, and reports failures.
+  /// Turns to the page being read, and reports failures.
   void _followSpeech() {
     final error = _speech.error;
     if (error != null && !identical(error, _shownError) && mounted) {
@@ -137,7 +165,7 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
     if (group == null || topic == null || group >= topic.sections.length) {
       return;
     }
-    _jumpTo(topic.sections[group].id);
+    if (group != _page) _goTo(group);
   }
 
   @override
@@ -145,53 +173,65 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
     _speech.removeListener(_followSpeech);
     _speech.onGroupDone = null;
     _speech.stop();
-    _scroll.dispose();
+    _pages.dispose();
+    for (final c in _scrolls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
+  /// Marks the page's section read once its foot is on screen.
   void _checkVisible() {
     final topic = _topic;
-    if (topic == null || !mounted || !_scroll.hasClients) return;
+    if (topic == null || !mounted || topic.sections.isEmpty) return;
+    final section = topic.sections[_page.clamp(0, topic.sections.length - 1)];
     final progress = context.read<ProgressStore>();
-    final read = progress.readSections(topic.id);
-    for (final section in topic.sections) {
-      if (read.contains(section.id)) continue;
-      final box = _footerKeys[section.id]?.currentContext?.findRenderObject();
-      if (box == null || !box.attached) continue;
-      final viewport = RenderAbstractViewport.maybeOf(box);
-      if (viewport == null) continue;
-      // Scroll offset at which the footer's bottom meets the viewport bottom.
-      final revealAt = viewport.getOffsetToReveal(box, 1.0).offset;
-      if (_scroll.offset >= revealAt - 1) {
-        progress.markSectionRead(topic.id, section.id);
-      }
+    if (progress.readSections(topic.id).contains(section.id)) return;
+    final scroll = _scrolls[section.id];
+    final box = _footerKeys[section.id]?.currentContext?.findRenderObject();
+    if (scroll == null || !scroll.hasClients) return;
+    if (box == null || !box.attached) return;
+    final viewport = RenderAbstractViewport.maybeOf(box);
+    if (viewport == null) return;
+    // Scroll offset at which the footer's bottom meets the viewport bottom.
+    final revealAt = viewport.getOffsetToReveal(box, 1.0).offset;
+    if (scroll.offset >= revealAt - 1) {
+      progress.markSectionRead(topic.id, section.id);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final topic = _topic;
-    if (topic == null) return const NotFoundView(message: 'Topic not found.');
-    final progress = context.watch<ProgressStore>();
-    final speech = context.watch<SpeechController>();
-    final ads = context.read<AdsService>();
+  Widget _sectionPage(
+    BuildContext context,
+    Topic topic,
+    int i, {
+    required bool isRead,
+    required bool speaking,
+    required bool canListen,
+  }) {
+    final section = topic.sections[i];
     final scheme = Theme.of(context).colorScheme;
-    final readCount = progress.readCount(topic);
-    final total = topic.sections.length;
     final textTheme = Theme.of(context).textTheme;
-
-    final children = <Widget>[];
-    for (var i = 0; i < total; i++) {
-      final section = topic.sections[i];
-      final isRead = progress.readSections(topic.id).contains(section.id);
-      final footerKey = _footerKeys.putIfAbsent(section.id, GlobalKey.new);
-      final headingKey = _headingKeys.putIfAbsent(section.id, GlobalKey.new);
-      final speaking = speech.group == i;
-      children.addAll([
+    final progress = context.read<ProgressStore>();
+    final ads = context.read<AdsService>();
+    final footerKey = _footerKeys.putIfAbsent(section.id, GlobalKey.new);
+    return PageList(
+      key: PageStorageKey('notes-page-${section.id}'),
+      controller: _scrollFor(section),
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            'PART ${i + 1} OF ${topic.sections.length}',
+            style: textTheme.labelMedium?.copyWith(
+              color: scheme.primary,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
         AnimatedContainer(
-          key: headingKey,
           duration: const Duration(milliseconds: 250),
-          margin: const EdgeInsets.only(top: 8, bottom: 8),
+          margin: const EdgeInsets.only(top: 2, bottom: 8),
           padding: EdgeInsets.only(left: speaking ? 10 : 0),
           decoration: BoxDecoration(
             border: Border(
@@ -206,13 +246,10 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
               Expanded(
                 child: Semantics(
                   header: true,
-                  child: Text(
-                    '${i + 1}. ${section.heading}',
-                    style: textTheme.titleLarge,
-                  ),
+                  child: Text(section.heading, style: textTheme.titleLarge),
                 ),
               ),
-              if (speech.supported)
+              if (canListen)
                 IconButton(
                   key: ValueKey('listen-${section.id}'),
                   tooltip: 'Listen from here',
@@ -240,7 +277,7 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
                     padding: const EdgeInsets.all(12),
                     child: Icon(
                       Icons.check_circle,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: scheme.primary,
                       semanticLabel: 'Read',
                     ),
                   )
@@ -252,20 +289,24 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
                   ),
           ],
         ),
-        const Divider(height: 24),
-      ]);
-      if (i == 1 && total >= 3) {
-        children.add(ads.banner(AdPlacement.studyNotesBanner));
-      }
-    }
-    children.add(
-      FilledButton.icon(
-        key: const ValueKey('next-flashcards'),
-        onPressed: () => context.go('/topic/${topic.id}/cards'),
-        icon: const Icon(Icons.arrow_forward),
-        label: const Text('Next: Flashcards'),
-      ),
+        if (i == 1 && topic.sections.length >= 3) ...[
+          const SizedBox(height: 12),
+          ads.banner(AdPlacement.studyNotesBanner),
+        ],
+      ],
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topic = _topic;
+    if (topic == null) return const NotFoundView(message: 'Topic not found.');
+    final progress = context.watch<ProgressStore>();
+    final speech = context.watch<SpeechController>();
+    final readCount = progress.readCount(topic);
+    final total = topic.sections.length;
+    final textTheme = Theme.of(context).textTheme;
+    final read = progress.readSections(topic.id);
 
     return Scaffold(
       appBar: AppBar(
@@ -308,17 +349,151 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
         ),
       ),
       // Notes text is selectable so commands and terms can be copied.
-      body: SelectionArea(
-        child: PageList(controller: _scroll, children: children),
+      body: KeyHandler(
+        onKey: _onKey,
+        child: SelectionArea(
+          child: PageView.builder(
+            key: const ValueKey('notes-pages'),
+            controller: _pages,
+            itemCount: total,
+            onPageChanged: (i) {
+              setState(() => _page = i);
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _checkVisible(),
+              );
+            },
+            itemBuilder: (context, i) => _sectionPage(
+              context,
+              topic,
+              i,
+              isRead: read.contains(topic.sections[i].id),
+              speaking: speech.group == i,
+              canListen: speech.supported,
+            ),
+          ),
+        ),
       ),
-      bottomNavigationBar: speech.status == SpeechStatus.idle
-          ? null
-          : _ListenBar(
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (speech.status != SpeechStatus.idle)
+            _ListenBar(
               speech: speech,
               heading: speech.group == null || speech.group! >= total
                   ? ''
                   : topic.sections[speech.group!].heading,
             ),
+          _PageNav(
+            page: _page,
+            total: total,
+            read: [for (final s in topic.sections) read.contains(s.id)],
+            onBack: _page == 0 ? null : () => _goTo(_page - 1),
+            onNext: () => _next(topic),
+            onDot: (i) => _goTo(i),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Back / page dots / Next under the notes. On the last page Next leads to
+/// the flashcards.
+class _PageNav extends StatelessWidget {
+  const _PageNav({
+    required this.page,
+    required this.total,
+    required this.read,
+    required this.onBack,
+    required this.onNext,
+    required this.onDot,
+  });
+
+  final int page;
+  final int total;
+  final List<bool> read;
+  final VoidCallback? onBack;
+  final VoidCallback onNext;
+  final ValueChanged<int> onDot;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final last = page >= total - 1;
+    return Material(
+      key: const ValueKey('notes-nav'),
+      color: scheme.surfaceContainer,
+      child: SafeArea(
+        top: false,
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: maxContentWidth),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: TextButton.icon(
+                      key: const ValueKey('notes-back'),
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('Back', overflow: TextOverflow.fade),
+                    ),
+                  ),
+                  Expanded(
+                    child: Semantics(
+                      label: 'Part ${page + 1} of $total',
+                      excludeSemantics: true,
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        children: [
+                          for (var i = 0; i < total; i++)
+                            InkWell(
+                              key: ValueKey('notes-dot-$i'),
+                              customBorder: const CircleBorder(),
+                              onTap: () => onDot(i),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: i == page ? 18 : 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: i == page
+                                        ? scheme.primary
+                                        : read[i]
+                                        ? scheme.primary.withValues(alpha: 0.45)
+                                        : scheme.outlineVariant,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    flex: last ? 2 : 1,
+                    child: FilledButton.icon(
+                      key: ValueKey(last ? 'next-flashcards' : 'notes-next'),
+                      onPressed: onNext,
+                      icon: const Icon(Icons.arrow_forward),
+                      iconAlignment: IconAlignment.end,
+                      label: Text(
+                        last ? 'Flashcards' : 'Next',
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
