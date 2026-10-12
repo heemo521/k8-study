@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:k8_study/content/models.dart';
 import 'package:k8_study/engine/flashcards.dart';
+import 'package:k8_study/engine/labs.dart';
 import 'package:k8_study/engine/quiz.dart';
 import 'package:k8_study/progress/insights.dart';
 import 'package:k8_study/progress/progress_store.dart';
@@ -261,6 +262,55 @@ void main() {
       await tapKey(tester, 'next');
     }
     fail('no difficulty-2+ multiple-choice question was drawn');
+  });
+
+  testWidgets('lab: worked run, then less guidance next time', (tester) async {
+    await setPhoneViewport(tester);
+    final h = await pumpApp(tester, initialLocation: '/topic/cluster-upgrade');
+    final lab = h.content.topic('cluster-upgrade')!.labs.first;
+    await tapKey(tester, 'lab-${lab.id}');
+    expect(find.text('Worked example'), findsOneWidget);
+    for (final (i, step) in lab.steps.indexed) {
+      // Worked: the full command is shown.
+      expect(find.text(step.answers.first), findsOneWidget);
+      if (i == 0) {
+        await tester.enterText(
+          find.byKey(const ValueKey('lab-input-0')),
+          'kubectl get pods',
+        );
+        await tapKey(tester, 'lab-check');
+        expect(find.byKey(const ValueKey('lab-wrong')), findsOneWidget);
+      }
+      await tester.enterText(
+        find.byKey(ValueKey('lab-input-$i')),
+        step.answers.first,
+      );
+      await tapKey(tester, 'lab-check');
+      expect(find.byKey(const ValueKey('lab-right')), findsOneWidget);
+      await tapKey(tester, 'lab-next');
+    }
+    expect(find.byKey(const ValueKey('lab-done')), findsOneWidget);
+    expect(h.progress.labRuns(lab.id), 1);
+  });
+
+  testWidgets('lab: second run shows only how each command starts', (
+    tester,
+  ) async {
+    await setPhoneViewport(tester);
+    final catalog = await loadCatalog(tester);
+    final lab = catalog.subjects.first.topic('deployments')!.labs.first;
+    await pumpApp(
+      tester,
+      catalog: catalog,
+      prefs: {'k8s.labs': '{"${lab.id}": 1}'},
+      initialLocation: '/topic/deployments/lab/${lab.id}',
+    );
+    expect(find.text('Partly guided'), findsOneWidget);
+    final first = lab.steps.first.answers.first;
+    expect(find.text(first), findsNothing);
+    expect(find.text(partialHint(first)), findsOneWidget);
+    await tapKey(tester, 'lab-show');
+    expect(find.text(first), findsOneWidget);
   });
 
   testWidgets('search finds a note section and jumps to it', (tester) async {

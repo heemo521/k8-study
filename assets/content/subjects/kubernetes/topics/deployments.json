@@ -934,5 +934,57 @@
       "explanation": "`--to-revision` picks a specific revision from `kubectl rollout history`.",
       "competencyId": "ws-rollouts"
     }
+  ],
+  "labs": [
+    {
+      "id": "deployments-lab-01",
+      "title": "Roll out a new image, then roll back",
+      "scenario": "You run the example `nginx-deployment`, update its image, watch the rollout and then undo it.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+      "steps": [
+        {
+          "prompt": "Create the Deployment from the example manifest at `https://k8s.io/examples/controllers/nginx-deployment.yaml`.",
+          "answers": [
+            "kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml"
+          ],
+          "explanation": "`kubectl apply -f` creates (or updates) the objects in a manifest, here read from a URL."
+        },
+        {
+          "prompt": "Check that the Deployment exists.",
+          "answers": [
+            "kubectl get deployments"
+          ],
+          "explanation": "The READY, UP-TO-DATE and AVAILABLE columns show how far it has got."
+        },
+        {
+          "prompt": "Update the `nginx` container to the image `nginx:1.16.1`.",
+          "answers": [
+            "kubectl set image deployment/nginx-deployment nginx=nginx:1.16.1"
+          ],
+          "explanation": "Changing the Pod template image starts a rolling update."
+        },
+        {
+          "prompt": "Follow the rollout until it finishes.",
+          "answers": [
+            "kubectl rollout status deployment/nginx-deployment"
+          ],
+          "explanation": "`rollout status` waits and reports when the new ReplicaSet is fully rolled out."
+        },
+        {
+          "prompt": "List the Deployment's revisions.",
+          "answers": [
+            "kubectl rollout history deployment/nginx-deployment"
+          ],
+          "explanation": "Each change to the Pod template creates a revision you can roll back to."
+        },
+        {
+          "prompt": "Roll back to the previous revision.",
+          "answers": [
+            "kubectl rollout undo deployment/nginx-deployment"
+          ],
+          "explanation": "`rollout undo` returns the Pod template to the previous revision."
+        }
+      ]
+    }
   ]
 }

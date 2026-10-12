@@ -18,6 +18,10 @@ Highlights:
 - **Mock exam → gap plan**: a CKA-weighted mock exam shows which competencies
   are under 80% and builds a plan for each one (re-read the notes, review the
   flashcards, pass a targeted quiz), plus a re-test of what's still open.
+- **Learning-science study loop** ([`docs/LEARNING.md`](docs/LEARNING.md)):
+  typed `kubectl` answers, guided labs whose help fades with each run,
+  Sure / Not sure ratings, spaced review of wrong or unsure answers, a mixed
+  daily review, a warm-up before the notes, and "why?" prompts.
 - **Works offline** once loaded, and installs as an app.
 
 Try it: <https://heemo521.github.io/k8-study/> (deployed from `main` by

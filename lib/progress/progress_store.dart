@@ -31,6 +31,7 @@ abstract final class StorageKeys {
   static const recent = 'k8s.recent';
   static const activity = 'k8s.activity';
   static const plans = 'k8s.plans';
+  static const labs = 'k8s.labs';
 }
 
 /// One competency an exam showed as weak, with the exam's result for it.
@@ -246,6 +247,9 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
   Map<String, Map<String, int>> _activity = {};
   Map<String, GapPlan> _plans = {};
 
+  /// Completed runs per lab id (spec §14.8).
+  Map<String, int> _labs = {};
+
   // ---- loading -------------------------------------------------------------
 
   T _read<T>(String key, T fallback, T Function(dynamic json) parse) {
@@ -309,7 +313,12 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       e.key: GapPlan.fromJson(e.value as Map<String, dynamic>),
   };
 
+  static Map<String, int> _parseLabs(dynamic j) => {
+    for (final e in (j as Map<String, dynamic>).entries) e.key: e.value as int,
+  };
+
   static final Map<String, Object Function(dynamic)> _parsers = {
+    StorageKeys.labs: _parseLabs,
     StorageKeys.plans: _parsePlans,
     StorageKeys.activity: _parseActivity,
     StorageKeys.notes: _parseNotes,
@@ -343,6 +352,19 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     _recent = _read(StorageKeys.recent, {}, _parseRecent);
     _activity = _read(StorageKeys.activity, {}, _parseActivity);
     _plans = _read(StorageKeys.plans, {}, _parsePlans);
+    _labs = _read(StorageKeys.labs, {}, _parseLabs);
+  }
+
+  // ---- labs ----------------------------------------------------------------
+
+  /// How many times the lab [labId] has been completed.
+  int labRuns(String labId) => _labs[labId] ?? 0;
+
+  void recordLabRun(String labId) {
+    _labs[labId] = labRuns(labId) + 1;
+    _bump('labs');
+    _write(StorageKeys.labs, _labs);
+    notifyListeners();
   }
 
   // ---- gap plans -----------------------------------------------------------
@@ -652,6 +674,7 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
     StorageKeys.recent,
     StorageKeys.activity,
     StorageKeys.plans,
+    StorageKeys.labs,
     StorageKeys.settings,
   ];
 
@@ -721,10 +744,12 @@ class ProgressStore extends ChangeNotifier implements AdCapStore {
       StorageKeys.recent,
       StorageKeys.activity,
       StorageKeys.plans,
+      StorageKeys.labs,
     ]) {
       await _prefs.remove(key);
     }
     _plans = {};
+    _labs = {};
     _answers = {};
     _recent = {};
     _activity = {};

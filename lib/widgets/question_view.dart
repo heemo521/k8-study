@@ -259,29 +259,33 @@ class _CommandAnswerState extends State<_CommandAnswer> {
     super.dispose();
   }
 
+  Widget _field(TextTheme textTheme) => TextField(
+    key: const ValueKey('command-input'),
+    controller: _controller,
+    enabled: widget.onChanged != null,
+    autocorrect: false,
+    enableSuggestions: false,
+    textCapitalization: TextCapitalization.none,
+    keyboardType: TextInputType.visiblePassword,
+    style: textTheme.bodyLarge?.merge(_mono),
+    decoration: const InputDecoration(
+      labelText: 'Type the command',
+      hintText: 'kubectl …',
+      border: OutlineInputBorder(),
+    ),
+    onChanged: (text) =>
+        widget.onChanged?.call(text.trim().isEmpty ? {} : {text}),
+  );
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final q = widget.question;
     if (!widget.revealed) {
-      return TextField(
-        key: const ValueKey('command-input'),
-        controller: _controller,
-        enabled: widget.onChanged != null,
-        autocorrect: false,
-        enableSuggestions: false,
-        textCapitalization: TextCapitalization.none,
-        keyboardType: TextInputType.visiblePassword,
-        style: textTheme.bodyLarge?.merge(_mono),
-        decoration: const InputDecoration(
-          labelText: 'Type the command',
-          hintText: 'kubectl …',
-          border: OutlineInputBorder(),
-        ),
-        onChanged: (text) =>
-            widget.onChanged?.call(text.trim().isEmpty ? {} : {text}),
-      );
+      // Own semantics node: otherwise the field's role and size merge into
+      // the surrounding column's node.
+      return Semantics(container: true, child: _field(textTheme));
     }
     final ok = isCorrect(q, {widget.typed});
     final color = ok ? scheme.correct : scheme.wrong;

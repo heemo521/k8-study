@@ -37,25 +37,29 @@ Dunlosky et al. 2013), and "I recognise it, so I know it".
 
 ## 2. Audit: how k8-study measures up
 
+Status after the v1.2 changes (spec §14):
+
 | Principle | Status | Where |
 |-----------|--------|-------|
-| Retrieval practice | ✅ Strong | Flashcards (flip before reveal), topic quizzes, practice tests |
-| Spacing | ✅ Good | Leitner 5 boxes, 1/3/7/14/30 days (`lib/engine/flashcards.dart`) |
-| Feedback | ✅ Good | Per-option explanations; quiz feedback immediate, practice tests deferred |
-| Deliberate practice | ✅ Good | Missed-first quiz draw, gap plan, competency review quizzes |
+| Retrieval practice | ✅ Strong | Flashcards (flip before reveal), quizzes, practice tests, typed commands |
+| Spacing | ✅ Strong | Leitner flashcards; wrong or unsure answers re-scheduled on the same intervals (§14.2) |
+| Interleaving | ✅ Good | Today's review mixes due cards and questions across topics (§14.3); practice tests mix domains |
+| Feedback | ✅ Good | Per-option explanations; confident mistakes called out (§14.1) |
+| Metacognition | ✅ Good | Sure / Not sure on every answer; lucky guesses still count as gaps (§14.1) |
+| Generation / pretesting | ✅ Good | Warm-up questions before a topic's notes (§14.6) |
+| Self-explanation | ✅ Good | "Why is it right?" before explanations on harder questions (§14.7) |
+| Worked examples → fading | ✅ Good | Guided labs: worked → partly guided → on your own (§14.8) |
+| Transfer (hands-on) | 🟡 Better | Typed `kubectl` answers and labs (§14.5, §14.8); a real cluster is still needed for full practice |
+| Deliberate practice | ✅ Good | Missed-first draws, gap plan, competency reviews |
 | Mastery learning | ✅ Good | 80% mastery threshold, gap plan per competency |
 | Dual coding | ✅ Good | Animated step-through diagrams |
 | Cognitive load | ✅ Good | Structured note blocks, short sections |
-| Interleaving | 🟡 Partial | Practice tests and due-card session mix topics; topic quizzes and per-topic cards are blocked |
-| Spacing of *questions* | 🟡 Partial | Only flashcards are scheduled; missed quiz questions are re-prioritised but not on a timer |
-| Metacognition | 🟡 Partial | Honest scores and gaps, but no confidence rating, so "lucky guesses" count as known |
-| Generation / pretesting | ❌ Missing | Notes always come before questions |
-| Self-explanation | ❌ Missing | No "why?" prompts |
-| Worked examples → fading | ❌ Missing | Commands appear in notes, but there's no step-by-step task that fades to solo |
-| Transfer (hands-on) | ❌ Biggest gap | Everything is recognition (multiple choice) or flip-cards; the CKA is typed `kubectl` tasks |
-| Flashcard self-grading honesty | 🟡 Risk | "Got it" is self-judged; easy to over-rate recognition as recall |
+| Short sessions & sleep | ✅ Good | 20-card cap; "next review tomorrow" nudges (§14.4) |
+| Flashcard self-grading honesty | 🟡 Risk | "Got it" is still self-judged; the study guide below says to recall fully before flipping |
 
 ## 3. Recommendations (ranked by impact ÷ effort)
+
+All eight are now implemented (spec §14.1–14.8). Kept here as the rationale.
 
 1. **Typed-answer questions** *(transfer, generation — high impact)*. New
    question type `command`: the learner types a `kubectl`/YAML answer; graded by

@@ -7,6 +7,7 @@ import '../screens/about_screen.dart';
 import '../screens/flashcards_screen.dart';
 import '../screens/gap_plan_screen.dart';
 import '../screens/home_shell.dart';
+import '../screens/lab_screen.dart';
 import '../screens/practice_hub_screen.dart';
 import '../screens/practice_result_screen.dart';
 import '../screens/practice_run_screen.dart';
@@ -75,6 +76,14 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                                 s.uri.queryParameters['mode'] == 'missed',
                             warmup: s.uri.queryParameters['mode'] == 'warmup',
                           ),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'lab/:labId',
+                        parentNavigatorKey: rootKey,
+                        builder: (_, s) => LabScreen(
+                          topicId: s.pathParameters['topicId']!,
+                          labId: s.pathParameters['labId']!,
                         ),
                       ),
                       // A sibling (not a child) of the quiz route, so the

@@ -830,5 +830,43 @@
       ],
       "explanation": "`--stdin --tty` (short: `-it`) attach your terminal; everything after `--` is the command run in the container."
     }
+  ],
+  "labs": [
+    {
+      "id": "troubleshoot-apps-lab-01",
+      "title": "Investigate a crashing Pod",
+      "scenario": "Pod `my-pod` keeps restarting. Narrow down why.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/kubectl/quick-reference/",
+      "steps": [
+        {
+          "prompt": "List the Pods in the namespace and look at STATUS and RESTARTS.",
+          "answers": [
+            "kubectl get pods"
+          ],
+          "explanation": "A rising RESTARTS count points to a container that keeps exiting."
+        },
+        {
+          "prompt": "Show the details and recent events for `my-pod`.",
+          "answers": [
+            "kubectl describe pods my-pod"
+          ],
+          "explanation": "`describe` shows container states, exit reasons and the Pod's events."
+        },
+        {
+          "prompt": "Show the logs of the previous, crashed container in `my-pod`.",
+          "answers": [
+            "kubectl logs my-pod --previous"
+          ],
+          "explanation": "The crashed instance's output usually holds the error."
+        },
+        {
+          "prompt": "List the namespace's events, oldest first.",
+          "answers": [
+            "kubectl get events --sort-by=.metadata.creationTimestamp"
+          ],
+          "explanation": "Sorting by creation time shows what happened in order."
+        }
+      ]
+    }
   ]
 }

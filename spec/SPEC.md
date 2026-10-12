@@ -789,3 +789,27 @@ Each feature below comes from the audit in
   one sentence, then **Show the explanation**.
 - Not shown for wrong answers (they need the explanation now), `command`
   questions or the warm-up. Next stays available, so it can be skipped.
+
+### 14.8 Guided labs with fading
+
+- A topic may have `labs`: a scenario and an ordered list of steps, each a
+  `prompt`, accepted `answers` and an `explanation`.
+
+  ```jsonc
+  "labs": [{ "id": "deployments-lab-01", "title": "…", "scenario": "…",
+             "sourceUrl": "…",
+             "steps": [{ "prompt": "…", "answers": ["kubectl …"], "explanation": "…" }] }]
+  ```
+
+- The topic hub lists them under **Hands-on labs** (`/topic/<id>/lab/<labId>`).
+- Each step is typed and checked with the §14.5 grading. A wrong answer can be
+  retried, or the answer shown. After a right (or shown) answer the
+  explanation appears and the lab moves on.
+- **Fading** by completed runs (`k8s.labs`: lab id → runs, included in
+  backup and reset):
+  - run 1, *Worked example*: the full command is shown;
+  - run 2, *Partly guided*: only its start (`kubectl rollout undo …`);
+  - run 3 and later, *On your own*: the prompt only.
+- The lab asks the learner to run each command in their own practice cluster.
+  The app checks the typed command, not the cluster.
+- Authoring follows §14.5: every answer appears on `sourceUrl`.

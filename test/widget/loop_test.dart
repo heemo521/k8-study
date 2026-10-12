@@ -211,6 +211,8 @@ void main() {
       '/topic/architecture/notes',
       '/topic/kubeadm/cards',
       '/topic/kubeadm/quiz',
+      '/topic/namespaces/quiz?mode=warmup',
+      '/topic/deployments/lab/deployments-lab-01',
       '/practice',
       '/progress',
       '/about',

@@ -65,7 +65,10 @@ async function tap(page, text, exact = true) {
     if (await hasText(page, text) || i >= 8) await scrollDown(page, 300);
     else await page.waitForTimeout(250);
   }
-  if (idx < 0) throw new Error(`no semantics node for "${text}"`);
+  if (idx < 0) {
+    await shot(page, 'failure');
+    throw new Error(`no semantics node for "${text}" — on screen: ${(await allText(page)).replace(/\s+/g, ' ').slice(0, 400)}`);
+  }
   const el = page.locator('flt-semantics').nth(idx);
   await el.click({ force: true });
   await page.waitForTimeout(450);
@@ -196,7 +199,15 @@ async function noHorizontalScroll(page) {
     if (!q) { check(`quiz question ${i + 1} identified`, false, text.replace(/\s+/g, ' ').slice(0, 300)); break; }
     if (q.type === 'command') {
       // Typed answer: focus the field, then type (wrong on the first question).
-      await page.locator('flt-semantics-host input').first().click({ force: true });
+      // Flutter's text input may not be ready right after navigation: click
+      // until an input element really has focus, then type.
+      for (let k = 0; k < 10; k++) {
+        const box = await page.locator('flt-semantics-host input').first().boundingBox();
+        if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        await page.waitForTimeout(300);
+        const focused = await page.evaluate(() => ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName));
+        if (focused) break;
+      }
       await page.keyboard.type(i === 0 ? 'kubectl version' : q.answers[0]);
       await page.waitForTimeout(300);
     } else {
