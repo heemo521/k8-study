@@ -1,0 +1,15 @@
+{
+  "tests": [
+    {
+      "id": "networking-mixed",
+      "title": "Networking basics: mixed",
+      "description": "Random questions from every Networking topic.",
+      "questionCount": 15,
+      "timeLimitMinutes": 20,
+      "filter": {
+        "domainIds": null
+      },
+      "weighting": "uniform"
+    }
+  ]
+}

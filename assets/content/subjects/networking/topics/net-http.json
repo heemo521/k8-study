@@ -1,0 +1,962 @@
+{
+  "id": "net-http",
+  "title": "HTTP, TLS & Proxies",
+  "summary": "How the web talks: URLs, HTTP requests and responses, status codes, HTTPS with TLS, and the reverse proxies and load balancers in between.",
+  "order": 4,
+  "domainIds": [
+    "net-web"
+  ],
+  "competencyIds": [
+    "net-http",
+    "net-proxy"
+  ],
+  "prerequisites": [
+    "net-tcp-udp",
+    "net-dns"
+  ],
+  "estMinutes": 16,
+  "reviewedAt": "2026-10-12",
+  "sections": [
+    {
+      "id": "net-http-url",
+      "heading": "Reading a URL",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL",
+      "sourceTitle": "What is a URL? (MDN)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A URL is a full delivery label. The **scheme** names the delivery service. The **domain** is the harbor and the **port** is the desk, often left off when it's the usual one. The **path** is the shelf, **parameters** are extra notes for the clerk, and the **anchor** is a sticky note the clerk never even sees."
+        },
+        {
+          "type": "p",
+          "text": "A **URL** is the address of one resource on the web, such as a page or an image. Take `https://www.example.com:443/path/to/file.html?key1=value1#part`:"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Part",
+            "Example",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "Scheme",
+              "`https`",
+              "The protocol to use (`http` or `https` for web pages)"
+            ],
+            [
+              "Domain",
+              "`www.example.com`",
+              "Which web server (an IP address works too, but rarely)"
+            ],
+            [
+              "Port",
+              "`443`",
+              "The \"gate\" on the server. Usually omitted for the standard 80 (HTTP) and 443 (HTTPS)"
+            ],
+            [
+              "Path",
+              "`/path/to/file.html`",
+              "Which resource on that server"
+            ],
+            [
+              "Parameters",
+              "`?key1=value1`",
+              "Extra key/value pairs, joined with `&`"
+            ],
+            [
+              "Anchor",
+              "`#part`",
+              "A spot inside the resource. **Never sent to the server**"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "net-http-http",
+      "heading": "What HTTP is",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/HTTP",
+      "sourceTitle": "HTTP (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every request at the harbor's front window uses the same standard **order form** (HTTP). It's written in plain words anyone can read. The clerk keeps no memory between forms: each one must stand on its own. Forms for sensitive goods travel in a sealed pouch instead (HTTPS over TLS)."
+        },
+        {
+          "type": "p",
+          "text": "**HTTP** (HyperText Transfer Protocol) is the protocol for moving web documents, typically between a **browser** and a **server**."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Textual**: messages are plain text that people can read.",
+            "**Stateless**: each request stands alone; HTTP itself remembers nothing about earlier ones.",
+            "The `http` scheme usually means an **unencrypted** connection. The `https` scheme means HTTP over a secure **TLS** channel.",
+            "Besides web pages, it carries server-to-server REST APIs and `fetch()` requests from web pages."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "net-http-messages",
+      "heading": "Requests and responses",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview",
+      "sourceTitle": "An overview of HTTP (MDN)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "The browser fills in an order form: what it wants done (`GET`), which shelf, and some notes (headers). The clerk sends back a reply slip with a **status stamp** and the goods. Sessions like a shopping basket work because the browser attaches a loyalty card (a cookie) to every form."
+        },
+        {
+          "type": "p",
+          "text": "HTTP is **client-server**: the client (usually a browser) always sends the request; the server answers with a response. HTTP needs a **reliable** transport, so it normally runs over **TCP**, often encrypted with TLS."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "1. Open a TCP connection (or reuse one).",
+            "2. Send a **request**: a **method** (like `GET` to fetch or `POST` to send form data), a **path**, the HTTP version, **headers**, and sometimes a body.",
+            "3. Read the **response**: the version, a **status code** and message, headers, and usually a body.",
+            "4. Close the connection or reuse it for more requests."
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "http",
+          "text": "GET / HTTP/1.1\nHost: developer.mozilla.org\nAccept-Language: fr"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Stateless, not sessionless**: **cookies** let requests share state, such as a shopping basket.",
+            "With HTTP/1.1 and the **Host** header, several sites can share **one IP address**.",
+            "HTTP/2 sends many messages over one connection at once (multiplexing)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "net-http-status",
+      "heading": "Status codes",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status",
+      "sourceTitle": "HTTP response status codes (MDN)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every reply slip gets a stamp. The first digit says how it went: 2 means done, 3 means \"we moved, go here\", 4 means \"your form was the problem\", 5 means \"our side failed\". A clerk passing your form to a back office stamps 502 if the back office answered nonsense, and 504 if it never answered."
+        },
+        {
+          "type": "p",
+          "text": "A **status code** says whether a request worked. Codes come in five classes:"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Range",
+            "Meaning"
+          ],
+          "rows": [
+            [
+              "100-199",
+              "Informational"
+            ],
+            [
+              "200-299",
+              "Success"
+            ],
+            [
+              "300-399",
+              "Redirection"
+            ],
+            [
+              "400-499",
+              "Client error"
+            ],
+            [
+              "500-599",
+              "Server error"
+            ]
+          ]
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**200 OK**: it worked. **301 Moved Permanently**: the resource has a new URL.",
+            "**401 Unauthorized**: really means \"unauthenticated\"; log in first. **403 Forbidden**: the server knows who you are, but you don't have access. **404 Not Found**: no such resource.",
+            "**500 Internal Server Error**: generic server failure. **503 Service Unavailable**: not ready, often down for maintenance or overloaded.",
+            "**502 Bad Gateway**: a server acting as a gateway got an invalid response. **504 Gateway Timeout**: it got no response in time."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "502 and 504 come from a server standing **in front of** another one, like a proxy or load balancer."
+        }
+      ]
+    },
+    {
+      "id": "net-http-tls",
+      "heading": "HTTPS and TLS",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TLS",
+      "sourceTitle": "TLS (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Sensitive orders travel in **tamper-evident pouches** (TLS), so nobody on the route can read or change them. Before handing one over, you check the clerk's **ID card** (digital certificate) to be sure you're dealing with the real harbor. For extra trust, both sides can show ID."
+        },
+        {
+          "type": "p",
+          "text": "**TLS** (Transport Layer Security, formerly **SSL**) is a protocol that lets apps talk securely over a network: no third party can **eavesdrop** on or **tamper** with messages. **HTTPS** is HTTP over TLS."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "The server must present a valid **digital certificate** proving its identity. Browsers require this to make a secure connection.",
+            "**Mutual authentication** is possible: the client presents a certificate too.",
+            "Major browsers began dropping TLS 1.0 and 1.1 in early 2020, so servers should support **TLS 1.2 or 1.3**."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "net-http-proxies",
+      "heading": "Proxies and load balancing",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Proxy_servers_and_tunneling",
+      "sourceTitle": "Proxy servers and tunneling (MDN)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Big harbor offices put a **reception desk** (reverse proxy) in front of their clerks. Visitors only ever meet reception, which hands each one to a free clerk (load balancing) and keeps copies of popular leaflets (caching). Because clerks only see reception, it pins a note to each form: \"originally from visitor X\" (`X-Forwarded-For`)."
+        },
+        {
+          "type": "p",
+          "text": "A **proxy** is a server that sits between the client and the destination server and passes requests along. There are two kinds:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Forward proxy**: works **for clients**, for example to save bandwidth or hide the client's IP address.",
+            "**Reverse proxy**: works **for servers**, hiding them behind it. Uses: **load balancing** (spreading requests over several servers), caching static content, compression, authentication and decryption."
+          ]
+        },
+        {
+          "type": "diagram",
+          "title": "A reverse proxy balancing load",
+          "width": 10,
+          "height": 4.6,
+          "nodes": [
+            {
+              "id": "client",
+              "label": "Client",
+              "x": 0,
+              "y": 1.8,
+              "w": 1.8,
+              "h": 1,
+              "kind": "user"
+            },
+            {
+              "id": "rp",
+              "label": "Reverse proxy\n(load balancer)",
+              "x": 3.2,
+              "y": 1.8,
+              "w": 2.6,
+              "h": 1,
+              "kind": "service"
+            },
+            {
+              "id": "s1",
+              "label": "Web server 1",
+              "x": 7.4,
+              "y": 0.1,
+              "w": 2.6,
+              "h": 1,
+              "kind": "worker"
+            },
+            {
+              "id": "s2",
+              "label": "Web server 2",
+              "x": 7.4,
+              "y": 1.8,
+              "w": 2.6,
+              "h": 1,
+              "kind": "worker"
+            },
+            {
+              "id": "s3",
+              "label": "Web server 3",
+              "x": 7.4,
+              "y": 3.5,
+              "w": 2.6,
+              "h": 1,
+              "kind": "worker"
+            }
+          ],
+          "edges": [
+            {
+              "from": "client",
+              "to": "rp",
+              "flow": true
+            },
+            {
+              "from": "rp",
+              "to": "s1",
+              "flow": true
+            },
+            {
+              "from": "rp",
+              "to": "s2",
+              "flow": true
+            },
+            {
+              "from": "rp",
+              "to": "s3",
+              "flow": true
+            }
+          ],
+          "steps": [
+            {
+              "text": "The client only ever talks to the **reverse proxy**. The servers behind it stay hidden.",
+              "highlight": [
+                "client",
+                "rp"
+              ]
+            },
+            {
+              "text": "The proxy spreads requests across several servers: **load balancing**.",
+              "highlight": [
+                "rp",
+                "s1",
+                "s2",
+                "s3"
+              ]
+            },
+            {
+              "text": "The servers now see the proxy's IP address, so the proxy adds headers such as `X-Forwarded-For` with the client's original IP.",
+              "highlight": [
+                "rp",
+                "s2"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Headers that carry the original client's details: the standard `Forwarded`, and the common `X-Forwarded-For` (client IP), `X-Forwarded-Host` (original host) and `X-Forwarded-Proto` (HTTP or HTTPS). The `Via` header describes the proxies themselves."
+        }
+      ]
+    },
+    {
+      "id": "net-http-k8s",
+      "heading": "Where this shows up in Kubernetes",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "sourceTitle": "Ingress (Kubernetes docs)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "At the Kube harbor's **main gate** (Ingress), a receptionist reads each visitor's request and sends it to the right desk (Service) by name and path. The gate can balance the queues, open sealed pouches (terminate TLS) and serve several businesses from one entrance. It only handles web visitors, though: other kinds of freight need another way in."
+        },
+        {
+          "type": "p",
+          "text": "A Kubernetes **Ingress** is a set of routing rules that configures a load balancer or proxy server for your cluster. It exposes **HTTP and HTTPS** routes from outside the cluster to Services inside it."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "It can do **load balancing**, **TLS termination** (decrypting HTTPS at the entrance) and **name-based virtual hosting** (routing by the `Host` header, so many host names share one IP address).",
+            "It needs an **Ingress controller** running in the cluster to actually do the work.",
+            "It does **not** expose arbitrary ports or protocols, only HTTP and HTTPS.",
+            "The Ingress API is frozen. Kubernetes recommends the newer **Gateway API** instead."
+          ]
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "net-http-fc-01",
+      "front": "Which part of a URL is never sent to the server?",
+      "back": "The anchor (fragment identifier), the part after `#`.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL"
+    },
+    {
+      "id": "net-http-fc-02",
+      "front": "When can you leave the port out of a URL?",
+      "back": "When the server uses the standard port: 80 for HTTP, 443 for HTTPS.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL"
+    },
+    {
+      "id": "net-http-fc-03",
+      "front": "What does it mean that HTTP is stateless?",
+      "back": "Each request is independent; HTTP itself keeps no link between requests. Cookies add sessions on top.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/HTTP"
+    },
+    {
+      "id": "net-http-fc-04",
+      "front": "What's the difference between the http and https schemes?",
+      "back": "`https` sends HTTP over a secure TLS channel; `http` is typically unencrypted.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/HTTP"
+    },
+    {
+      "id": "net-http-fc-05",
+      "front": "What does an HTTP request contain?",
+      "back": "A method, a path, the HTTP version, optional headers, and a body for some methods such as POST.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview"
+    },
+    {
+      "id": "net-http-fc-06",
+      "front": "What does an HTTP response contain?",
+      "back": "The HTTP version, a status code and message, headers, and usually a body.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview"
+    },
+    {
+      "id": "net-http-fc-07",
+      "front": "What do the five status code classes mean?",
+      "back": "1xx informational, 2xx success, 3xx redirection, 4xx client error, 5xx server error.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status"
+    },
+    {
+      "id": "net-http-fc-08",
+      "front": "401 vs 403?",
+      "back": "401: you must authenticate. 403: the server knows who you are but you lack access rights.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status"
+    },
+    {
+      "id": "net-http-fc-09",
+      "front": "502 vs 504?",
+      "back": "Both come from a gateway. 502: it got an invalid response upstream. 504: it got no response in time.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status"
+    },
+    {
+      "id": "net-http-fc-10",
+      "front": "What does TLS protect against?",
+      "back": "Eavesdropping and tampering. TLS was formerly called SSL.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TLS"
+    },
+    {
+      "id": "net-http-fc-11",
+      "front": "What does a certificate authority do?",
+      "back": "Signs digital certificates, vouching that the site and key in them are correct. Browsers ship with trusted root certificates.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Certificate_authority"
+    },
+    {
+      "id": "net-http-fc-12",
+      "front": "What does the Host header carry?",
+      "back": "The host and optional port of the server the request is for. It's required in every HTTP/1.1 request.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Host"
+    },
+    {
+      "id": "net-http-fc-13",
+      "front": "Forward proxy vs reverse proxy?",
+      "back": "A forward proxy acts for clients (can hide them). A reverse proxy acts for servers (hides them), e.g. for load balancing and caching.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Proxy_servers_and_tunneling"
+    },
+    {
+      "id": "net-http-fc-14",
+      "front": "What does X-Forwarded-For contain?",
+      "back": "The originating client IP, then each proxy's IP. The leftmost is the client, the rightmost the most recent proxy.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For"
+    },
+    {
+      "id": "net-http-fc-15",
+      "front": "What does a Kubernetes Ingress expose?",
+      "back": "HTTP and HTTPS routes from outside the cluster to Services. Not arbitrary ports or protocols.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "net-http-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "In `https://www.example.com/docs?lang=en#intro`, which part does the browser NOT send to the server?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL",
+      "competencyId": "net-http",
+      "options": [
+        {
+          "id": "a",
+          "text": "#intro",
+          "correct": true,
+          "explanation": "The anchor is never sent with the request."
+        },
+        {
+          "id": "b",
+          "text": "?lang=en",
+          "correct": false,
+          "explanation": "Parameters are sent to the server."
+        },
+        {
+          "id": "c",
+          "text": "/docs",
+          "correct": false,
+          "explanation": "The path tells the server which resource you want."
+        },
+        {
+          "id": "d",
+          "text": "www.example.com",
+          "correct": false,
+          "explanation": "The domain picks the server."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-02",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Why can most URLs leave out the port?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL",
+      "competencyId": "net-http",
+      "options": [
+        {
+          "id": "a",
+          "text": "Web servers usually use the standard ports, 80 for HTTP and 443 for HTTPS",
+          "correct": true,
+          "explanation": "The port is only needed for a non-standard one."
+        },
+        {
+          "id": "b",
+          "text": "DNS returns the port",
+          "correct": false,
+          "explanation": "DNS returns addresses, not ports."
+        },
+        {
+          "id": "c",
+          "text": "HTTP doesn't use ports",
+          "correct": false,
+          "explanation": "It does; the default is just implied."
+        },
+        {
+          "id": "d",
+          "text": "The browser tries every port",
+          "correct": false,
+          "explanation": "It uses the scheme's default."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "HTTP keeps track of earlier requests on the same connection by itself.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/HTTP",
+      "competencyId": "net-http",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "HTTP is stateless; cookies are what add sessions."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: HTTP is stateless."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-04",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which are part of an HTTP request? Select 3.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview",
+      "competencyId": "net-http",
+      "options": [
+        {
+          "id": "a",
+          "text": "A method such as GET or POST",
+          "correct": true,
+          "explanation": "The method says what to do."
+        },
+        {
+          "id": "b",
+          "text": "The path of the resource",
+          "correct": true,
+          "explanation": "The path says which resource."
+        },
+        {
+          "id": "c",
+          "text": "Headers",
+          "correct": true,
+          "explanation": "Optional headers carry extra information."
+        },
+        {
+          "id": "d",
+          "text": "A status code",
+          "correct": false,
+          "explanation": "Status codes are in responses."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "How can several websites share one IP address on the same server?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview",
+      "competencyId": "net-http",
+      "options": [
+        {
+          "id": "a",
+          "text": "HTTP/1.1's Host header says which site the request is for",
+          "correct": true,
+          "explanation": "With the Host header, server instances can share one IP address."
+        },
+        {
+          "id": "b",
+          "text": "Each site uses a different TLD",
+          "correct": false,
+          "explanation": "The TLD doesn't help the server pick a site."
+        },
+        {
+          "id": "c",
+          "text": "NAT",
+          "correct": false,
+          "explanation": "NAT shares an address among clients on a local network."
+        },
+        {
+          "id": "d",
+          "text": "They can't",
+          "correct": false,
+          "explanation": "They can, using the Host header."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-06",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "A page returns 403. What does that tell you?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status",
+      "competencyId": "net-http",
+      "options": [
+        {
+          "id": "a",
+          "text": "The server knows who you are, but you don't have access",
+          "correct": true,
+          "explanation": "Unlike 401, the client's identity is known."
+        },
+        {
+          "id": "b",
+          "text": "You need to log in first",
+          "correct": false,
+          "explanation": "That's 401 Unauthorized."
+        },
+        {
+          "id": "c",
+          "text": "The resource doesn't exist",
+          "correct": false,
+          "explanation": "That's 404."
+        },
+        {
+          "id": "d",
+          "text": "The server crashed",
+          "correct": false,
+          "explanation": "Server failures are 5xx."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-07",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "Users get 504 Gateway Timeout through your load balancer. What happened?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status",
+      "competencyId": "net-proxy",
+      "options": [
+        {
+          "id": "a",
+          "text": "The load balancer, acting as a gateway, got no response in time from the server behind it",
+          "correct": true,
+          "explanation": "504 is a gateway that couldn't get a response in time."
+        },
+        {
+          "id": "b",
+          "text": "The server sent back an invalid response",
+          "correct": false,
+          "explanation": "That's 502 Bad Gateway."
+        },
+        {
+          "id": "c",
+          "text": "The client's request was malformed",
+          "correct": false,
+          "explanation": "Client errors are 4xx."
+        },
+        {
+          "id": "d",
+          "text": "The URL moved permanently",
+          "correct": false,
+          "explanation": "That's 301."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-08",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Which status code class means the client made an error?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status",
+      "competencyId": "net-http",
+      "options": [
+        {
+          "id": "a",
+          "text": "400-499",
+          "correct": true,
+          "explanation": "4xx is client error."
+        },
+        {
+          "id": "b",
+          "text": "500-599",
+          "correct": false,
+          "explanation": "5xx is server error."
+        },
+        {
+          "id": "c",
+          "text": "300-399",
+          "correct": false,
+          "explanation": "3xx is redirection."
+        },
+        {
+          "id": "d",
+          "text": "200-299",
+          "correct": false,
+          "explanation": "2xx is success."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-09",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "What does TLS do? Select 2.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TLS",
+      "competencyId": "net-proxy",
+      "options": [
+        {
+          "id": "a",
+          "text": "Stops third parties eavesdropping on messages",
+          "correct": true,
+          "explanation": "It provides communication privacy."
+        },
+        {
+          "id": "b",
+          "text": "Stops messages being tampered with",
+          "correct": true,
+          "explanation": "It prevents tampering."
+        },
+        {
+          "id": "c",
+          "text": "Translates domain names to IP addresses",
+          "correct": false,
+          "explanation": "That's DNS."
+        },
+        {
+          "id": "d",
+          "text": "Guarantees in-order delivery",
+          "correct": false,
+          "explanation": "That's TCP."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-10",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "To set up a TLS connection, browsers require the server to present a valid digital certificate.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TLS",
+      "competencyId": "net-proxy",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct: the certificate confirms the server's identity."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": false,
+          "explanation": "It's required: modern browsers need a valid certificate."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-11",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Your site runs several web servers behind one address that spreads requests across them. What is that front server?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Proxy_servers_and_tunneling",
+      "competencyId": "net-proxy",
+      "options": [
+        {
+          "id": "a",
+          "text": "A reverse proxy doing load balancing",
+          "correct": true,
+          "explanation": "Reverse proxies sit in front of servers and can distribute load."
+        },
+        {
+          "id": "b",
+          "text": "A forward proxy",
+          "correct": false,
+          "explanation": "Forward proxies act for clients, not servers."
+        },
+        {
+          "id": "c",
+          "text": "A DNS server",
+          "correct": false,
+          "explanation": "DNS maps names; it doesn't relay requests."
+        },
+        {
+          "id": "d",
+          "text": "A certificate authority",
+          "correct": false,
+          "explanation": "CAs sign certificates."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-12",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "Behind a load balancer, your app's logs show only the load balancer's IP. Which header holds the real client IP?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For",
+      "competencyId": "net-proxy",
+      "options": [
+        {
+          "id": "a",
+          "text": "X-Forwarded-For",
+          "correct": true,
+          "explanation": "It identifies the originating client IP through proxies."
+        },
+        {
+          "id": "b",
+          "text": "Host",
+          "correct": false,
+          "explanation": "Host names the server being requested."
+        },
+        {
+          "id": "c",
+          "text": "Via",
+          "correct": false,
+          "explanation": "Via describes the proxies themselves, not the client."
+        },
+        {
+          "id": "d",
+          "text": "X-Forwarded-Proto",
+          "correct": false,
+          "explanation": "That holds the original protocol, HTTP or HTTPS."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-13",
+      "type": "single",
+      "difficulty": 3,
+      "stem": "`X-Forwarded-For: <client>, <proxy1>, <proxy2>`. Which is the most recent proxy?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For",
+      "competencyId": "net-proxy",
+      "options": [
+        {
+          "id": "a",
+          "text": "<proxy2>, the rightmost",
+          "correct": true,
+          "explanation": "The rightmost address is the most recent proxy."
+        },
+        {
+          "id": "b",
+          "text": "<client>, the leftmost",
+          "correct": false,
+          "explanation": "The leftmost is the original client."
+        },
+        {
+          "id": "c",
+          "text": "<proxy1>",
+          "correct": false,
+          "explanation": "That's an earlier proxy."
+        },
+        {
+          "id": "d",
+          "text": "It can't be told",
+          "correct": false,
+          "explanation": "Order is defined: each proxy is appended."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-14",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "You need to expose a database's TCP port to the Internet. Is an Ingress the right tool?",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "competencyId": "net-proxy",
+      "options": [
+        {
+          "id": "a",
+          "text": "No: Ingress only exposes HTTP and HTTPS",
+          "correct": true,
+          "explanation": "An Ingress doesn't expose arbitrary ports or protocols."
+        },
+        {
+          "id": "b",
+          "text": "Yes: Ingress exposes any port",
+          "correct": false,
+          "explanation": "It handles HTTP and HTTPS only."
+        },
+        {
+          "id": "c",
+          "text": "Yes, if you add TLS",
+          "correct": false,
+          "explanation": "TLS doesn't change which protocols Ingress handles."
+        },
+        {
+          "id": "d",
+          "text": "Yes, with name-based virtual hosting",
+          "correct": false,
+          "explanation": "Virtual hosting routes HTTP by host name; it doesn't open other ports."
+        }
+      ]
+    },
+    {
+      "id": "net-http-q-15",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which can a Kubernetes Ingress provide? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+      "competencyId": "net-proxy",
+      "options": [
+        {
+          "id": "a",
+          "text": "Load balancing",
+          "correct": true,
+          "explanation": "Ingress may load balance traffic."
+        },
+        {
+          "id": "b",
+          "text": "TLS termination",
+          "correct": true,
+          "explanation": "It can terminate SSL/TLS."
+        },
+        {
+          "id": "c",
+          "text": "Name-based virtual hosting",
+          "correct": true,
+          "explanation": "It can route by host name."
+        },
+        {
+          "id": "d",
+          "text": "Exposing UDP services",
+          "correct": false,
+          "explanation": "Only HTTP and HTTPS."
+        }
+      ]
+    }
+  ]
+}

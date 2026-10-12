@@ -172,7 +172,7 @@ Cited by 5 cards/questions: `scheduling-fc-10`, `scheduling-fc-11`, `scheduling-
 
 Notes: Scheduling: Resources, Affinity & Taints › Taints and tolerations
 
-Cited by 6 cards/questions: `scheduling-fc-12`, `scheduling-fc-13`, `scheduling-fc-14`, `scheduling-q-13`, `scheduling-q-14`, `scheduling-q-15`
+Cited by 8 cards/questions: `scheduling-fc-12`, `scheduling-fc-13`, `scheduling-fc-14`, `scheduling-q-13`, `scheduling-q-14`, `scheduling-q-15`, `scheduling-cmd-01`, `scheduling-cmd-02`
 
 ### [Service Accounts](https://kubernetes.io/docs/concepts/security/service-accounts/)
 
@@ -286,7 +286,7 @@ Cited by 6 cards/questions: `workload-controllers-fc-01`, `workload-controllers-
 
 Notes: Deployments, Rollouts & Rollbacks › Deployment → ReplicaSet → Pods; Deployments, Rollouts & Rollbacks › Update strategies: RollingUpdate vs Recreate; Deployments, Rollouts & Rollbacks › Updating and watching a rollout; Deployments, Rollouts & Rollbacks › History and rollbacks; Deployments, Rollouts & Rollbacks › Pause, resume and scale
 
-Cited by 23 cards/questions: `deployments-fc-01`, `deployments-fc-02`, `deployments-fc-03`, `deployments-fc-04`, `deployments-fc-05`, `deployments-fc-06`, `deployments-fc-07`, `deployments-fc-08`, `deployments-fc-09`, `deployments-fc-10`, `deployments-fc-13`, `deployments-q-01`, `deployments-q-02`, `deployments-q-03`, `deployments-q-04`, `deployments-q-05`, `deployments-q-06`, `deployments-q-07`, `deployments-q-08`, `deployments-q-09`, `deployments-q-12`, `deployments-q-13`, `deployments-q-14`
+Cited by 28 cards/questions: `deployments-fc-01`, `deployments-fc-02`, `deployments-fc-03`, `deployments-fc-04`, `deployments-fc-05`, `deployments-fc-06`, `deployments-fc-07`, `deployments-fc-08`, `deployments-fc-09`, `deployments-fc-10`, `deployments-fc-13`, `deployments-q-01`, `deployments-q-02`, `deployments-q-03`, `deployments-q-04`, `deployments-q-05`, `deployments-q-06`, `deployments-q-07`, `deployments-q-08`, `deployments-q-09`, `deployments-q-12`, `deployments-q-13`, `deployments-q-14`, `deployments-cmd-01`, `deployments-cmd-02`, `deployments-cmd-03`, `deployments-cmd-04`, `deployments-cmd-05`
 
 ### [Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/)
 
@@ -364,13 +364,13 @@ Cited by 7 cards/questions: `kubectl-basics-fc-01`, `kubectl-basics-fc-02`, `kub
 
 Notes: Services & EndpointSlices › kubectl expose
 
-Cited by 3 cards/questions: `services-fc-10`, `services-q-11`, `services-q-12`
+Cited by 4 cards/questions: `services-fc-10`, `services-q-11`, `services-q-12`, `services-cmd-01`
 
 ### [kubectl Quick Reference](https://kubernetes.io/docs/reference/kubectl/quick-reference/)
 
 Notes: kubectl Essentials › Generate manifests fast; kubectl Essentials › Switching clusters and namespaces; kubectl Essentials › Everyday cheat sheet; Troubleshooting Applications › Logs and events cheat sheet; Monitoring Resource Usage › kubectl top
 
-Cited by 15 cards/questions: `kubectl-basics-fc-08`, `kubectl-basics-fc-12`, `kubectl-basics-fc-13`, `kubectl-basics-fc-14`, `kubectl-basics-q-07`, `kubectl-basics-q-08`, `kubectl-basics-q-12`, `kubectl-basics-q-13`, `kubectl-basics-q-14`, `troubleshoot-apps-fc-10`, `troubleshoot-apps-q-03`, `troubleshoot-apps-q-06`, `resource-monitoring-fc-12`, `resource-monitoring-q-06`, `resource-monitoring-q-13`
+Cited by 26 cards/questions: `kubectl-basics-fc-08`, `kubectl-basics-fc-12`, `kubectl-basics-fc-13`, `kubectl-basics-fc-14`, `kubectl-basics-q-07`, `kubectl-basics-q-08`, `kubectl-basics-q-12`, `kubectl-basics-q-13`, `kubectl-basics-q-14`, `kubectl-basics-cmd-01`, `kubectl-basics-cmd-02`, `kubectl-basics-cmd-03`, `namespaces-cmd-02`, `pods-cmd-01`, `cluster-upgrade-cmd-01`, `cluster-upgrade-cmd-03`, `troubleshoot-apps-fc-10`, `troubleshoot-apps-q-03`, `troubleshoot-apps-q-06`, `troubleshoot-apps-cmd-01`, `troubleshoot-apps-cmd-02`, `troubleshoot-apps-cmd-03`, `troubleshoot-apps-cmd-04`, `resource-monitoring-fc-12`, `resource-monitoring-q-06`, `resource-monitoring-q-13`
 
 ### [Ports and Protocols](https://kubernetes.io/docs/reference/networking/ports-and-protocols/)
 
@@ -484,19 +484,19 @@ Cited by 2 cards/questions: `cluster-upgrade-fc-12`, `cluster-upgrade-q-13`
 
 Notes: Namespaces › Create, inspect and delete namespaces
 
-Cited by 3 cards/questions: `namespaces-fc-09`, `namespaces-q-07`, `namespaces-q-08`
+Cited by 4 cards/questions: `namespaces-fc-09`, `namespaces-q-07`, `namespaces-q-08`, `namespaces-cmd-01`
 
 ### [Safely Drain a Node](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/)
 
 Notes: Upgrading a kubeadm Cluster › Draining safely
 
-Cited by 5 cards/questions: `cluster-upgrade-fc-09`, `cluster-upgrade-fc-10`, `cluster-upgrade-q-07`, `cluster-upgrade-q-08`, `cluster-upgrade-q-09`
+Cited by 6 cards/questions: `cluster-upgrade-fc-09`, `cluster-upgrade-fc-10`, `cluster-upgrade-q-07`, `cluster-upgrade-q-08`, `cluster-upgrade-q-09`, `cluster-upgrade-cmd-02`
 
 ### [Managing Secrets using kubectl](https://kubernetes.io/docs/tasks/configmap-secret/managing-secret-using-kubectl/)
 
 Notes: ConfigMaps & Secrets › Create and read a generic Secret
 
-Cited by 2 cards/questions: `configmaps-secrets-fc-12`, `configmaps-secrets-q-13`
+Cited by 3 cards/questions: `configmaps-secrets-fc-12`, `configmaps-secrets-q-13`, `configmaps-secrets-cmd-01`
 
 ### [Assign Pods to Nodes](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/)
 
@@ -755,3 +755,185 @@ Cited by 2 cards/questions: `docker-containers-fc-10`, `docker-containers-q-12`
 Notes: Images & Dockerfiles › Reference rules worth knowing; Images & Dockerfiles › CMD vs ENTRYPOINT
 
 Cited by 10 cards/questions: `docker-images-fc-03`, `docker-images-fc-04`, `docker-images-fc-05`, `docker-images-fc-06`, `docker-images-fc-07`, `docker-images-q-02`, `docker-images-q-03`, `docker-images-q-04`, `docker-images-q-05`, `docker-images-q-06`
+
+## Networking (32 pages, reviewed 2026-10-12)
+
+### [https://developer.mozilla.org/en-US/docs/Glossary/Bandwidth](https://developer.mozilla.org/en-US/docs/Glossary/Bandwidth)
+
+Cited by 1 cards/questions: `net-tcp-udp-fc-12`
+
+### [https://developer.mozilla.org/en-US/docs/Glossary/Certificate_authority](https://developer.mozilla.org/en-US/docs/Glossary/Certificate_authority)
+
+Cited by 1 cards/questions: `net-http-fc-11`
+
+### [DNS (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/DNS)
+
+Notes: Domain Names & DNS › What DNS is
+
+Cited by 5 cards/questions: `net-dns-fc-06`, `net-dns-fc-07`, `net-dns-q-05`, `net-dns-q-06`, `net-dns-q-07`
+
+### [Firewall (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/Firewall)
+
+Notes: Addresses, Ports & Packets › Firewalls
+
+Cited by 2 cards/questions: `net-addresses-fc-12`, `net-addresses-q-10`
+
+### [HTTP (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/HTTP)
+
+Notes: HTTP, TLS & Proxies › What HTTP is
+
+Cited by 3 cards/questions: `net-http-fc-03`, `net-http-fc-04`, `net-http-q-03`
+
+### [IP address (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/IP_address)
+
+Notes: Addresses, Ports & Packets › IP addresses
+
+Cited by 3 cards/questions: `net-addresses-fc-04`, `net-addresses-fc-05`, `net-addresses-q-04`
+
+### [https://developer.mozilla.org/en-US/docs/Glossary/IPv6](https://developer.mozilla.org/en-US/docs/Glossary/IPv6)
+
+Cited by 1 cards/questions: `net-addresses-fc-06`
+
+### [Latency (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/Latency)
+
+Notes: TCP, UDP & Latency › Latency
+
+Cited by 2 cards/questions: `net-tcp-udp-fc-10`, `net-tcp-udp-q-10`
+
+### [NAT (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/NAT)
+
+Notes: Addresses, Ports & Packets › NAT: sharing one address
+
+Cited by 2 cards/questions: `net-addresses-fc-11`, `net-addresses-q-09`
+
+### [Packet (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/Packet)
+
+Notes: Addresses, Ports & Packets › Packets
+
+Cited by 4 cards/questions: `net-addresses-fc-07`, `net-addresses-fc-08`, `net-addresses-q-05`, `net-addresses-q-06`
+
+### [Port (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/Port)
+
+Notes: Addresses, Ports & Packets › Ports
+
+Cited by 4 cards/questions: `net-addresses-fc-09`, `net-addresses-fc-10`, `net-addresses-q-07`, `net-addresses-q-08`
+
+### [Protocol (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/Protocol)
+
+Notes: TCP, UDP & Latency › What a protocol is
+
+Cited by 2 cards/questions: `net-tcp-udp-fc-01`, `net-tcp-udp-q-01`
+
+### [https://developer.mozilla.org/en-US/docs/Glossary/QUIC](https://developer.mozilla.org/en-US/docs/Glossary/QUIC)
+
+Cited by 1 cards/questions: `net-tcp-udp-fc-13`
+
+### [Round Trip Time (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/Round_Trip_Time)
+
+Notes: TCP, UDP & Latency › Round-trip time and ping
+
+Cited by 2 cards/questions: `net-tcp-udp-fc-11`, `net-tcp-udp-q-11`
+
+### [TCP (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/TCP)
+
+Notes: TCP, UDP & Latency › TCP: reliable delivery
+
+Cited by 4 cards/questions: `net-tcp-udp-fc-02`, `net-tcp-udp-fc-03`, `net-tcp-udp-q-02`, `net-tcp-udp-q-03`
+
+### [TCP handshake (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/TCP_handshake)
+
+Notes: TCP, UDP & Latency › The three-way handshake
+
+Cited by 6 cards/questions: `net-tcp-udp-fc-04`, `net-tcp-udp-fc-05`, `net-tcp-udp-fc-06`, `net-tcp-udp-q-04`, `net-tcp-udp-q-05`, `net-tcp-udp-q-06`
+
+### [TLD (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/TLD)
+
+Notes: Domain Names & DNS › Top-level domains
+
+Cited by 3 cards/questions: `net-dns-fc-08`, `net-dns-fc-09`, `net-dns-q-08`
+
+### [TLS (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/TLS)
+
+Notes: HTTP, TLS & Proxies › HTTPS and TLS
+
+Cited by 3 cards/questions: `net-http-fc-10`, `net-http-q-09`, `net-http-q-10`
+
+### [TTL (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/TTL)
+
+Notes: Domain Names & DNS › Caching and TTL
+
+Cited by 3 cards/questions: `net-dns-fc-10`, `net-dns-q-09`, `net-dns-q-10`
+
+### [UDP (MDN glossary)](https://developer.mozilla.org/en-US/docs/Glossary/UDP)
+
+Notes: TCP, UDP & Latency › UDP: fast, no promises
+
+Cited by 6 cards/questions: `net-tcp-udp-fc-07`, `net-tcp-udp-fc-08`, `net-tcp-udp-fc-09`, `net-tcp-udp-q-07`, `net-tcp-udp-q-08`, `net-tcp-udp-q-09`
+
+### [How does the Internet work? (MDN)](https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/How_does_the_Internet_work)
+
+Notes: Addresses, Ports & Packets › From one cable to the Internet
+
+Cited by 6 cards/questions: `net-addresses-fc-01`, `net-addresses-fc-02`, `net-addresses-fc-03`, `net-addresses-q-01`, `net-addresses-q-02`, `net-addresses-q-03`
+
+### [What is a URL? (MDN)](https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL)
+
+Notes: HTTP, TLS & Proxies › Reading a URL
+
+Cited by 4 cards/questions: `net-http-fc-01`, `net-http-fc-02`, `net-http-q-01`, `net-http-q-02`
+
+### [What is a domain name? (MDN)](https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_domain_name)
+
+Notes: Domain Names & DNS › Names instead of numbers; Domain Names & DNS › Reading a domain name
+
+Cited by 9 cards/questions: `net-dns-fc-01`, `net-dns-fc-02`, `net-dns-fc-03`, `net-dns-fc-04`, `net-dns-fc-05`, `net-dns-q-01`, `net-dns-q-02`, `net-dns-q-03`, `net-dns-q-04`
+
+### [An overview of HTTP (MDN)](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview)
+
+Notes: HTTP, TLS & Proxies › Requests and responses
+
+Cited by 4 cards/questions: `net-http-fc-05`, `net-http-fc-06`, `net-http-q-04`, `net-http-q-05`
+
+### [Proxy servers and tunneling (MDN)](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Proxy_servers_and_tunneling)
+
+Notes: HTTP, TLS & Proxies › Proxies and load balancing
+
+Cited by 2 cards/questions: `net-http-fc-13`, `net-http-q-11`
+
+### [https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Host](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Host)
+
+Cited by 1 cards/questions: `net-http-fc-12`
+
+### [https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For)
+
+Cited by 3 cards/questions: `net-http-fc-14`, `net-http-q-12`, `net-http-q-13`
+
+### [HTTP response status codes (MDN)](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status)
+
+Notes: HTTP, TLS & Proxies › Status codes
+
+Cited by 6 cards/questions: `net-http-fc-07`, `net-http-fc-08`, `net-http-fc-09`, `net-http-q-06`, `net-http-q-07`, `net-http-q-08`
+
+### [DNS for Services and Pods (Kubernetes docs)](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+
+Notes: Domain Names & DNS › DNS inside Kubernetes
+
+Cited by 4 cards/questions: `net-dns-fc-11`, `net-dns-fc-12`, `net-dns-q-11`, `net-dns-q-12`
+
+### [Ingress (Kubernetes docs)](https://kubernetes.io/docs/concepts/services-networking/ingress/)
+
+Notes: HTTP, TLS & Proxies › Where this shows up in Kubernetes
+
+Cited by 3 cards/questions: `net-http-fc-15`, `net-http-q-14`, `net-http-q-15`
+
+### [Ports and Protocols (Kubernetes docs)](https://kubernetes.io/docs/reference/networking/ports-and-protocols/)
+
+Notes: Addresses, Ports & Packets › Where this shows up in Kubernetes
+
+Cited by 4 cards/questions: `net-addresses-fc-13`, `net-addresses-fc-14`, `net-addresses-q-11`, `net-addresses-q-12`
+
+### [Protocols for Services (Kubernetes docs)](https://kubernetes.io/docs/reference/networking/service-protocols/)
+
+Notes: TCP, UDP & Latency › Where this shows up in Kubernetes
+
+Cited by 3 cards/questions: `net-tcp-udp-fc-14`, `net-tcp-udp-q-12`, `net-tcp-udp-q-13`

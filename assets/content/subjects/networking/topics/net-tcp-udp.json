@@ -1,0 +1,737 @@
+{
+  "id": "net-tcp-udp",
+  "title": "TCP, UDP & Latency",
+  "summary": "How data actually travels: protocols, TCP's reliable connections and handshake, fast but unreliable UDP, and latency.",
+  "order": 2,
+  "domainIds": [
+    "net-transport"
+  ],
+  "competencyIds": [
+    "net-tcp-udp"
+  ],
+  "prerequisites": [
+    "net-addresses"
+  ],
+  "estMinutes": 13,
+  "reviewedAt": "2026-10-12",
+  "sections": [
+    {
+      "id": "net-tcp-udp-protocol",
+      "heading": "What a protocol is",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Protocol",
+      "sourceTitle": "Protocol (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Two harbors can only trade if they agree on the paperwork: which form to use, what goes in each box, what a stamp means. A harbor that fills in the form its own way just gets its parcels sent back. That shared rulebook is a **protocol**."
+        },
+        {
+          "type": "p",
+          "text": "A **protocol** is a set of rules for how data is exchanged between computers. Two devices can only talk if they agree on the **format** of the data they send. The rest of this subject is a tour of the protocols the Internet runs on."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-tcp",
+      "heading": "TCP: reliable delivery",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP",
+      "sourceTitle": "TCP (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "For valuable cargo the harbor uses **registered freight** (TCP). Both sides agree to the shipment first, every crate is numbered, and the receiver signs for each one, so nothing goes missing and everything is unpacked in order. A new route starts with small loads and grows them while the canal can take more."
+        },
+        {
+          "type": "p",
+          "text": "**TCP** (Transmission Control Protocol) lets two computers **connect** and send each other streams of data. It is the careful option."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "It **guarantees delivery**: data and packets arrive, error-free, in the **same order** they were sent.",
+            "It uses **congestion control**: a connection starts by sending a little, then sends more until it reaches what the computers and network can handle."
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "Use TCP when every byte must arrive, error-free and in order."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-handshake",
+      "heading": "The three-way handshake",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP_handshake",
+      "sourceTitle": "TCP handshake (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Before registered freight moves, the two harbors trade three radio calls. \"Ready to sync?\" (SYN). \"Synced, are you?\" (SYN-ACK). \"Acknowledged.\" (ACK). Only then do crates move. Hanging up is politer still: each side says \"finished\" (FIN) and gets an \"okay\" (ACK), so one side can keep sending after the other is done."
+        },
+        {
+          "type": "p",
+          "text": "Before any data moves, TCP sets up the connection with three messages, so both sides can agree on its settings:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "1. **SYN** (synchronize): the initiator, usually the browser, asks the server to connect.",
+            "2. **SYN-ACK** (synchronize-acknowledge): the server agrees.",
+            "3. **ACK** (acknowledge): the initiator confirms. The connection is now open."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Closing uses a **four-way handshake**: each side sends its own **FIN** (finish) and gets an **ACK** back. In between, the connection is **half-closed**: one side is done, but the other can still send."
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "Order when opening a secure web page: **DNS lookup**, then the **TCP handshake**, then the **TLS handshake**."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-udp",
+      "heading": "UDP: fast, no promises",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/UDP",
+      "sourceTitle": "UDP (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "For live harbor traffic reports, nobody wants registered freight. The harbor radio just **broadcasts** each update (UDP). No call to set it up, no signatures, no resends. A missed report is simply skipped, because the next one is already on the way, and waiting for an old one would be worse than useless."
+        },
+        {
+          "type": "p",
+          "text": "**UDP** (User Datagram Protocol) is for when **speed and efficiency matter more than reliability**. There is no connection to set up: no handshake. It just sends."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "It has **port numbers** (to reach the right program) and **checksums** (to spot damaged data), and very little else.",
+            "There is **no guarantee** of delivery, of order, or against duplicates.",
+            "Time-sensitive apps use it because **dropping a packet beats waiting** for a resend.",
+            "Apps that need error correction can use TCP instead, or do the checking themselves."
+          ]
+        },
+        {
+          "type": "table",
+          "header": [
+            "",
+            "TCP",
+            "UDP"
+          ],
+          "rows": [
+            [
+              "Connection first?",
+              "Yes (handshake)",
+              "No"
+            ],
+            [
+              "Delivery guaranteed?",
+              "Yes",
+              "No"
+            ],
+            [
+              "Order kept?",
+              "Yes",
+              "No"
+            ],
+            [
+              "Best for",
+              "Data that must arrive whole",
+              "Real-time, time-sensitive data"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-latency",
+      "heading": "Latency",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Latency",
+      "sourceTitle": "Latency (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "**Latency** is how long a parcel takes from the dock to its door. Low latency means the parcel is there almost at once; high latency means everyone waits. Delay can also build up at the packing table, when goods are repacked into a new format (codec latency), but on the routes between harbors it is the crossing time that counts (network latency)."
+        },
+        {
+          "type": "p",
+          "text": "**Latency** is the time it takes for requested data to reach its destination. **Low latency is good** (little delay); **high latency is bad**."
+        },
+        {
+          "type": "p",
+          "text": "**Network latency** usually means the time for a packet to travel from source to destination."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-rtt",
+      "heading": "Round-trip time and ping",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Round_Trip_Time",
+      "sourceTitle": "Round Trip Time (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "To time a route, the harbor sends a parcel and waits for the signed receipt to come back. Out plus back is the **round trip** (RTT). The harbor's test signal (`ping`) does this a few times and reports the shortest, average and longest trips."
+        },
+        {
+          "type": "p",
+          "text": "**Round-trip time (RTT)** is the time for a packet to reach its destination **plus** the time for the acknowledgment to come back. The `ping` command measures it:"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "text": "ping <hostname>"
+        },
+        {
+          "type": "p",
+          "text": "`ping` sends a few packets, prints the time for each, then a summary line: `round-trip min/avg/max/stddev`. The **avg** value is the average RTT, in milliseconds."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-k8s",
+      "heading": "Where this shows up in Kubernetes",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/service-protocols/",
+      "sourceTitle": "Protocols for Services (Kubernetes docs)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every harbor phone number (Service) is set up for a kind of freight. Registered freight (TCP) is the default and works for every kind of number. Radio broadcasts (UDP) work for most, but on the public entrance the city builds (`LoadBalancer`), the city must support it. A third kind, SCTP, needs road builders (network plugins) that support it."
+        },
+        {
+          "type": "p",
+          "text": "Each port on a Kubernetes **Service** has a `protocol`. There are three valid values:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "`TCP`: **the default**, and works for every kind of Service.",
+            "`UDP`: works for most Services. For `type: LoadBalancer`, it depends on your cloud provider supporting it.",
+            "`SCTP`: needs a network plugin that supports it. For `LoadBalancer` it depends on the cloud provider (most don't), and it isn't supported on Windows nodes."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "HTTP, HTTPS and TLS are special cases that all typically run over TCP."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "net-tcp-udp-fc-01",
+      "front": "What is a protocol?",
+      "back": "A system of rules defining how data is exchanged between computers, including the data's format.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Protocol"
+    },
+    {
+      "id": "net-tcp-udp-fc-02",
+      "front": "What does TCP guarantee?",
+      "back": "Delivery of data and packets, error-free, in the same order they were sent.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP"
+    },
+    {
+      "id": "net-tcp-udp-fc-03",
+      "front": "What is TCP congestion control?",
+      "back": "Connections start sending small amounts, then increase to what the computers and network can support.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP"
+    },
+    {
+      "id": "net-tcp-udp-fc-04",
+      "front": "Name the three messages of the TCP handshake, in order.",
+      "back": "SYN, SYN-ACK, ACK.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP_handshake"
+    },
+    {
+      "id": "net-tcp-udp-fc-05",
+      "front": "How is a TCP connection closed?",
+      "back": "A four-way handshake: each side sends a FIN and receives an ACK, independently.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP_handshake"
+    },
+    {
+      "id": "net-tcp-udp-fc-06",
+      "front": "When does the TCP handshake happen relative to DNS and TLS?",
+      "back": "After the DNS lookup and before the TLS handshake.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP_handshake"
+    },
+    {
+      "id": "net-tcp-udp-fc-07",
+      "front": "Does UDP have a handshake?",
+      "back": "No. It is connectionless, with no handshaking dialogues.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/UDP"
+    },
+    {
+      "id": "net-tcp-udp-fc-08",
+      "front": "What does UDP provide?",
+      "back": "Port numbers and checksums. No guarantee of delivery, ordering or duplicate protection.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/UDP"
+    },
+    {
+      "id": "net-tcp-udp-fc-09",
+      "front": "Why do time-sensitive apps use UDP?",
+      "back": "Dropping a packet is better than waiting for a delayed retransmission.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/UDP"
+    },
+    {
+      "id": "net-tcp-udp-fc-10",
+      "front": "What is latency?",
+      "back": "The time it takes for requested data to reach its destination. Low is good, high is bad.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Latency"
+    },
+    {
+      "id": "net-tcp-udp-fc-11",
+      "front": "What is round-trip time (RTT)?",
+      "back": "Time for a packet to reach its destination plus time for the acknowledgment to come back. Measured with `ping`.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Round_Trip_Time"
+    },
+    {
+      "id": "net-tcp-udp-fc-12",
+      "front": "What is bandwidth?",
+      "back": "How much information can pass through a connection in a given time, usually in bits per second (Mbps, Gbps).",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Bandwidth"
+    },
+    {
+      "id": "net-tcp-udp-fc-13",
+      "front": "What does HTTP/3 use instead of TCP?",
+      "back": "QUIC, a multiplexed transport protocol built on UDP.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/QUIC"
+    },
+    {
+      "id": "net-tcp-udp-fc-14",
+      "front": "Default protocol for a Kubernetes Service port?",
+      "back": "TCP. UDP and SCTP are the other valid values.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/service-protocols/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "net-tcp-udp-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Why do two computers need a shared protocol?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Protocol",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "They must agree on the format of the data they exchange",
+          "correct": true,
+          "explanation": "A protocol is that agreed set of rules."
+        },
+        {
+          "id": "b",
+          "text": "To get an IP address",
+          "correct": false,
+          "explanation": "Addressing is one protocol's job, not why protocols exist."
+        },
+        {
+          "id": "c",
+          "text": "To encrypt every message",
+          "correct": false,
+          "explanation": "Encryption is a feature of some protocols such as TLS."
+        },
+        {
+          "id": "d",
+          "text": "To use the same operating system",
+          "correct": false,
+          "explanation": "Protocols let different systems talk."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-02",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "A file download must arrive complete and in the right order. Which transport fits?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "TCP",
+          "correct": true,
+          "explanation": "TCP guarantees delivery, in order and error-free."
+        },
+        {
+          "id": "b",
+          "text": "UDP",
+          "correct": false,
+          "explanation": "UDP gives no guarantee of delivery or order."
+        },
+        {
+          "id": "c",
+          "text": "IPv4",
+          "correct": false,
+          "explanation": "IP addresses and routes packets; it isn't the reliable transport layer."
+        },
+        {
+          "id": "d",
+          "text": "DNS",
+          "correct": false,
+          "explanation": "DNS maps names to addresses."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-03",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "What does TCP congestion control do when a connection starts?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "Sends small amounts first, then grows to what the network can handle",
+          "correct": true,
+          "explanation": "That's how TCP finds the available capacity."
+        },
+        {
+          "id": "b",
+          "text": "Sends as fast as possible, then backs off",
+          "correct": false,
+          "explanation": "It starts small rather than at full speed."
+        },
+        {
+          "id": "c",
+          "text": "Waits for the server's bandwidth report",
+          "correct": false,
+          "explanation": "There's no such report; it ramps up gradually."
+        },
+        {
+          "id": "d",
+          "text": "Drops late packets to avoid delay",
+          "correct": false,
+          "explanation": "That's UDP's trade-off, not TCP's."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-04",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "What is the correct order of the TCP three-way handshake?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP_handshake",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "SYN, SYN-ACK, ACK",
+          "correct": true,
+          "explanation": "Initiator sends SYN, server replies SYN-ACK, initiator confirms with ACK."
+        },
+        {
+          "id": "b",
+          "text": "SYN, ACK, FIN",
+          "correct": false,
+          "explanation": "FIN is for closing a connection."
+        },
+        {
+          "id": "c",
+          "text": "ACK, SYN, SYN-ACK",
+          "correct": false,
+          "explanation": "The initiator starts with SYN."
+        },
+        {
+          "id": "d",
+          "text": "FIN, ACK, SYN",
+          "correct": false,
+          "explanation": "That mixes closing and opening messages."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "A browser opens an HTTPS page on a site it has never visited. Which happens first?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP_handshake",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "DNS lookup",
+          "correct": true,
+          "explanation": "The handshake happens after the DNS lookup and before the TLS handshake."
+        },
+        {
+          "id": "b",
+          "text": "TCP handshake",
+          "correct": false,
+          "explanation": "It needs the IP address from the DNS lookup first."
+        },
+        {
+          "id": "c",
+          "text": "TLS handshake",
+          "correct": false,
+          "explanation": "TLS comes after the TCP handshake."
+        },
+        {
+          "id": "d",
+          "text": "The HTTP request",
+          "correct": false,
+          "explanation": "The request goes over the finished connection."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-06",
+      "type": "truefalse",
+      "difficulty": 2,
+      "stem": "After one side of a TCP connection sends FIN and gets an ACK, the other side can still send data.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/TCP_handshake",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct: the connection is half-closed until the other side sends its own FIN."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": false,
+          "explanation": "It can: the connection is only half-closed at that point."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-07",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which does UDP NOT guarantee? Select 3.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/UDP",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "Delivery",
+          "correct": true,
+          "explanation": "UDP has no guarantee of delivery."
+        },
+        {
+          "id": "b",
+          "text": "Ordering",
+          "correct": true,
+          "explanation": "Packets can arrive out of order."
+        },
+        {
+          "id": "c",
+          "text": "Protection against duplicates",
+          "correct": true,
+          "explanation": "There's no duplicate protection."
+        },
+        {
+          "id": "d",
+          "text": "Port numbers for addressing",
+          "correct": false,
+          "explanation": "UDP does provide port numbers."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-08",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "A live video call would rather lose a packet than wait for it to be resent. Which transport suits it?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/UDP",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "UDP",
+          "correct": true,
+          "explanation": "Time-sensitive apps prefer dropping packets to waiting for retransmission."
+        },
+        {
+          "id": "b",
+          "text": "TCP",
+          "correct": false,
+          "explanation": "TCP waits for lost data to be resent, adding delay."
+        },
+        {
+          "id": "c",
+          "text": "HTTP",
+          "correct": false,
+          "explanation": "HTTP is an application protocol that normally relies on TCP."
+        },
+        {
+          "id": "d",
+          "text": "NAT",
+          "correct": false,
+          "explanation": "NAT shares addresses; it isn't a transport."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-09",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "UDP sets up a connection with a handshake before sending data.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/UDP",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "UDP has no handshaking dialogues."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: UDP is connectionless."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-10",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Which statement about latency is right?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Latency",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "Low latency is good: little delay",
+          "correct": true,
+          "explanation": "Latency is delay, so less is better."
+        },
+        {
+          "id": "b",
+          "text": "High latency means a faster connection",
+          "correct": false,
+          "explanation": "High latency means long waits."
+        },
+        {
+          "id": "c",
+          "text": "Latency is how much data fits through a connection per second",
+          "correct": false,
+          "explanation": "That's bandwidth."
+        },
+        {
+          "id": "d",
+          "text": "Latency only applies to video codecs",
+          "correct": false,
+          "explanation": "Network latency is the most common use of the term."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-11",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Which command measures round-trip time to a host?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Round_Trip_Time",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "ping",
+          "correct": true,
+          "explanation": "ping sends packets and reports min/avg/max round-trip times."
+        },
+        {
+          "id": "b",
+          "text": "whois",
+          "correct": false,
+          "explanation": "whois looks up who registered a domain."
+        },
+        {
+          "id": "c",
+          "text": "curl",
+          "correct": false,
+          "explanation": "curl makes requests, it doesn't report RTT statistics."
+        },
+        {
+          "id": "d",
+          "text": "kubectl",
+          "correct": false,
+          "explanation": "kubectl talks to the Kubernetes API."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-12",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "You create a Kubernetes Service and don't set `protocol` on its port. Which protocol does it use?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/service-protocols/",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "TCP",
+          "correct": true,
+          "explanation": "TCP is the default."
+        },
+        {
+          "id": "b",
+          "text": "UDP",
+          "correct": false,
+          "explanation": "UDP must be set explicitly."
+        },
+        {
+          "id": "c",
+          "text": "SCTP",
+          "correct": false,
+          "explanation": "SCTP must be set explicitly and needs plugin support."
+        },
+        {
+          "id": "d",
+          "text": "HTTP",
+          "correct": false,
+          "explanation": "HTTP isn't a valid `protocol` value; it typically runs over TCP."
+        }
+      ]
+    },
+    {
+      "id": "net-tcp-udp-q-13",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which are valid values for a Service port's `protocol`? Select 3.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/service-protocols/",
+      "competencyId": "net-tcp-udp",
+      "options": [
+        {
+          "id": "a",
+          "text": "TCP",
+          "correct": true,
+          "explanation": "The default."
+        },
+        {
+          "id": "b",
+          "text": "UDP",
+          "correct": true,
+          "explanation": "Valid; for LoadBalancer Services it depends on the cloud provider."
+        },
+        {
+          "id": "c",
+          "text": "SCTP",
+          "correct": true,
+          "explanation": "Valid with a supporting network plugin."
+        },
+        {
+          "id": "d",
+          "text": "HTTPS",
+          "correct": false,
+          "explanation": "HTTPS is a special case over TCP, not a `protocol` value."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,823 @@
+{
+  "id": "net-addresses",
+  "title": "Addresses, Ports & Packets",
+  "summary": "How computers find each other: switches and routers, IP addresses, packets, port numbers, NAT and firewalls.",
+  "order": 1,
+  "domainIds": [
+    "net-transport"
+  ],
+  "competencyIds": [
+    "net-addr"
+  ],
+  "estMinutes": 14,
+  "reviewedAt": "2026-10-12",
+  "sections": [
+    {
+      "id": "net-addresses-network",
+      "heading": "From one cable to the Internet",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/How_does_the_Internet_work",
+      "sourceTitle": "How does the Internet work? (MDN)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Picture the harbor before it had any system. Every ship ran a rope to every other ship: chaos. So the port hired a **deck messenger** (a switch) who learns which cabin each crew badge (MAC address) belongs to. For mail to other harbors, a **sorting office** (a router) reads only the start of the street address (IP prefix): \"anything starting 142.250 goes north.\""
+        },
+        {
+          "type": "p",
+          "text": "A network is just computers that are linked, by cable or by Wi-Fi, so they can send each other messages. Linking every computer to every other one does not scale: ten computers would need **45 cables**."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "A **switch** is a small computer that forwards messages. Each computer plugs into it once, so 10 computers need only 10 cables.",
+            "The switch tells computers apart by **MAC address** (a hardware ID for each network card, like a fingerprint). It learns where each MAC lives from the messages it sees.",
+            "MAC addresses have no structure, so one giant switched network can't grow forever. Instead we split computers into separate networks and join them with a **router**.",
+            "A router uses **IP addresses**, which work like street addresses: computers in one network share a **prefix** (the start of the address). So a router stores one rule for a whole group, such as \"anything starting `142.250` goes that way\".",
+            "Your home router usually combines a switch, a router and a **modem**. An **ISP** (Internet Service Provider) links your network to everyone else's. That web of networks is the **Internet**."
+          ]
+        },
+        {
+          "type": "diagram",
+          "title": "A message crossing the Internet",
+          "width": 10,
+          "height": 4,
+          "nodes": [
+            {
+              "id": "pc",
+              "label": "Your laptop",
+              "x": 0,
+              "y": 1.5,
+              "w": 1.8,
+              "h": 1,
+              "kind": "user"
+            },
+            {
+              "id": "sw",
+              "label": "Switch\n(MAC)",
+              "x": 2.2,
+              "y": 1.5,
+              "w": 1.6,
+              "h": 1,
+              "kind": "generic"
+            },
+            {
+              "id": "rt",
+              "label": "Router\n(IP)",
+              "x": 4.2,
+              "y": 1.5,
+              "w": 1.6,
+              "h": 1,
+              "kind": "control"
+            },
+            {
+              "id": "isp",
+              "label": "ISP routers",
+              "x": 6.2,
+              "y": 1.5,
+              "w": 1.8,
+              "h": 1,
+              "kind": "external"
+            },
+            {
+              "id": "srv",
+              "label": "Web server",
+              "x": 8.4,
+              "y": 1.5,
+              "w": 1.6,
+              "h": 1,
+              "kind": "worker"
+            }
+          ],
+          "edges": [
+            {
+              "from": "pc",
+              "to": "sw",
+              "flow": true
+            },
+            {
+              "from": "sw",
+              "to": "rt",
+              "flow": true
+            },
+            {
+              "from": "rt",
+              "to": "isp",
+              "flow": true
+            },
+            {
+              "from": "isp",
+              "to": "srv",
+              "flow": true
+            }
+          ],
+          "steps": [
+            {
+              "text": "Inside your home or office network, the **switch** delivers messages by MAC address.",
+              "highlight": [
+                "pc",
+                "sw"
+              ]
+            },
+            {
+              "text": "For any address outside your network, the message goes to the **router**, which forwards it by IP prefix.",
+              "highlight": [
+                "sw",
+                "rt"
+              ]
+            },
+            {
+              "text": "Your **ISP**'s routers pass it from network to network until it reaches the server's network.",
+              "highlight": [
+                "rt",
+                "isp",
+                "srv"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "MAC addresses deliver inside one local network. IP addresses get you between networks."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-ip",
+      "heading": "IP addresses",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/IP_address",
+      "sourceTitle": "IP address (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Every ship in the harbor, and every bay on it, has its own **phone number** (IP address). No two share one, so a call always reaches the right place. Most numbers in use are still the older short kind (IPv4), though longer numbers are slowly rolling out."
+        },
+        {
+          "type": "p",
+          "text": "An **IP address** is a number that identifies one device on an IP network, so nothing else on that network has the same one. **IP** stands for **Internet Protocol**, the set of rules these addresses belong to."
+        },
+        {
+          "type": "p",
+          "text": "When people say \"IP address\" they usually still mean an **IPv4** address, a **32-bit** number. That will stay true until **IPv6**, the newer version, is deployed more broadly."
+        },
+        {
+          "type": "callout",
+          "kind": "exam",
+          "text": "IPv4 = 32-bit, dotted, still the usual meaning of \"IP address\". IPv6 = newer, many more addresses."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-packets",
+      "heading": "Packets",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Packet",
+      "sourceTitle": "Packet (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "Big shipments never cross the harbor in one piece. They are split into **parcels** (packets), each with a label: who it's from, who it's for, its place in the sequence, and a checksum seal. Each sorting office stamps the hop counter down by one. A parcel whose counter hits zero is thrown away instead of circling forever."
+        },
+        {
+          "type": "p",
+          "text": "Data crosses a network in small chunks called **packets**. Each packet has two parts: the **payload** (the actual data) and **control information** (how to deliver it), usually kept in a header."
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "**Addresses**: the source address of the sender and the destination address of the receiver.",
+            "**Sequencing information**, so the pieces can be put back in order.",
+            "**Error detection**: a checksum is calculated before sending and recalculated on arrival; a mismatch means the data was damaged.",
+            "**Hop limit**: a hop is one step from one network to the next. The limit drops by one per hop, and at 0 the packet is discarded. This stops lost packets from looping forever.",
+            "**Priority**: on a busy network, high-priority queues are emptied faster."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-ports",
+      "heading": "Ports",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Port",
+      "sourceTitle": "Port (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "One phone number reaches a whole ship, so how does a call find the right desk? With an **extension**: desk 80 handles web requests, desk 443 handles secure web requests, desk 25 handles mail. (Yes, networking also calls these \"ports\". In this app the Port of Kube is the harbor; a numbered port is a desk extension.)"
+        },
+        {
+          "type": "p",
+          "text": "An IP address gets data to the right computer. A **port** gets it to the right program on that computer. Ports are numbered, and a server program **waits on** (listens on) its port for requests."
+        },
+        {
+          "type": "p",
+          "text": "Ports **below 1024** are tied by default to well-known protocols:"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Port",
+            "Default protocol"
+          ],
+          "rows": [
+            [
+              "80",
+              "HTTP (web)"
+            ],
+            [
+              "443",
+              "HTTPS (secure web)"
+            ],
+            [
+              "25",
+              "SMTP (sending mail)"
+            ],
+            [
+              "110",
+              "POP (fetching mail)"
+            ],
+            [
+              "143",
+              "IMAP (mail)"
+            ],
+            [
+              "194",
+              "IRC (chat)"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "kind": "key",
+          "text": "An IP address plus a port number names one program on one machine."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-nat",
+      "heading": "NAT: sharing one address",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/NAT",
+      "sourceTitle": "NAT (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "A busy office building has one outside phone number but dozens of desks. Its **switchboard** (NAT) gives each desk its own inside number, and rewrites calls on the way in and out so every reply reaches the desk that made the call."
+        },
+        {
+          "type": "p",
+          "text": "**NAT** (Network Address Translation) lets **many computers share one IP address**. Each computer on the local network gets its own unique local address, and NAT adjusts traffic going in and out so data reaches the right computer."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-firewalls",
+      "heading": "Firewalls",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Firewall",
+      "sourceTitle": "Firewall (MDN glossary)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "At the harbor gate, a **guard** holds a rule list: \"No visitors to desk 22\", \"Nobody leaves for that address\". Every arrival and departure is checked and either waved through or turned away. Some gates have one guard with a clipboard; big ones have a whole gatehouse."
+        },
+        {
+          "type": "p",
+          "text": "A **firewall** filters network traffic: it lets each piece through or blocks it, according to rules. A rule might block **incoming** connections to a certain port, or **outgoing** connections to a certain IP address."
+        },
+        {
+          "type": "p",
+          "text": "A firewall can be a single piece of software, or a dedicated machine that does nothing else."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-k8s",
+      "heading": "Where this shows up in Kubernetes",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/ports-and-protocols/",
+      "sourceTitle": "Ports and Protocols (Kubernetes docs)",
+      "blocks": [
+        {
+          "type": "callout",
+          "kind": "story",
+          "text": "When the harbor sits behind strict city walls, the wall guards (firewalls) need the list of desk extensions the harbor staff use: the front desk, the ledger room, each ship's cargo officer, and the numbered gates on every ship. Leave one closed and that conversation never happens."
+        },
+        {
+          "type": "p",
+          "text": "Kubernetes components talk to each other on fixed ports, all over **TCP** unless noted. If your nodes sit behind firewalls, these must be open (every default can be changed):"
+        },
+        {
+          "type": "table",
+          "header": [
+            "Port",
+            "Who listens"
+          ],
+          "rows": [
+            [
+              "6443",
+              "Kubernetes API server (control plane)"
+            ],
+            [
+              "2379-2380",
+              "etcd (control plane)"
+            ],
+            [
+              "10250",
+              "kubelet API (every node)"
+            ],
+            [
+              "10259 / 10257",
+              "kube-scheduler / kube-controller-manager"
+            ],
+            [
+              "10256",
+              "kube-proxy (worker nodes)"
+            ],
+            [
+              "30000-32767",
+              "NodePort Services, TCP and UDP (worker nodes)"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "A common change: put the API server behind a load balancer that listens on **443** and forwards to 6443."
+        }
+      ]
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "net-addresses-fc-01",
+      "front": "What does a network switch use to deliver messages inside a local network?",
+      "back": "MAC addresses: hardware IDs for each network interface. The switch learns which connection each MAC is on.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/How_does_the_Internet_work"
+    },
+    {
+      "id": "net-addresses-fc-02",
+      "front": "Why are networks joined by routers instead of one huge switch?",
+      "back": "Routers use IP addresses, which share a prefix per network, so one rule covers a whole group of addresses. MAC addresses have no hierarchy.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/How_does_the_Internet_work"
+    },
+    {
+      "id": "net-addresses-fc-03",
+      "front": "What is an ISP?",
+      "back": "An Internet Service Provider: a company running linked routers that carry your network's traffic to other networks.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/How_does_the_Internet_work"
+    },
+    {
+      "id": "net-addresses-fc-04",
+      "front": "What is an IP address?",
+      "back": "A number that uniquely identifies a device on an IP network. IP = Internet Protocol.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/IP_address"
+    },
+    {
+      "id": "net-addresses-fc-05",
+      "front": "How big is an IPv4 address?",
+      "back": "32 bits.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/IP_address"
+    },
+    {
+      "id": "net-addresses-fc-06",
+      "front": "Why is IPv6 replacing IPv4?",
+      "back": "Among other reasons, IPv6 allows for many more IP addresses.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/IPv6"
+    },
+    {
+      "id": "net-addresses-fc-07",
+      "front": "What are the two main parts of a packet?",
+      "back": "The payload (the user data) and control information (addresses, sequencing, error detection), usually in the header.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Packet"
+    },
+    {
+      "id": "net-addresses-fc-08",
+      "front": "What happens when a packet's hop limit reaches 0?",
+      "back": "The packet is discarded. The limit drops by one each time the packet passes to the next network.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Packet"
+    },
+    {
+      "id": "net-addresses-fc-09",
+      "front": "Default ports for HTTP and HTTPS?",
+      "back": "HTTP: 80. HTTPS: 443.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Port"
+    },
+    {
+      "id": "net-addresses-fc-10",
+      "front": "Which port numbers are tied by default to specific protocols?",
+      "back": "Ports below 1024.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Port"
+    },
+    {
+      "id": "net-addresses-fc-11",
+      "front": "What does NAT do?",
+      "back": "Network Address Translation lets many computers share one IP address, rewriting traffic so it reaches the right local computer.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/NAT"
+    },
+    {
+      "id": "net-addresses-fc-12",
+      "front": "What does a firewall do?",
+      "back": "Filters network traffic, letting it pass or blocking it by rules, such as blocking incoming connections to a port.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Firewall"
+    },
+    {
+      "id": "net-addresses-fc-13",
+      "front": "Default port of the Kubernetes API server?",
+      "back": "6443 (TCP).",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/ports-and-protocols/"
+    },
+    {
+      "id": "net-addresses-fc-14",
+      "front": "Default NodePort range?",
+      "back": "30000-32767, TCP and UDP.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/ports-and-protocols/"
+    }
+  ],
+  "questions": [
+    {
+      "id": "net-addresses-q-01",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "Ten computers must all talk to each other. Without a switch, how many cables does a direct cable between every pair need?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/How_does_the_Internet_work",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "45",
+          "correct": true,
+          "explanation": "Each pair needs its own cable, which comes to 45 for ten computers."
+        },
+        {
+          "id": "b",
+          "text": "10",
+          "correct": false,
+          "explanation": "10 cables is what you need once a switch is added: one per computer."
+        },
+        {
+          "id": "c",
+          "text": "9",
+          "correct": false,
+          "explanation": "Each computer needs nine plugs, but the cables total 45."
+        },
+        {
+          "id": "d",
+          "text": "100",
+          "correct": false,
+          "explanation": "That counts each computer with itself and every pair twice."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-02",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "What lets a router store one forwarding rule for thousands of computers?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/How_does_the_Internet_work",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "Computers in one network share an IP address prefix",
+          "correct": true,
+          "explanation": "IP addresses are like street addresses, so one rule such as \"starts with 142.250\" covers a group."
+        },
+        {
+          "id": "b",
+          "text": "Every computer has a unique MAC address",
+          "correct": false,
+          "explanation": "MAC addresses have no hierarchy, which is exactly why they don't scale this way."
+        },
+        {
+          "id": "c",
+          "text": "The router asks every computer where it is",
+          "correct": false,
+          "explanation": "Broadcasting to find unknown recipients is what switches do, and it gets costly as networks grow."
+        },
+        {
+          "id": "d",
+          "text": "DNS tells the router the route",
+          "correct": false,
+          "explanation": "DNS turns names into IP addresses; it doesn't forward packets."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-03",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "A switch uses IP addresses to forward messages within a local network.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/How_does_the_Internet_work",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": false,
+          "explanation": "Switches deliver by MAC address, not IP address."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": true,
+          "explanation": "Correct: switches use MAC addresses; routers use IP addresses."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-04",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "When people just say \"IP address\", which kind do they usually mean?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/IP_address",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "A 32-bit IPv4 address",
+          "correct": true,
+          "explanation": "IPv4 is still the usual meaning until IPv6 is deployed more widely."
+        },
+        {
+          "id": "b",
+          "text": "An IPv6 address",
+          "correct": false,
+          "explanation": "IPv6 is newer and still being rolled out."
+        },
+        {
+          "id": "c",
+          "text": "A MAC address",
+          "correct": false,
+          "explanation": "MAC addresses identify network interfaces for local delivery; they aren't IP addresses."
+        },
+        {
+          "id": "d",
+          "text": "A port number",
+          "correct": false,
+          "explanation": "A port picks a program on a machine, not the machine itself."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-05",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "Why does a packet carry a hop limit?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Packet",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "So packets stuck in a loop are eventually discarded",
+          "correct": true,
+          "explanation": "It drops by one per hop and the packet is dropped at 0, so loops can't build up."
+        },
+        {
+          "id": "b",
+          "text": "To set the packet's priority",
+          "correct": false,
+          "explanation": "Priority is a separate field."
+        },
+        {
+          "id": "c",
+          "text": "To detect damaged data",
+          "correct": false,
+          "explanation": "That is the job of error-detection codes such as checksums."
+        },
+        {
+          "id": "d",
+          "text": "To put packets back in order",
+          "correct": false,
+          "explanation": "That's the sequencing information."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-06",
+      "type": "multi",
+      "difficulty": 2,
+      "stem": "Which are part of a packet's control information? Select 3.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Packet",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "Source and destination addresses",
+          "correct": true,
+          "explanation": "Both are needed to route the packet."
+        },
+        {
+          "id": "b",
+          "text": "Sequencing information",
+          "correct": true,
+          "explanation": "Used to put packets back in order."
+        },
+        {
+          "id": "c",
+          "text": "Error detection codes",
+          "correct": true,
+          "explanation": "For example a checksum compared on arrival."
+        },
+        {
+          "id": "d",
+          "text": "The payload",
+          "correct": false,
+          "explanation": "The payload is the user data, not control information."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-07",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "A web server serves plain HTTP on its default port. Which port is it listening on?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Port",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "80",
+          "correct": true,
+          "explanation": "80 is HTTP's default port."
+        },
+        {
+          "id": "b",
+          "text": "443",
+          "correct": false,
+          "explanation": "443 is the default for HTTPS."
+        },
+        {
+          "id": "c",
+          "text": "25",
+          "correct": false,
+          "explanation": "25 is SMTP, for sending mail."
+        },
+        {
+          "id": "d",
+          "text": "6443",
+          "correct": false,
+          "explanation": "6443 is the Kubernetes API server's default port."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-08",
+      "type": "truefalse",
+      "difficulty": 1,
+      "stem": "Port numbers below 1024 are each associated by default with a specific protocol.",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Port",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "True",
+          "correct": true,
+          "explanation": "Correct: for example 80 for HTTP and 443 for HTTPS."
+        },
+        {
+          "id": "b",
+          "text": "False",
+          "correct": false,
+          "explanation": "They are: ports below 1024 have default protocols."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-09",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "Twenty laptops in an office reach the Internet through one public IP address. What makes this possible?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/NAT",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "NAT",
+          "correct": true,
+          "explanation": "NAT lets many computers share one IP address and steers replies to the right one."
+        },
+        {
+          "id": "b",
+          "text": "A firewall",
+          "correct": false,
+          "explanation": "A firewall filters traffic; it doesn't share addresses."
+        },
+        {
+          "id": "c",
+          "text": "DNS",
+          "correct": false,
+          "explanation": "DNS maps names to addresses."
+        },
+        {
+          "id": "d",
+          "text": "A switch",
+          "correct": false,
+          "explanation": "A switch delivers within the local network by MAC address."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-10",
+      "type": "single",
+      "difficulty": 1,
+      "stem": "You want to block all incoming connections to one port on a server. What filters traffic like that?",
+      "sourceUrl": "https://developer.mozilla.org/en-US/docs/Glossary/Firewall",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "A firewall",
+          "correct": true,
+          "explanation": "Firewalls pass or block traffic by rules such as \"block incoming to this port\"."
+        },
+        {
+          "id": "b",
+          "text": "NAT",
+          "correct": false,
+          "explanation": "NAT shares an address; it isn't a filtering rule set."
+        },
+        {
+          "id": "c",
+          "text": "A router's IP prefix rules",
+          "correct": false,
+          "explanation": "Those decide where to forward, not whether to allow."
+        },
+        {
+          "id": "d",
+          "text": "The port's default protocol",
+          "correct": false,
+          "explanation": "Defaults name a protocol; they don't block anything."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-11",
+      "type": "single",
+      "difficulty": 2,
+      "stem": "Your nodes sit behind a strict firewall. Which port must be open for clients to reach the Kubernetes API server by default?",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/ports-and-protocols/",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "TCP 6443",
+          "correct": true,
+          "explanation": "The API server's default port is 6443."
+        },
+        {
+          "id": "b",
+          "text": "TCP 10250",
+          "correct": false,
+          "explanation": "10250 is the kubelet API."
+        },
+        {
+          "id": "c",
+          "text": "TCP 2379-2380",
+          "correct": false,
+          "explanation": "Those are etcd's ports."
+        },
+        {
+          "id": "d",
+          "text": "TCP 30000-32767",
+          "correct": false,
+          "explanation": "That's the default NodePort range."
+        }
+      ]
+    },
+    {
+      "id": "net-addresses-q-12",
+      "type": "multi",
+      "difficulty": 3,
+      "stem": "Which ports must be open on worker nodes, using Kubernetes defaults? Select 2.",
+      "sourceUrl": "https://kubernetes.io/docs/reference/networking/ports-and-protocols/",
+      "competencyId": "net-addr",
+      "options": [
+        {
+          "id": "a",
+          "text": "10250 for the kubelet API",
+          "correct": true,
+          "explanation": "Every node runs the kubelet API on 10250."
+        },
+        {
+          "id": "b",
+          "text": "30000-32767 for NodePort Services",
+          "correct": true,
+          "explanation": "That's the default NodePort range, TCP and UDP."
+        },
+        {
+          "id": "c",
+          "text": "2379-2380 for etcd",
+          "correct": false,
+          "explanation": "etcd runs on the control plane, or externally."
+        },
+        {
+          "id": "d",
+          "text": "10259 for kube-scheduler",
+          "correct": false,
+          "explanation": "The scheduler is a control plane component."
+        }
+      ]
+    }
+  ]
+}

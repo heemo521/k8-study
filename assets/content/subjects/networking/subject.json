@@ -1,0 +1,94 @@
+{
+  "id": "networking",
+  "title": "Networking",
+  "tagline": "The network basics Kubernetes builds on",
+  "description": "Plain-English networking fundamentals: addresses and ports, TCP and UDP, DNS, HTTP, TLS and proxies, each tied back to where it shows up in Kubernetes.",
+  "contentVersion": 1,
+  "reviewedAt": "2026-10-12",
+  "domains": [
+    {
+      "id": "net-transport",
+      "title": "Addresses & Transport",
+      "weightPercent": null,
+      "isExamDomain": false,
+      "competencies": [
+        {
+          "id": "net-addr",
+          "text": "Explain IP addresses, packets, ports, NAT and firewalls"
+        },
+        {
+          "id": "net-tcp-udp",
+          "text": "Compare TCP and UDP and reason about latency"
+        }
+      ]
+    },
+    {
+      "id": "net-web",
+      "title": "Names & the Web",
+      "weightPercent": null,
+      "isExamDomain": false,
+      "competencies": [
+        {
+          "id": "net-dns",
+          "text": "Explain domain names, DNS lookups and caching"
+        },
+        {
+          "id": "net-http",
+          "text": "Read HTTP requests, responses and status codes"
+        },
+        {
+          "id": "net-proxy",
+          "text": "Explain TLS, proxies and load balancing"
+        }
+      ]
+    }
+  ],
+  "topics": [
+    "net-addresses",
+    "net-tcp-udp",
+    "net-dns",
+    "net-http"
+  ],
+  "sourceAllowlist": [
+    {
+      "prefix": "https://developer.mozilla.org/en-US/docs/"
+    },
+    {
+      "prefix": "https://kubernetes.io/docs/"
+    }
+  ],
+  "attributions": [
+    {
+      "text": "Networking notes are original summaries adapted from MDN Web Docs, by Mozilla Contributors, licensed under CC BY-SA 2.5. Changes: content has been summarized, reorganized, and rewritten. These adapted notes are shared under the same license. Each note links to its source page.",
+      "links": [
+        {
+          "label": "MDN Web Docs",
+          "url": "https://developer.mozilla.org/"
+        },
+        {
+          "label": "CC BY-SA 2.5 license",
+          "url": "https://creativecommons.org/licenses/by-sa/2.5/"
+        }
+      ]
+    },
+    {
+      "text": "The Kubernetes sections are adapted from the Kubernetes Documentation, © The Kubernetes Authors, licensed under CC BY 4.0. Changes: summarized and rewritten.",
+      "links": [
+        {
+          "label": "Kubernetes Documentation",
+          "url": "https://kubernetes.io/docs/"
+        },
+        {
+          "label": "CC BY 4.0 license",
+          "url": "https://creativecommons.org/licenses/by/4.0/"
+        }
+      ]
+    }
+  ],
+  "trademarks": [
+    {
+      "text": "Mozilla and MDN are trademarks of the Mozilla Foundation. Kubernetes® is a registered trademark of The Linux Foundation. This app is not affiliated with or endorsed by either.",
+      "links": []
+    }
+  ]
+}
