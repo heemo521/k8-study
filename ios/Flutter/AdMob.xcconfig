@@ -1,0 +1,5 @@
+// AdMob app ID for Info.plist (GADApplicationIdentifier). Google's public test
+// app ID by default. Put the real one in AdMob.local.xcconfig (git-ignored):
+//   ADMOB_APP_ID = ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY
+ADMOB_APP_ID = ca-app-pub-3940256099942544~1458002511
+#include? "AdMob.local.xcconfig"
