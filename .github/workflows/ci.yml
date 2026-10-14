@@ -40,6 +40,25 @@ jobs:
           python3 tool/validate_content.py ci-sample
           ONBOARDING_SUBJECT=ci-sample flutter test test/widget/onboarding_test.dart
 
+  android:
+    name: Build Android app bundle (test ads)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      # No key.properties in CI, so this is signed with the debug key and uses
+      # Google's test ad IDs. It only proves the Android build compiles.
+      - run: flutter build appbundle --release --dart-define=ADS_ENABLED=true
+
   pwa-check:
     name: PWA check (headless Chromium, 390px)
     needs: build

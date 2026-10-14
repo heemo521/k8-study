@@ -13,17 +13,16 @@ mapped to CKA exam domains.
 | Constraint | Decision |
 |---|---|
 | Stack | Flutter (stable channel), `flutter build web`, PWA |
-| Native builds | Out of scope until the web version earns it |
+| Native builds | Android and iOS from the same code, for the app stores (docs/PUBLISHING.md) |
 | Backend / accounts | None. All progress lives in browser local storage |
-| Ads | Behind `AdsService`; web renders placeholders; flag-gated, off by default |
+| Ads | Behind `AdsService`; web renders placeholders, native uses AdMob; flag-gated, off by default |
 | Content | Hand-written from kubernetes.io/docs (CC BY 4.0), every note links its source |
 
 ### 1.1 Non-goals (v1)
 
-- Native iOS/Android builds, store publishing.
 - Backend, sync, accounts, analytics, leaderboards.
 - A live cluster / terminal simulator (the real CKA is hands-on; see §7.4).
-- Real ad network calls or real ad unit IDs.
+- Real ad unit IDs in the repo, and real ad network calls on the web.
 - Scraping kubernetes.io or copying text from it or from any tutorial app.
 
 ## 2. Verified facts this spec relies on
@@ -504,7 +503,10 @@ abstract interface class AdsService {
   - `PlaceholderAdsService` (web, v1). The banner is a 320×50 bordered box
     labelled "Ad placeholder". The interstitial is a full-screen dialog
     labelled "Ad placeholder" with a Close button enabled after 3 seconds;
-  - `AdMobAdsService` is a native-only stub to be filled in later (not compiled into web).
+  - `AdMobAdsService` (Android/iOS): Google AdMob 320×50 banners and
+    interstitials, after the Google consent (UMP) prompt where required. It is
+    reached only through `ads/impl/platform_ads.dart`, whose conditional export
+    keeps the SDK out of the web build.
 - Selected once in `main.dart` and provided through DI. A static check (a
   test that greps `lib/screens/**`) fails if any screen imports an ad SDK or
   anything under `lib/ads/impl/`.
@@ -517,6 +519,11 @@ abstract interface class AdsService {
   `ca-pub-0000000000000000`. `.env*` is already git-ignored.
 - In v1, the web build never loads `adsbygoogle.js`. A real AdSense integration
   is a later, separately approved change.
+- Native builds read `--dart-define=ADMOB_BANNER_ID=...` and
+  `ADMOB_INTERSTITIAL_ID=...`; without them they use Google's public test
+  units. The AdMob app ID comes from `android/key.properties` (`admobAppId=`)
+  and `ios/Flutter/AdMob.local.xcconfig`, both git-ignored. Only Google's test
+  publisher `ca-app-pub-3940256099942544` may appear in the repo.
 
 ### 9.3 Placement rules
 

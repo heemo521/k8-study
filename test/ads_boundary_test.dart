@@ -1,5 +1,5 @@
 // Spec §9.1/§9.2: screens talk to AdsService only, no ad SDKs anywhere in the
-// web build, and no real ad unit / publisher IDs in the repo.
+// web build, and no real ad unit / publisher / app IDs in the repo.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -12,7 +12,15 @@ const textExtensions = [
   '.yaml',
   '.md',
   '.mjs',
+  '.kts',
+  '.xml',
+  '.plist',
+  '.xcconfig',
+  '.properties',
 ];
+
+/// Google's public AdMob test publisher; anything else would be a real ID.
+const testAdMobPublisher = 'ca-app-pub-3940256099942544';
 
 Iterable<File> dartFiles(String dir) =>
     Directory(dir)
@@ -30,9 +38,24 @@ void main() {
     }
   });
 
-  test('no ad SDK dependency in pubspec', () {
-    final pubspec = File('pubspec.yaml').readAsStringSync();
-    expect(pubspec, isNot(contains('google_mobile_ads')));
+  test('only the native AdMob service imports the SDK', () {
+    for (final f in dartFiles('lib')) {
+      if (!f.readAsStringSync().contains('package:google_mobile_ads')) continue;
+      expect(
+        f.path.replaceAll(r'\\', '/'),
+        'lib/ads/impl/admob_ads_service.dart',
+      );
+    }
+  });
+
+  test('the web ads selector never reaches the AdMob SDK', () {
+    final web = File('lib/ads/impl/platform_ads_web.dart').readAsStringSync();
+    expect(web, isNot(contains('admob')));
+    final selector = File('lib/ads/impl/platform_ads.dart').readAsStringSync();
+    expect(
+      selector,
+      contains("export 'platform_ads_web.dart'\n    if (dart.library.io)"),
+    );
   });
 
   test('web build never loads adsbygoogle.js', () {
@@ -51,7 +74,7 @@ void main() {
   test('only the obviously-fake publisher id appears in source', () {
     final pubId = RegExp(r'ca-pub-\d+');
     final appId = RegExp(r'ca-app-pub-\d+');
-    for (final dir in ['lib', 'web', 'tool']) {
+    for (final dir in ['lib', 'web', 'tool', 'android', 'ios']) {
       if (!Directory(dir).existsSync()) continue;
       for (final f in Directory(
         dir,
@@ -61,7 +84,9 @@ void main() {
         for (final m in pubId.allMatches(text)) {
           expect(m.group(0), 'ca-pub-0000000000000000', reason: f.path);
         }
-        expect(appId.hasMatch(text), isFalse, reason: f.path);
+        for (final m in appId.allMatches(text)) {
+          expect(m.group(0), testAdMobPublisher, reason: f.path);
+        }
       }
     }
   });

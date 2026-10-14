@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   go_router: ^18.0.2
+  google_mobile_ads: ^9.1.0
   material_ui: ^1.6.0
   provider: ^6.1.5+1
   shared_preferences: ^2.5.6
